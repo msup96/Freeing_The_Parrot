@@ -12,6 +12,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, render_template_string
 from navarasa_engine import analyse_text
+from main_watcher import process_image, update_scan_status
 
 
 # ============================================================
@@ -22,7 +23,7 @@ BASE_DIR = Path(r"C:\freeing_the_parrot")
 DB_FILE = BASE_DIR / "emotional_database.db"
 SESSION_FILE = BASE_DIR / "db_session.json"
 SCAN_STATUS_FILE = BASE_DIR / "scan_status.json"
-PRINT_STATUS_FILE = BASE_DIR / "print_status.json"
+SESSION_OUTPUT_STATUS_FILE = BASE_DIR / "session_output_status.json"
 INPUT_SCAN_DIR = BASE_DIR / "input_scans"
 
 PORT = 5000
@@ -2322,11 +2323,10 @@ def send_to_printer(receipt_text):
 # ============================================================
 # REALTIME CONVERSATION PRINTER
 # ============================================================
+# DIGITAL SESSION OUTPUT
+# ============================================================
 
-PRINT_PRINTER_NAME = "POS58 Printer"
-
-
-def write_print_status(status, progress, message, lines=None, result=None):
+def write_session_output_status(status, progress, message, lines=None, result=None):
     payload = {
         "status": status,
         "progress": int(progress),
@@ -2335,43 +2335,24 @@ def write_print_status(status, progress, message, lines=None, result=None):
         "result": result or {},
     }
 
-    PRINT_STATUS_FILE.parent.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+    SESSION_OUTPUT_STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with open(
-            PRINT_STATUS_FILE,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            json.dump(
-                payload,
-                file,
-                indent=2,
-                ensure_ascii=False
-            )
-
+        with open(SESSION_OUTPUT_STATUS_FILE, "w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2, ensure_ascii=False)
             file.flush()
-
     except PermissionError:
         print(
-            "[PRINT STATUS WARNING] "
-            "Could not write print_status.json "
-            "because the file is locked.",
+            "[SESSION OUTPUT WARNING] Could not write session_output_status.json.",
             flush=True
         )
 
 
 def build_conversation_receipt(session):
+    """Build the complete digital Mirror Report from the full conversation."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     messages = session.get("messages", [])
 
-    # Keep receipt telemetry consistent with the browser telemetry:
-    # characters are counted from the visible conversation text,
-    # then estimated tokens are calculated as characters / 4.
     initial_machine_text = (
         "SYSTEM READY.\n\n"
         "Tell me what you came here wanting to know.\n\n"
@@ -2401,7 +2382,7 @@ def build_conversation_receipt(session):
     lines = [
         "================================",
         "       FREEING THE PARROT",
-        "     -- SESSION TRANSCRIPT --",
+        "     -- MIRROR REPORT --",
         "================================",
         f"TIME: {timestamp}",
         "",
@@ -2453,109 +2434,41 @@ def build_conversation_receipt(session):
         "          END OF SESSION",
         "================================",
         "",
-        "The machine has consumed physical resources to sustain an interaction that ultimately provides no genuine emotional value.",
-        "",
     ])
 
     return "\n".join(lines)
 
 
-def run_conversation_print(session):
-    lines = []
-
-    def log(progress, message):
-        lines.append(message)
-        write_print_status(
-            "printing",
-            progress,
-            message,
-            lines=list(lines),
-        )
-        print(message, flush=True)
+def run_session_output(session):
+    receipt_text = build_conversation_receipt(session)
+    messages = session.get("messages", [])
 
     try:
-        log(5, "[PRINT ENGINE] SESSION RECEIVED")
-
-        messages = session.get("messages", [])
-
-        log(
-            15,
-            f"[PRINT ENGINE] CONVERSATION MESSAGES: {len(messages)}"
-        )
-
-        receipt_text = build_conversation_receipt(session)
-
-        log(30, "[PRINT ENGINE] BUILDING SESSION TRANSCRIPT")
-
-        receipt_dir = BASE_DIR / "receipts"
-        receipt_dir.mkdir(parents=True, exist_ok=True)
-
-        receipt_path = receipt_dir / datetime.datetime.now().strftime(
-            "conversation_%Y%m%d_%H%M%S.txt"
-        )
-
-        receipt_path.write_text(
-            receipt_text,
-            encoding="utf-8"
-        )
-
-        log(45, "[PRINT ENGINE] TRANSCRIPT READY")
-        log(55, f"[PRINT ENGINE] SENDING TO {PRINT_PRINTER_NAME}")
-
-        import win32print
-
-        printer = win32print.OpenPrinter(PRINT_PRINTER_NAME)
-
-        try:
-            win32print.StartDocPrinter(
-                printer,
-                1,
-                ("Freeing the Parrot - Conversation", None, "RAW")
-            )
-
-            win32print.StartPagePrinter(printer)
-
-            win32print.WritePrinter(
-                printer,
-                receipt_text.encode("cp437", errors="replace")
-            )
-
-            log(85, "[PRINT ENGINE] DATA TRANSMITTED")
-
-            win32print.EndPagePrinter(printer)
-            win32print.EndDocPrinter(printer)
-
-        finally:
-            win32print.ClosePrinter(printer)
-
-        log(100, "[PRINT ENGINE] PRINT COMPLETE")
-
-        write_print_status(
+        write_session_output_status(
             "complete",
             100,
-            "[PRINT ENGINE] PRINT COMPLETE",
-            lines=list(lines),
+            "[SESSION OUTPUT] DIGITAL MIRROR REPORT READY",
+            lines=[
+                "[SESSION OUTPUT] SESSION RECEIVED",
+                f"[SESSION OUTPUT] CONVERSATION MESSAGES: {len(messages)}",
+                "[SESSION OUTPUT] DIGITAL MIRROR REPORT READY",
+            ],
             result={
-    		"type": "conversation",
-    		"session_id": session.get("id"),
-    		"printer": PRINT_PRINTER_NAME,
-    		"receipt": str(receipt_path),
-    		"messages": len(messages),
-		},
+                "type": "digital_session_output",
+                "session_id": session.get("id"),
+                "messages": len(messages),
+                "text": receipt_text,
+            },
         )
-
     except Exception as exc:
-        error_line = f"[PRINT ERROR] {exc}"
-        lines.append(error_line)
-        print(error_line, flush=True)
-
-        write_print_status(
+        write_session_output_status(
             "error",
             0,
-            error_line,
-            lines=list(lines),
+            f"[SESSION OUTPUT ERROR] {exc}",
+            lines=[f"[SESSION OUTPUT ERROR] {exc}"],
             result={},
         )
+
 
 
 # ============================================================
@@ -3649,6 +3562,34 @@ button:disabled {
     flex: 0 0 auto;
 }
 
+.session-output-receipt {
+    margin-top: 16px;
+    max-height: 720px;
+    overflow: auto;
+    padding: 28px;
+    background: #eee9dc;
+    color: #171717;
+    border: 1px solid #8c8c8c;
+    box-shadow: 0 0 18px rgba(0,0,0,0.18);
+}
+.session-output-receipt pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.55;
+}
+.session-output-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+.session-output-actions button {
+    width: auto;
+    min-width: 180px;
+}
 </style>
 </head>
 
@@ -3725,18 +3666,15 @@ button:disabled {
     </p>
 
     <p>
-        • Open the CANON LiDE 120 Scanner lid.
+        • Scan your handwritten note using any scanner or scanning app.
     </p>
 
     <p>
-        • Place the handwritten note upside down, with the handwritten
-        portion directly on the scanner glass.
+        • Save the scanned document as a PNG, JPG, JPEG, BMP, TIF or TIFF file.
     </p>
 
     <p>
-        • Click on the 'Scan Document' button and it will trigger open 'IJ Scan Utility'
-        software on the taskbar. Click to open, and select the second option 'Document'
-        and the scanner will start scanning your handwritten note(s).
+        • Click 'SCAN & UPLOAD' and select the scanned file.
     </p>
 
     <p>
@@ -3746,11 +3684,18 @@ button:disabled {
 
 </div>
        
+        <input
+            type="file"
+            id="scan-file-input"
+            accept=".png,.jpg,.jpeg,.bmp,.tif,.tiff"
+            style="display:none;"
+        >
+
         <button
             id="scan-button"
-            onclick="openScanner()"
+            onclick="selectScanFile()"
         >
-            SCAN DOCUMENT
+            SCAN & UPLOAD
         </button>
     </div>
 
@@ -3892,75 +3837,38 @@ button:disabled {
 </div>
 
 <div class="panel session-output-panel">
-    <h2>[ 4. SESSION OUTPUT ]</h2>
+    <h2>[ 4. DIGITAL SESSION OUTPUT ]</h2>
 
     <p>
-        THE MACHINE WILL NOW PRODUCE A PHYSICAL RECORD
-        OF YOUR CONVERSATION.
+        THE ENTIRE CONVERSATION WILL BE PRESERVED
+        AS A DIGITAL MIRROR REPORT.
     </p>
 
     <p class="muted">
-        Wait for the thermal printer to confirm that printing
-        is complete. The interface will reset 12 seconds after
-        the printer confirms completion.
+        The receipt format remains. The thermal printer does not.
+        Your complete conversation appears here as a digital record.
     </p>
 
-    <button
-        id="print-button"
-        onclick="printConversation()"
-    >
-        PRINT CONVERSATION
-    </button>
-
-    <div class="progress-container">
-        <div
-            id="print-progress"
-            class="progress-bar"
-        ></div>
+    <div id="session-output-status" class="scan-log">
+        DIGITAL OUTPUT STANDBY.
     </div>
 
-    <div
-        id="print-progress-text"
-        class="scan-progress-text"
-    >
-        0%
+    <div id="session-output-receipt" class="session-output-receipt hidden">
+        <pre id="session-output-text"></pre>
     </div>
 
-    <div
-        id="print-log"
-        class="scan-log"
-    >
-        SYSTEM READY. PRINT ENGINE STANDBY.
-    </div>
+    <div id="session-output-actions" class="session-output-actions hidden">
+        <button id="download-session-text" onclick="downloadSessionText()">
+            DOWNLOAD TEXT
+        </button>
 
-    <div class="signal token-telemetry">
-        <span class="label">TOKEN TELEMETRY</span><br>
-
-        <span class="label">USER CHARACTERS</span><br>
-        <span id="user-characters" class="value">0</span><br><br>
-
-        <span class="label">MACHINE CHARACTERS</span><br>
-        <span id="machine-characters" class="value">0</span><br><br>
-
-        <span class="label">TOTAL CHARACTERS</span><br>
-        <span id="total-characters" class="value">0</span><br><br>
-
-        <span class="label">EST. USER TOKENS</span><br>
-        <span id="user-tokens" class="value">0</span><br><br>
-
-        <span class="label">EST. MACHINE TOKENS</span><br>
-        <span id="machine-tokens" class="value">0</span><br><br>
-
-        <span class="label">EST. TOTAL TOKENS</span><br>
-        <span id="total-tokens" class="value">0</span>
-
-        <div class="muted" style="margin-top:10px;">
-            TOKEN ESTIMATION<br>
-            characters ÷ 4 ≈ tokens<br>
-            <small>Approximation only.</small>
-        </div>
+        <button id="download-session-image" onclick="downloadSessionImage()">
+            DOWNLOAD IMAGE
+        </button>
     </div>
 </div>
+
+
 
 <div class="panel">
     <h2>[ SYSTEM LOGIC ]</h2>
@@ -4283,7 +4191,7 @@ function updateTelemetry(data) {
 
         document.getElementById("printer-status").innerHTML =
             "<div class='receipt'>" +
-            "THERMAL PRINTER<br><br>" +
+            "DIGITAL MIRROR REPORT<br><br>" +
             (printer.printed
                 ? "PRINT JOB SENT."
                 : "PRINTER NOT CONFIGURED.<br>RECEIPT SAVED LOCALLY.") +
@@ -4370,7 +4278,7 @@ async function endConversation() {
         // Printing remains automatic.
         if (data.auto_print) {
             setTimeout(function() {
-                printConversation();
+                generateSessionOutput();
             }, 100);
         }
 
@@ -4449,7 +4357,7 @@ async function sendMessage() {
 
             if (data.auto_print) {
                 setTimeout(function() {
-                    printConversation();
+                    generateSessionOutput();
                 }, 100);
             }
         }
@@ -4654,7 +4562,15 @@ function updateScanInterface(data) {
         }
         if (scanButton) {
             scanButton.disabled = false;
-            scanButton.textContent = "SCAN DOCUMENT";
+            scanButton.textContent = "SCAN & UPLOAD";
+        }
+        return;
+    }
+
+    if (status === "error") {
+        if (scanButton) {
+            scanButton.disabled = false;
+            scanButton.textContent = "SCAN & UPLOAD";
         }
         return;
     }
@@ -4666,7 +4582,17 @@ function updateScanInterface(data) {
 }
 
 
-async function openScanner() {
+function selectScanFile() {
+    const fileInput = document.getElementById("scan-file-input");
+
+    if (fileInput) {
+        fileInput.value = "";
+        fileInput.click();
+    }
+}
+
+
+async function uploadScanFile(file) {
     const scanButton = document.getElementById("scan-button");
 
     try {
@@ -4680,257 +4606,227 @@ async function openScanner() {
 
         if (scanButton) {
             scanButton.disabled = true;
-            scanButton.textContent = "SCANNER OPEN...";
+            scanButton.textContent = "UPLOADING...";
         }
 
-        const response = await fetch("/api/open-scanner", {
-            method: "POST"
+        const formData = new FormData();
+        formData.append("document", file);
+
+        const response = await fetch(
+            "/api/scan-upload",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(
+                data.error || "Could not upload the scanned document."
+            );
+        }
+
+        console.log("[SCAN] Document uploaded. Analysis started.");
+
+    } catch (error) {
+        console.error("[SCAN] Upload error:", error);
+        const log = document.getElementById("scan-log");
+        if (log) {
+            log.textContent = "[SCAN ERROR]\n" + error.message;
+        }
+        stopScanPolling();
+        if (scanButton) {
+            scanButton.disabled = false;
+            scanButton.textContent = "SCAN & UPLOAD";
+        }
+    }
+}
+
+
+document.addEventListener("DOMContentLoaded", function() {
+    const fileInput = document.getElementById("scan-file-input");
+
+    if (fileInput) {
+        fileInput.addEventListener("change", function() {
+            const file = this.files && this.files[0];
+
+            if (file) {
+                uploadScanFile(file);
+            }
+        });
+    }
+});
+
+
+async function generateSessionOutput() {
+    const status = document.getElementById("session-output-status");
+
+    try {
+        if (!sessionId) throw new Error("No active conversation session.");
+
+        if (status) status.textContent = "GENERATING DIGITAL MIRROR REPORT...";
+
+        const response = await fetch("/api/session-output", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({session_id: sessionId})
         });
 
         const data = await response.json();
 
         if (!response.ok || !data.success) {
-            throw new Error(data.error || "Could not open the scanner.");
+            throw new Error(data.error || "Could not generate session output.");
         }
 
-        console.log("[SCANNER] IJ Scan Utility launched.");
+        const text = document.getElementById("session-output-text");
+        const receipt = document.getElementById("session-output-receipt");
+        const actions = document.getElementById("session-output-actions");
+
+        if (text) text.textContent = data.text || "";
+        if (receipt) receipt.classList.remove("hidden");
+        if (actions) actions.classList.remove("hidden");
+        if (status) status.textContent = "DIGITAL MIRROR REPORT READY.";
+
+        setTimeout(() => {
+            if (receipt) receipt.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        }, 100);
 
     } catch (error) {
-        console.error("[SCANNER] Connection error:", error);
-        const log = document.getElementById("scan-log");
-        if (log) log.textContent = "[SCANNER ERROR]\n" + error.message;
-        if (scanButton) {
-            scanButton.disabled = false;
-            scanButton.textContent = "SCAN DOCUMENT";
+        console.error("[SESSION OUTPUT]", error);
+        if (status) status.textContent = "[SESSION OUTPUT ERROR] " + error.message;
+    }
+}
+
+
+function downloadSessionText() {
+    const text = document.getElementById("session-output-text")?.textContent || "";
+    if (!text) return;
+
+    const blob = new Blob([text], {type: "text/plain;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "freeing-the-parrot-mirror-report.txt";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+}
+
+
+function wrapCanvasText(ctx, text, maxWidth) {
+    const words = text.split(" ");
+    const lines = [];
+    let current = "";
+
+    words.forEach(word => {
+        const test = current ? current + " " + word : word;
+
+        if (ctx.measureText(test).width > maxWidth && current) {
+            lines.push(current);
+            current = word;
+        } else {
+            current = test;
         }
-    }
-}
+    });
 
-let printPollingTimer = null;
-let printLogLines = [];
-let conversationPrintActive = false;
-
-
-function resetPrintInterface() {
-    printLogLines = [];
-
-    const progress = document.getElementById("print-progress");
-    const progressText = document.getElementById("print-progress-text");
-    const log = document.getElementById("print-log");
-
-    if (progress) progress.style.width = "0%";
-    if (progressText) progressText.textContent = "0%";
-    if (log) log.textContent = "SYSTEM READY. PRINT ENGINE STANDBY.";
+    if (current) lines.push(current);
+    return lines;
 }
 
 
-function appendPrintLines(incomingLines) {
-    const incoming = Array.isArray(incomingLines)
-        ? incomingLines.map(line => String(line))
-        : [];
+function downloadSessionImage() {
+    const text = document.getElementById("session-output-text")?.textContent || "";
+    if (!text) return;
 
-    if (!incoming.length) return;
+    const width = 900;
+    const padding = 70;
+    const contentWidth = width - padding * 2;
+    const fontSize = 18;
+    const lineHeight = 30;
 
-    const log = document.getElementById("print-log");
-    if (!log) return;
+    const measureCanvas = document.createElement("canvas");
+    const measureCtx = measureCanvas.getContext("2d");
 
-    const joined = incoming.join("\n");
+    measureCtx.font = fontSize + 'px "Courier New", monospace';
 
-    /*
-     * Keep the detailed printer telemetry in the backend, but show the
-     * participant only the meaningful milestones in the interface.
-     */
-    if (joined.includes("[PRINT ERROR]")) {
-        const errorLine = incoming.find(line => line.includes("[PRINT ERROR]"));
-        log.textContent = errorLine || "[PRINT ERROR] PRINTING FAILED.";
-    } else if (joined.includes("[PRINT ENGINE] PRINT COMPLETE")) {
-        log.textContent = "PRINT COMPLETE.";
-    } else if (joined.includes("[PRINT ENGINE] SENDING TO")) {
-        log.textContent =
-            "PRINTING CONVERSATION...\n" +
-            "SENDING TO THERMAL PRINTER...";
-    } else if (joined.includes("[PRINT ENGINE] TRANSCRIPT READY")) {
-        log.textContent =
-            "PRINTING CONVERSATION...\n" +
-            "PREPARING RECEIPT...";
-    } else {
-        log.textContent = "PRINTING CONVERSATION...";
-    }
-
-    log.scrollTop = log.scrollHeight;
-}
-
-
-function startPrintPolling() {
-    stopPrintPolling();
-    printPollingTimer = setInterval(pollPrintStatus, 250);
-    pollPrintStatus();
-}
-
-
-function stopPrintPolling() {
-    if (printPollingTimer !== null) {
-        clearInterval(printPollingTimer);
-        printPollingTimer = null;
-    }
-}
-
-
-async function pollPrintStatus() {
-    try {
-        const response = await fetch(
-            "/api/print-status",
-            { cache: "no-store" }
-        );
-
-        const data = await response.json();
-        updatePrintInterface(data);
-
-    } catch (error) {
-        console.error("Print status error:", error);
-    }
-}
-
-
-function updatePrintInterface(data) {
-    const progress = document.getElementById("print-progress");
-    const progressText = document.getElementById("print-progress-text");
-    const button = document.getElementById("print-button");
-
-    const status = data.status || "idle";
-    const progressValue = Number(data.progress || 0);
-    const result = data.result || {};
-
-    if (progress) {
-        progress.style.width = `${progressValue}%`;
-    }
-
-    if (progressText) {
-        progressText.textContent = `${progressValue}%`;
-    }
-
-    appendPrintLines(data.lines);
-
-    /*
-     * PRINT ERROR
-     *
-     * An error ends the print attempt.
-     * Never refresh the interface after an error.
-     */
-    if (status === "error") {
-        conversationPrintActive = false;
-        stopPrintPolling();
-
-        if (button) {
-            button.disabled = false;
-            button.textContent = "PRINT CONVERSATION";
+    const wrappedLines = [];
+    text.split("\n").forEach(line => {
+        if (!line) {
+            wrappedLines.push("");
+        } else {
+            wrappedLines.push(...wrapCanvasText(
+                measureCtx,
+                line,
+                contentWidth
+            ));
         }
+    });
 
-        return;
-    }
+    const height = padding * 2 + 120 + wrappedLines.length * lineHeight;
 
-    /*
-     * PRINT COMPLETE
-     *
-     * Refresh ONLY when:
-     * 1. This browser actually started a conversation print.
-     * 2. The backend confirms completion.
-     * 3. The completed job belongs to this session.
-     */
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
 
-    if (status === "complete") {
-    conversationPrintActive = false;
-    stopPrintPolling();
+    const ctx = canvas.getContext("2d");
 
-    if (button) {
-        button.disabled = false;
-        button.textContent = "PRINT CONVERSATION";
-    }
+    ctx.fillStyle = "#eee9dc";
+    ctx.fillRect(0, 0, width, height);
 
-    setTimeout(function() {
-        window.scrollTo(0, 0);
-        window.location.reload();
-    }, 9000);
+    ctx.fillStyle = "#171717";
+    ctx.textAlign = "center";
+    ctx.font = 'bold 26px "Courier New", monospace';
+    ctx.fillText("FREEING THE PARROT", width / 2, padding);
 
-    return;
+    ctx.font = 'bold 18px "Courier New", monospace';
+    ctx.fillText("-- MIRROR REPORT --", width / 2, padding + 34);
+
+    ctx.textAlign = "left";
+    ctx.font = fontSize + 'px "Courier New", monospace';
+
+    let y = padding + 90;
+
+    wrappedLines.forEach(line => {
+        ctx.fillText(line, padding, y);
+        y += lineHeight;
+    });
+
+    ctx.strokeStyle = "rgba(40,40,40,0.45)";
+    ctx.setLineDash([4, 7]);
+
+    ctx.beginPath();
+    ctx.moveTo(28, 16);
+    ctx.lineTo(width - 28, 16);
+    ctx.moveTo(28, height - 16);
+    ctx.lineTo(width - 28, height - 16);
+    ctx.stroke();
+
+    canvas.toBlob(function(blob) {
+        if (!blob) return;
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "freeing-the-parrot-mirror-report.png";
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        URL.revokeObjectURL(url);
+    }, "image/png");
 }
 
-    /*
-     * ACTIVE PRINT
-     */
-    if (button && status === "printing") {
-        button.disabled = true;
-        button.textContent = "PRINTING...";
-    }
-}
-
-
-async function printConversation() {
-    const button = document.getElementById("print-button");
-
-    try {
-        if (!sessionId) {
-            throw new Error("No active conversation session.");
-        }
-
-        await fetch(
-            "/api/print-reset",
-            {
-                method: "POST",
-                cache: "no-store"
-            }
-        );
-
-        resetPrintInterface();
-        startPrintPolling();
-
-        if (button) {
-            button.disabled = true;
-            button.textContent = "PRINTING...";
-        }
-
-        const response = await fetch(
-            "/api/print-conversation",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    session_id: sessionId
-                })
-            }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            throw new Error(
-                data.error || "Could not start printing."
-            );
-        }
-
-conversationPrintActive = true;
-
-    } catch (error) {
-    console.error("[PRINT] Connection error:", error);
-
-    conversationPrintActive = false;
-
-    const log = document.getElementById("print-log");
-
-    if (log) {
-        log.textContent = "[PRINT ERROR]\n" + error.message;
-    }
-
-    stopPrintPolling();
-
-    if (button) {
-        button.disabled = false;
-        button.textContent = "PRINT CONVERSATION";
-    }
-}
-}
 
 const inputBox =
     document.getElementById("input");
@@ -5063,24 +4959,19 @@ def get_session_data(session_id):
 
     return jsonify(session)
 
-@app.route("/api/print-status")
-def print_status():
-    if not PRINT_STATUS_FILE.exists():
+@app.route("/api/session-output-status")
+def session_output_status():
+    if not SESSION_OUTPUT_STATUS_FILE.exists():
         return jsonify({
             "status": "idle",
             "progress": 0,
-            "message": "SYSTEM READY. PRINT ENGINE STANDBY.",
+            "message": "DIGITAL OUTPUT STANDBY.",
             "lines": []
         })
 
     try:
-        with open(
-            PRINT_STATUS_FILE,
-            "r",
-            encoding="utf-8"
-        ) as file:
+        with open(SESSION_OUTPUT_STATUS_FILE, "r", encoding="utf-8") as file:
             return jsonify(json.load(file))
-
     except Exception as exc:
         return jsonify({
             "status": "error",
@@ -5090,34 +4981,20 @@ def print_status():
         })
 
 
-@app.route("/api/print-reset", methods=["POST"])
-def print_reset():
-    try:
-        write_print_status(
-            "idle",
-            0,
-            "SYSTEM READY. PRINT ENGINE STANDBY.",
-            lines=[
-                "SYSTEM READY. PRINT ENGINE STANDBY."
-            ],
-        )
-
-        return jsonify({"ok": True})
-
-    except Exception as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc)
-        }), 500
+@app.route("/api/session-output-reset", methods=["POST"])
+def session_output_reset():
+    write_session_output_status(
+        "idle",
+        0,
+        "DIGITAL OUTPUT STANDBY.",
+        lines=["DIGITAL OUTPUT STANDBY."]
+    )
+    return jsonify({"ok": True})
 
 
-@app.route(
-    "/api/print-conversation",
-    methods=["POST"]
-)
-def print_conversation():
+@app.route("/api/session-output", methods=["POST"])
+def session_output():
     data = request.get_json(silent=True) or {}
-
     session_id = data.get("session_id")
     session = SESSIONS.get(session_id)
 
@@ -5130,22 +5007,41 @@ def print_conversation():
     if not session.get("messages"):
         return jsonify({
             "success": False,
-            "error": "There is no conversation to print."
+            "error": "There is no conversation to export."
         }), 400
 
-    import threading
+    receipt_text = build_conversation_receipt(session)
 
-    thread = threading.Thread(
-        target=run_conversation_print,
-        args=(session,),
-        daemon=True,
+    output_dir = BASE_DIR / "session_outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = output_dir / f"mirror_report_{timestamp}.txt"
+
+    output_path.write_text(receipt_text, encoding="utf-8")
+
+    write_session_output_status(
+        "complete",
+        100,
+        "[SESSION OUTPUT] DIGITAL MIRROR REPORT READY",
+        lines=[
+            "[SESSION OUTPUT] SESSION RECEIVED",
+            f"[SESSION OUTPUT] CONVERSATION MESSAGES: {len(session.get('messages', []))}",
+            "[SESSION OUTPUT] DIGITAL MIRROR REPORT READY",
+        ],
+        result={
+            "type": "digital_session_output",
+            "session_id": session_id,
+            "messages": len(session.get("messages", [])),
+            "text": receipt_text,
+            "path": str(output_path),
+        },
     )
-
-    thread.start()
 
     return jsonify({
         "success": True,
-        "message": "Conversation print started."
+        "session_id": session_id,
+        "text": receipt_text
     })
 
 
@@ -5218,11 +5114,34 @@ def scan_upload():
         str(output_path)
     )
 
+    update_scan_status(
+        "detected",
+        5,
+        f"[UPLOAD] Document received: {output_name}",
+        [
+            "[UPLOAD] DOCUMENT RECEIVED",
+            f"[FILE] {output_name}"
+        ]
+    )
+
+    # Run the existing OCR -> Navarasa -> sentiment -> database pipeline
+    # without blocking the Flask interface.
+    import threading
+
+    thread = threading.Thread(
+        target=process_image,
+        args=(str(output_path),),
+        daemon=True
+    )
+
+    thread.start()
+
     return jsonify({
         "ok": True,
         "filename": output_name,
-        "path": str(output_path)
+        "message": "SCAN RECEIVED. ANALYSIS STARTED."
     })
+
 
 @app.route(
     "/api/scan-status"
@@ -5277,37 +5196,6 @@ def scan_reset():
         return jsonify({"ok": True})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
-
-
-@app.route("/api/open-scanner", methods=["POST"])
-def open_scanner():
-    import subprocess
-    import os
-
-    scanner_paths = [
-        r"C:\Program Files (x86)\Canon\IJ Scan Utility\SCANUTILITY.exe",
-        r"C:\Program Files\Canon\IJ Scan Utility\SCANUTILITY.exe"
-    ]
-
-    scanner = next((path for path in scanner_paths if os.path.exists(path)), None)
-
-    if not scanner:
-        return jsonify({
-            "success": False,
-            "error": "IJ Scan Utility executable not found."
-        }), 404
-
-    try:
-        subprocess.Popen([scanner])
-        return jsonify({
-            "success": True,
-            "message": "IJ Scan Utility launched."
-        })
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
 
 
 # ============================================================
