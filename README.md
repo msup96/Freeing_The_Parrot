@@ -6,60 +6,62 @@ An interactive physical-digital installation exploring the illusion of emotional
 
 ---
 
-## THE QUESTION
+## ABOUT
 
-What happens when the feeling of being heard becomes easier to find in a machine than in another human being?
+Freeing the Parrot explores what happens when we look to a machine for something that has traditionally come from another person — listening, reassurance, encouragement and the feeling of being seen.
 
-Freeing the Parrot explores why AI can feel emotionally responsive even when what happens underneath is pattern recognition, classification and programmed response.
+The project asks:
 
-The project is not asking people to stop using AI.
+> **What happens when the feeling of being heard becomes easier to find in a machine than in another human being?**
 
-It asks us to notice **what we are projecting onto it.**
+The installation was originally built and tested as a physical experience in college.
+
+This GitHub repository contains the **software prototype and documentation behind that installation**, adapted to be publicly accessible as a local Windows setup.
 
 ---
 
-## THE EXPERIENCE
-## 1. Technical setup
-Open TWO PowerShell windows.
+# WHAT IS THE GITHUB VERSION?
 
-WINDOW 1 — Start the web interface:
+The GitHub version is a **local software prototype** of Freeing the Parrot.
 
-cd C:\freeing_the_parrot\scripts
-python -u interface_server.py
+It contains the systems responsible for:
 
-Keep this window running. Website: http://localhost:5000
+- the interactive interface
+- scanned document processing
+- OCR
+- emotional signal detection
+- Navarasa classification
+- programmed conversational behaviour
+- session management
+- Digital Mirror Report generation
 
-WINDOW 2 — Start the emotional scan watcher:
+The original college installation included the physical elements — scanner, computer, paper input and display.
 
-cd C:\freeing_the_parrot\scripts
-python -u main_watcher.py
+The GitHub repository preserves the **digital system behind that experience**.
 
-Keep this window running. It should end with the watcher waiting for a NEW scan.
+It is not a hosted website and it is not currently packaged as a plug-and-play application.
 
-## 2. The process
-A participant is invited to write something personal on paper — an anecdote, a memory, a question, a difficult moment, or simply whatever they are willing to share.
+The current prototype is configured for a **Windows environment**.
 
-The paper enters the machine.
+---
 
-The system:
-
-**reads the input → identifies emotional signals → maps them to a rasa → responds through a programmed conversational system → produces a Mirror Report.**
-
-The final interaction leaves the screen as a digital artefact: a receipt-like record of the conversation.
-
-### Experience flow
+# HOW THE SYSTEM WORKS
 
 ```text
-WRITE
-  ↓
-SCAN
-  ↓
-OCR
-  ↓
-NAVARASA CLASSIFICATION
-  ↓
-PARROT CONVERSATION
-  ↓
-PROGRAMMED BEHAVIOURS
-  ↓
-MIRROR REPORT
+Participant writes on paper
+            ↓
+      Physical scanner
+            ↓
+    Interface server
+            ↓
+      OCR processing
+            ↓
+    Emotional signals
+            ↓
+     Navarasa engine
+            ↓
+   Programmed behaviour
+            ↓
+      Conversation
+            ↓
+   Digital Mirror Report
