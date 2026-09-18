@@ -23,13 +23,17 @@ It asks us to notice **what we are projecting onto it.**
 Open TWO PowerShell windows.
 
 WINDOW 1 — Start the web interface:
+
 cd C:\freeing_the_parrot\scripts
 python -u interface_server.py
+
 Keep this window running. Website: http://localhost:5000
 
 WINDOW 2 — Start the emotional scan watcher:
+
 cd C:\freeing_the_parrot\scripts
 python -u main_watcher.py
+
 Keep this window running. It should end with the watcher waiting for a NEW scan.
 
 ## 2. The process
