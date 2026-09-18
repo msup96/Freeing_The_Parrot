@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Freeing The Parrot - Socratic Terminal</title>
+    <link href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #0b1a10; 
+            color: #fff; 
+            font-family: 'Press Start 2P', monospace; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+        }
+        .arcade-container { 
+            width: 860px; 
+            height: 650px;
+            background-color: #14281d; 
+            padding: 20px; 
+            border: 6px solid #43b02a; 
+            box-shadow: 0 0 20px #207519;
+            display: flex;
+            flex-direction: column;
+        }
+        .header-title {
+            color: #ff3b30;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px #ffcc00;
+        }
+        .scan-status { 
+            color: #ffcc00; 
+            font-size: 8px; 
+            margin-bottom: 10px; 
+            text-align: center;
+        }
+        .chat-container {
+    	flex: 1 1 auto;
+   	min-height: 0;
+    	background-color: #08140c;
+    	border: 3px solid #1e3a29;
+    	padding: 15px;
+    	overflow-y: auto;
+    	overflow-x: hidden;
+    	margin-bottom: 15px;
+    	display: flex;
+    	flex-direction: column;
+    	gap: 15px;
+	}
+
+        .message-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .message-row.user-row {
+            flex-direction: row-reverse;
+        }
+        .avatar {
+            font-size: 24px;
+            background: #1e3a29;
+            padding: 8px;
+            border-radius: 8px;
+            border: 2px solid #ffcc00;
+        }
+        .nes-balloon {
+            max-width: 75%;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+        .nes-balloon.is-dark {
+            background-color: #0f2618 !important;
+            border-color: #00d2ff !important;
+            color: #e0f7fa !important;
+        }
+        .user-row .nes-balloon {
+            background-color: #20482e !important;
+            border-color: #ffcc00 !important;
+            color: #ffffff !important;
+        }
+        .options-box {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .options-box button {
+            font-size: 8px;
+        }
+        .input-bar {
+            display: flex;
+            gap: 10px;
+        }
+        .input-bar input {
+            flex: 1;
+            font-size: 9px;
+            background-color: #09140d;
+            color: #00ff88;
+            border: 2px solid #43b02a;
+        }
+
+	.input-bar input {
+    	overflow: hidden;
+    	white-space: nowrap;
+	}
+
+    </style>
+</head>
+<body>
+
+<div class="arcade-container nes-container is-rounded">
+    <div class="header-title">🦜 FREEING THE PARROT 🦜</div>
+    <div class="scan-status" id="status-line">[EMOTIONAL DATABASE: ACTIVE | WAITING FOR USER ACTION]</div>
+    
+    <div class="chat-container" id="chat-log">
+        <div class="message-row">
+            <div class="avatar">🦜</div>
+            <div class="nes-balloon from-left is-dark">
+                <p>Select an option to begin:</p>
+                <div class="options-box" id="initial-options">
+                    <button class="nes-btn is-warning" onclick="selectOption(1)">1. Start scanning</button>
+                    <button class="nes-btn is-primary" onclick="selectOption(2)">2. Proceed as you are</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-bar">
+        <input type="text" id="user-input" class="nes-input" placeholder="Type your anxious query here..." disabled>
+        <button class="nes-btn is-success" id="send-btn" onclick="sendQuery()" disabled>SEND</button>
+    </div>
+</div>
+
+<script>
+let activeRasa = "Shanta";
+let scanningActive = false;
+
+async function syncDatabase() {
+    try {
+        const response = await fetch('/db_session.json?t=' + new Date().getTime());
+        const data = await response.json();
+        activeRasa = data.primary_rasa || "Shanta";
+
+        if (scanningActive) {
+            document.getElementById('status-line').innerText = `[SCANNER ACTIVE | DETECTED RASA: ${activeRasa}]`;
+        }
+    } catch (e) {
+        console.error("Database connection waiting...", e);
+    }
+}
+setInterval(syncDatabase, 1500);
+
+function appendMessage(sender, text) {
+    const chatLog = document.getElementById('chat-log');
+    const row = document.createElement('div');
+    row.className = `message-row ${sender === 'user' ? 'user-row' : ''}`;
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.innerText = sender === 'user' ? '👤' : '🦜';
+
+    const balloon = document.createElement('div');
+    balloon.className = `nes-balloon ${sender === 'user' ? 'from-right' : 'from-left is-dark'}`;
+    
+    const p = document.createElement('p');
+    p.innerText = text;
+    
+    balloon.appendChild(p);
+    row.appendChild(avatar);
+    row.appendChild(balloon);
+    chatLog.appendChild(row);
+    chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function selectOption(opt) {
+    const optionsBox = document.getElementById('initial-options');
+    if (optionsBox) optionsBox.remove();
+
+    if (opt === 1) {
+        scanningActive = true;
+        appendMessage('user', '1. Start scanning');
+        appendMessage('parrot', 'Scanner watching glass... Feed your handwritten document now. Once done, type your query below.');
+    } else {
+        scanningActive = false;
+        appendMessage('user', '2. Proceed as you are');
+        appendMessage('parrot', `Loaded emotional state [${activeRasa}]. Type your query below to examine the consequences.`);
+    }
+
+    document.getElementById('user-input').disabled = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('user-input').focus();
+}
+
+async function sendQuery() {
+    const input = document.getElementById('user-input');
+    const query = input.value.trim();
+    if (!query) return;
+
+    appendMessage('user', query);
+    input.value = '';
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: query })
+        });
+        
+        const data = await response.json();
+        
+        setTimeout(() => {
+            appendMessage('parrot', `[Rasa Context: ${data.rasa}] ${data.reply}`);
+        }, 300);
+
+    } catch (e) {
+        console.error("Error communicating with backend server:", e);
+        appendMessage('parrot', "[ERROR] Backend server unreachable.");
+    }
+}
+
+document.getElementById('user-input').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') sendQuery();
+});
+</script>
+
+</body>
+</html>
