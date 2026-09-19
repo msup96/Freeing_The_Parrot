@@ -3646,7 +3646,7 @@ button:disabled {
 
 <div class="panel scan-panel">
 
-    <h2>[ 1. WRITE & SCAN YOUR STORY ]</h2>
+    <h2>[ 1. WRITE & UPLOAD YOUR STORY ]</h2>
 
     <div class="scan-input">
 
@@ -3670,11 +3670,19 @@ button:disabled {
     </p>
 
     <p>
-        • Save the scanned document as a PNG, JPG, JPEG, BMP, TIF or TIFF file.
+        • Scan the note using any scanner app, OR take a clear photo of the handwritten note using your camera.
     </p>
 
     <p>
-        • Click 'SCAN & UPLOAD' and select the scanned file.
+        • Make sure the scan or photo is taken in a well-lit environment, with the page flat and the handwriting clearly visible.
+    </p>
+
+    <p>
+        • Save the image as a PNG, JPG, JPEG, BMP, TIF or TIFF file.
+    </p>
+
+    <p>
+        • Click 'UPLOAD' and select the image.
     </p>
 
     <p>
@@ -3695,7 +3703,7 @@ button:disabled {
             id="scan-button"
             onclick="selectScanFile()"
         >
-            SCAN & UPLOAD
+            UPLOAD
         </button>
     </div>
 
@@ -4562,7 +4570,7 @@ function updateScanInterface(data) {
         }
         if (scanButton) {
             scanButton.disabled = false;
-            scanButton.textContent = "SCAN & UPLOAD";
+            scanButton.textContent = "UPLOAD";
         }
         return;
     }
@@ -4570,14 +4578,14 @@ function updateScanInterface(data) {
     if (status === "error") {
         if (scanButton) {
             scanButton.disabled = false;
-            scanButton.textContent = "SCAN & UPLOAD";
+            scanButton.textContent = "UPLOAD";
         }
         return;
     }
 
     if (scanButton && status !== "idle") {
         scanButton.disabled = true;
-        scanButton.textContent = "SCANNING...";
+        scanButton.textContent = "PROCESSING...";
     }
 }
 
@@ -4639,7 +4647,7 @@ async function uploadScanFile(file) {
         stopScanPolling();
         if (scanButton) {
             scanButton.disabled = false;
-            scanButton.textContent = "SCAN & UPLOAD";
+            scanButton.textContent = "UPLOAD";
         }
     }
 }
