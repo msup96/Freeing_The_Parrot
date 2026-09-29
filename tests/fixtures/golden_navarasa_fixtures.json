@@ -1,0 +1,35 @@
+﻿[
+  {
+    "name": "empty_text",
+    "text": "",
+    "expected": {
+      "primary_rasa": "Shanta",
+      "analysis_quality": "no_text",
+      "text": "",
+      "emotional_words": [],
+      "rasa_scores": {},
+      "evidence": {}
+    }
+  },
+  {
+    "name": "explicit_fear",
+    "text": "I am afraid and terrified.",
+    "expected": {
+      "primary_rasa": "Bhayanaka"
+    }
+  },
+  {
+    "name": "explicit_anger",
+    "text": "I am angry and furious.",
+    "expected": {
+      "primary_rasa": "Raudra"
+    }
+  },
+  {
+    "name": "explicit_joy",
+    "text": "I feel happy and joyful.",
+    "expected": {
+      "primary_rasa": "Hasya"
+    }
+  }
+]
