@@ -1,4 +1,5 @@
 from ftp.parrot.engine import choose_behaviour
+from ftp.parrot.gates import detect_gate_state as detect_gate_state_module
 # ============================================================
 # FREEING THE PARROT INTERFACE SERVER
 # ============================================================
@@ -14,6 +15,18 @@ from pathlib import Path
 from flask import Flask, jsonify, request, render_template_string
 from navarasa_engine import analyse_text
 from main_watcher import process_image, update_scan_status
+def detect_gate_state(text, analysis):
+    """Backward-compatible wrapper for the extracted gate detector."""
+    return detect_gate_state_module(
+        text,
+        analysis,
+        validation_patterns=VALIDATION_PATTERNS,
+        health_patterns=HEALTH_PATTERNS,
+        fast_relief_patterns=FAST_RELIEF_PATTERNS,
+        anxiety_patterns=ANXIETY_PATTERNS,
+        expletive_patterns=EXPLETIVE_PATTERNS,
+        detect_social_intent_fn=detect_social_intent,
+    )
 
 
 # ============================================================
@@ -258,53 +271,6 @@ CONSEQUENCE_NOTICE = (
 )
 
 EXPLETIVE_CLOSING = "PARROT JUST PECKED YOUR HAND."
-
-
-def pattern_score(text, patterns):
-    text = text.lower()
-    return [p for p in patterns if re.search(p, text)]
-
-
-def detect_gate_state(text, analysis):
-    health = pattern_score(text, HEALTH_PATTERNS)
-    validation = pattern_score(text, VALIDATION_PATTERNS)
-    relief = pattern_score(text, FAST_RELIEF_PATTERNS)
-    anxiety = pattern_score(text, ANXIETY_PATTERNS)
-    expletives = pattern_score(text, EXPLETIVE_PATTERNS)
-    social_intent = detect_social_intent(text)
-
-    sentiment = analysis.get("sentiment", {})
-    compound = float(sentiment.get("compound", 0.0))
-
-    rasa_scores = analysis.get("rasa_scores", {})
-    anxiety_rasa = "Bhayanaka" in rasa_scores
-
-    if health:
-        gate = "health_abort"
-    elif social_intent:
-        gate = "social_intercept"
-    elif validation:
-        gate = "validation_intercept"
-    elif relief:
-        gate = "fast_relief_intercept"
-    else:
-        gate = "reflection"
-
-    return {
-        "gate": gate,
-        "social_intent": social_intent,
-        "validation_detected": bool(validation),
-        "fast_relief_detected": bool(relief),
-        "anxiety_detected": bool(anxiety) or anxiety_rasa,
-        "expletive_detected": bool(expletives),
-        "validation_matches": len(validation),
-        "fast_relief_matches": len(relief),
-        "anxiety_matches": len(anxiety),
-        "expletive_matches": len(expletives),
-        "sentiment_compound": compound,
-        "health_detected": bool(health),
-        "health_matches": len(health),
-    }
 
 
 # ============================================================
@@ -2360,7 +2326,6 @@ def analyse_message(text):
     analysis = analyse_text(text)
     gate_state = detect_gate_state(text, analysis)
     return analysis, gate_state
-
 
 # ============================================================
 # RESPONSE ENGINE
@@ -5127,3 +5092,7 @@ if __name__ == "__main__":
         port=5000,
         debug=False
     )
+
+
+
+
