@@ -219,6 +219,32 @@ class SessionCoordinator:
             ),
         )
 
+    def record_observed_parrot_turn(
+        self,
+        *,
+        turn_index: int,
+        turn_text: str,
+        reply: str,
+        behaviour: str = "",
+        gate: str = "",
+    ) -> InteractionEvent:
+        """Record a Parrot turn at a fixed index without incrementing turn_count."""
+        if self._machine.is_locked():
+            raise SessionLockedError(
+                "Cannot record Parrot turns after the session is locked."
+            )
+        return self.record(
+            event_type=EventType.PARROT_TURN_GENERATED,
+            provenance_level=ProvenanceLevel.OBSERVED,
+            payload={
+                "turn_index": turn_index,
+                "user_text": turn_text,
+                "parrot_reply": reply,
+                "behaviour": behaviour,
+                "gate": gate,
+            },
+        )
+
     def record_parrot_turn(
         self,
         turn_text: str,

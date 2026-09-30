@@ -17,6 +17,7 @@ from flask import Flask, jsonify, request, render_template, render_template_stri
 from ftp.input.raw import build_raw_ingest_payload, save_session_media, sha256_bytes
 from ftp.session.coordinator import SessionCoordinator, SessionLockedError
 from ftp.session.states import SessionState
+from ftp.timeline.wiring import record_chat_timeline_events
 from navarasa_engine import analyse_text
 from main_watcher import process_image, update_scan_status
 def detect_gate_state(text, analysis):
@@ -4868,9 +4869,18 @@ def chat():
 
     session = get_session(session_id)
 
-    return jsonify(
-        process_chat_message(session, message)
-    )
+    result = process_chat_message(session, message)
+
+    try:
+        record_chat_timeline_events(
+            get_ftp2_coordinator(session["id"]),
+            message,
+            result,
+        )
+    except Exception:
+        pass
+
+    return jsonify(result)
 
 @app.route("/api/end-conversation", methods=["POST"])
 def end_conversation_route():
