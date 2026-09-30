@@ -13,6 +13,10 @@ import random
 from pathlib import Path
 
 from flask import Flask, jsonify, request, render_template, render_template_string
+
+from ftp.input.raw import build_raw_ingest_payload, save_session_media, sha256_bytes
+from ftp.session.coordinator import SessionCoordinator, SessionLockedError
+from ftp.session.states import SessionState
 from navarasa_engine import analyse_text
 from main_watcher import process_image, update_scan_status
 def detect_gate_state(text, analysis):
@@ -39,12 +43,15 @@ SESSION_FILE = BASE_DIR / "db_session.json"
 SCAN_STATUS_FILE = BASE_DIR / "scan_status.json"
 SESSION_OUTPUT_STATUS_FILE = BASE_DIR / "session_output_status.json"
 INPUT_SCAN_DIR = BASE_DIR / "input_scans"
+INGEST_MEDIA_DIR = BASE_DIR / "session_ingest"
+MAX_INGEST_BYTES = 15 * 1024 * 1024
 
 PORT = 5000
 PRINTER_NAME = None
 
 app = Flask(__name__)
 SESSIONS = {}
+FTP2_COORDINATORS: dict[str, SessionCoordinator] = {}
 
 
 # ============================================================
@@ -1991,6 +1998,21 @@ def get_session(session_id):
     if session_id and session_id in SESSIONS:
         return SESSIONS[session_id]
     return create_session()
+
+
+def begin_ftp2_participant_session() -> str:
+    """Create legacy chat session and FTP 2.0 coordinator (ENTER flow)."""
+    session = create_session()
+    session_id = session["id"]
+    coordinator = SessionCoordinator(session_id=session_id)
+    coordinator.start()
+    coordinator.advance(SessionState.LIVE_CONVERSATION)
+    FTP2_COORDINATORS[session_id] = coordinator
+    return session_id
+
+
+def get_ftp2_coordinator(session_id: str) -> SessionCoordinator | None:
+    return FTP2_COORDINATORS.get(session_id)
 
 
 # ============================================================
@@ -4724,6 +4746,117 @@ def home():
 def home_legacy():
     """Previous participant interface (scan, telemetry panels, arcade UI)."""
     return render_template_string(HTML_LEGACY)
+
+
+@app.route("/api/session/start", methods=["POST"])
+def session_start():
+    """Establish participant session + FTP 2.0 coordinator (before chat/ingest)."""
+    session_id = begin_ftp2_participant_session()
+    return jsonify({
+        "ok": True,
+        "session_id": session_id,
+    })
+
+
+@app.route("/api/input/ingest", methods=["POST"])
+def input_ingest():
+    session_id = request.form.get("session_id", "").strip()
+    modality = request.form.get("modality", "").strip().upper()
+
+    if not session_id:
+        return jsonify({"error": "session_id is required."}), 400
+
+    coordinator = get_ftp2_coordinator(session_id)
+    if coordinator is None:
+        return jsonify({
+            "error": "Session not found. Enter the experience first.",
+        }), 404
+
+    if session_id not in SESSIONS:
+        return jsonify({"error": "Session not found."}), 404
+
+    if SESSIONS[session_id].get("intervention_closed"):
+        return jsonify({"error": "This conversation has ended."}), 403
+
+    allowed = {"AUDIO", "IMAGE", "CAMERA"}
+    if modality not in allowed:
+        return jsonify({
+            "error": "modality must be AUDIO, IMAGE, or CAMERA.",
+        }), 400
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return jsonify({"error": "file is required."}), 400
+
+    data = upload.read()
+    if len(data) == 0:
+        return jsonify({"error": "Empty file."}), 400
+    if len(data) > MAX_INGEST_BYTES:
+        return jsonify({"error": "File too large."}), 413
+
+    extension = Path(upload.filename).suffix.lower() or ".bin"
+    if modality == "AUDIO" and extension not in {
+        ".webm", ".ogg", ".wav", ".mp3", ".m4a", ".bin",
+    }:
+        extension = ".webm"
+    if modality in ("IMAGE", "CAMERA") and extension not in {
+        ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".bin",
+    }:
+        extension = ".jpg"
+
+    duration_ms = None
+    metadata_raw = request.form.get("metadata")
+    if metadata_raw:
+        try:
+            meta = json.loads(metadata_raw)
+            if "duration_ms" in meta:
+                duration_ms = int(meta["duration_ms"])
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
+    digest = sha256_bytes(data)
+    saved_path, storage_ref = save_session_media(
+        INGEST_MEDIA_DIR,
+        session_id,
+        extension,
+        data,
+    )
+
+    if modality == "AUDIO":
+        source_channel = "WEB_MICROPHONE"
+        media_modality = "AUDIO"
+    elif modality == "CAMERA":
+        source_channel = "WEB_CAMERA"
+        media_modality = "IMAGE"
+    else:
+        source_channel = "WEB_FILE_UPLOAD"
+        media_modality = "IMAGE"
+
+    media_format = extension.lstrip(".").upper()
+    payload = build_raw_ingest_payload(
+        media_modality,
+        source_channel,
+        byte_size=len(data),
+        content_sha256=digest,
+        storage_ref=storage_ref,
+        media_format=media_format,
+        duration_ms=duration_ms,
+    )
+
+    try:
+        event = coordinator.record_raw_input(payload)
+    except SessionLockedError as exc:
+        return jsonify({"error": str(exc)}), 403
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({
+        "ok": True,
+        "session_id": session_id,
+        "ingest_id": payload["ingest_id"],
+        "event_id": event.event_id,
+        "message": "Received.",
+    })
 
 
 @app.route("/api/chat", methods=["POST"])

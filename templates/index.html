@@ -31,6 +31,13 @@
             </main>
 
             <footer class="ftp2-composer">
+                <div class="ftp2-modality" role="group" aria-label="Ways to respond">
+                    <button type="button" class="ftp2-modality__btn ftp2-modality__btn--active" data-modality="text">Write</button>
+                    <button type="button" class="ftp2-modality__btn" data-modality="voice" id="btn-voice">Voice</button>
+                    <button type="button" class="ftp2-modality__btn" data-modality="image" id="btn-image">Image</button>
+                    <button type="button" class="ftp2-modality__btn" data-modality="camera" id="btn-camera">Camera</button>
+                </div>
+                <input type="file" id="image-file-input" class="ftp2-hidden" accept="image/*" />
                 <label class="ftp2-composer__label" for="message-input">Your message</label>
                 <div class="ftp2-composer__row">
                     <textarea
@@ -45,6 +52,17 @@
                 </div>
             </footer>
         </section>
+
+        <div id="camera-overlay" class="ftp2-camera-overlay" hidden>
+            <div class="ftp2-camera-panel">
+                <p class="ftp2-camera-title">Camera</p>
+                <video id="camera-preview" class="ftp2-camera-preview" autoplay playsinline muted></video>
+                <div class="ftp2-camera-actions">
+                    <button type="button" id="btn-camera-capture" class="ftp2-btn">Capture</button>
+                    <button type="button" id="btn-camera-cancel" class="ftp2-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='ftp2.js') }}"></script>

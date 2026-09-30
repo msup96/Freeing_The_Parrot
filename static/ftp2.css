@@ -199,6 +199,91 @@ body {
     font-size: 0.9rem;
 }
 
+.ftp2-message--notice .ftp2-message__body {
+    font-size: 0.9rem;
+    color: var(--ftp2-text-muted);
+    font-style: italic;
+}
+
+/* —— Composer —— */
+
+.ftp2-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ftp2-modality {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.ftp2-modality__btn {
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--ftp2-border);
+    background: transparent;
+    color: var(--ftp2-text-muted);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: border-color var(--ftp2-transition), color var(--ftp2-transition);
+}
+
+.ftp2-modality__btn--active,
+.ftp2-modality__btn:hover:not(:disabled) {
+    border-color: var(--ftp2-accent-soft);
+    color: var(--ftp2-text);
+}
+
+.ftp2-modality__btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.ftp2-camera-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 7, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.ftp2-camera-panel {
+    width: min(32rem, 92vw);
+    padding: 1.5rem;
+    border: 1px solid var(--ftp2-border);
+    background: var(--ftp2-bg-elevated);
+}
+
+.ftp2-camera-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ftp2-text-muted);
+    margin: 0 0 1rem;
+}
+
+.ftp2-camera-preview {
+    width: 100%;
+    max-height: 50vh;
+    background: #000;
+    display: block;
+}
+
+.ftp2-camera-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    justify-content: flex-end;
+}
+
 /* —— Composer —— */
 
 .ftp2-composer {

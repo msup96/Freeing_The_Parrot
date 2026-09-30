@@ -179,6 +179,22 @@ class SessionCoordinator:
         )
         return self._store.append(event)
 
+    def record_raw_input(self, payload: dict) -> InteractionEvent:
+        """Record multimodal RAW ingest (observation only; Parrot must not see it)."""
+        if self._machine.is_locked():
+            raise SessionLockedError(
+                "Cannot record raw input after the session is locked."
+            )
+        if self._machine.state != SessionState.LIVE_CONVERSATION:
+            raise ValueError(
+                "Raw input may only be recorded during LIVE_CONVERSATION."
+            )
+        return self.record(
+            event_type=EventType.INPUT_RAW_INGESTED,
+            provenance_level=ProvenanceLevel.RAW,
+            payload=payload,
+        )
+
     def record_turn_telemetry(
         self,
         *,
