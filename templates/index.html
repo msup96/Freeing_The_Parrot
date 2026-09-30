@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freeing the Parrot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='ftp2.css') }}">
+</head>
+<body>
+    <div id="app" class="ftp2-app">
+        <section id="screen-entry" class="ftp2-screen ftp2-screen--active" aria-label="Entry">
+            <div class="ftp2-entry">
+                <h1 class="ftp2-title">FREEING THE PARROT</h1>
+                <p class="ftp2-tagline">THE MACHINE IS NOT YOUR ORACLE.<br>IT IS YOUR MIRROR.</p>
+                <p class="ftp2-invite">Enter the conversation.</p>
+                <button type="button" id="btn-enter" class="ftp2-btn ftp2-btn--primary">ENTER</button>
+            </div>
+        </section>
+
+        <section id="screen-conversation" class="ftp2-screen" aria-label="Conversation" hidden>
+            <header class="ftp2-header">
+                <div class="ftp2-wordmark">FREEING THE PARROT</div>
+                <div class="ftp2-parrot-mark" aria-hidden="true">
+                    <span class="ftp2-parrot-mark__bar"></span>
+                    <span class="ftp2-parrot-mark__node"></span>
+                </div>
+            </header>
+
+            <main class="ftp2-main">
+                <div id="conversation" class="ftp2-conversation" role="log" aria-live="polite"></div>
+            </main>
+
+            <footer class="ftp2-composer">
+                <label class="ftp2-composer__label" for="message-input">Your message</label>
+                <div class="ftp2-composer__row">
+                    <textarea
+                        id="message-input"
+                        class="ftp2-input"
+                        rows="2"
+                        placeholder="Write here…"
+                        autocomplete="off"
+                        spellcheck="true"
+                    ></textarea>
+                    <button type="button" id="btn-send" class="ftp2-btn ftp2-btn--send">SEND</button>
+                </div>
+            </footer>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='ftp2.js') }}"></script>
+</body>
+</html>

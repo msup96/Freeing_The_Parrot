@@ -1,0 +1,330 @@
+/* FTP 2.0 — participant shell (first UI checkpoint) */
+
+:root {
+    --ftp2-bg: #0a0e0c;
+    --ftp2-bg-elevated: #111816;
+    --ftp2-border: rgba(180, 200, 190, 0.12);
+    --ftp2-text: #e8ebe9;
+    --ftp2-text-muted: rgba(232, 235, 233, 0.55);
+    --ftp2-accent: #8b2e35;
+    --ftp2-accent-soft: rgba(139, 46, 53, 0.35);
+    --ftp2-user: #d4d8d6;
+    --ftp2-parrot: #c5cbc8;
+    --ftp2-font-display: "Georgia", "Times New Roman", serif;
+    --ftp2-font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --ftp2-max-width: 42rem;
+    --ftp2-transition: 280ms ease;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--ftp2-bg);
+    color: var(--ftp2-text);
+    font-family: var(--ftp2-font-ui);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+.ftp2-app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.ftp2-screen {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity var(--ftp2-transition);
+}
+
+.ftp2-screen--active {
+    display: flex;
+    opacity: 1;
+}
+
+/* —— Entry —— */
+
+.ftp2-entry {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1.5rem;
+    text-align: center;
+    max-width: 36rem;
+    margin: 0 auto;
+}
+
+.ftp2-title {
+    font-family: var(--ftp2-font-display);
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    margin: 0 0 2rem;
+    color: var(--ftp2-text);
+}
+
+.ftp2-tagline {
+    font-family: var(--ftp2-font-display);
+    font-size: clamp(0.95rem, 2vw, 1.1rem);
+    letter-spacing: 0.06em;
+    line-height: 1.65;
+    color: var(--ftp2-text-muted);
+    margin: 0 0 2.5rem;
+}
+
+.ftp2-invite {
+    font-size: 0.875rem;
+    letter-spacing: 0.04em;
+    color: var(--ftp2-text-muted);
+    margin: 0 0 2rem;
+}
+
+/* —— Conversation layout —— */
+
+.ftp2-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--ftp2-border);
+    max-width: 56rem;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.ftp2-wordmark {
+    font-family: var(--ftp2-font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--ftp2-text-muted);
+}
+
+.ftp2-parrot-mark {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ftp2-parrot-mark__bar {
+    display: block;
+    width: 1.5rem;
+    height: 1px;
+    background: var(--ftp2-border);
+}
+
+.ftp2-parrot-mark__node {
+    display: block;
+    width: 5px;
+    height: 5px;
+    border: 1px solid var(--ftp2-accent);
+    transform: rotate(45deg);
+}
+
+.ftp2-main {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.ftp2-conversation {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    scroll-behavior: smooth;
+}
+
+.ftp2-message {
+    max-width: var(--ftp2-max-width);
+    animation: ftp2-fade-in var(--ftp2-transition) ease;
+}
+
+@keyframes ftp2-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ftp2-message__label {
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ftp2-text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.ftp2-message--user .ftp2-message__body {
+    color: var(--ftp2-user);
+    font-size: 1rem;
+    white-space: pre-wrap;
+}
+
+.ftp2-message--parrot .ftp2-message__body {
+    font-family: var(--ftp2-font-display);
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: var(--ftp2-parrot);
+    white-space: pre-wrap;
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--ftp2-accent-soft);
+}
+
+.ftp2-message--error .ftp2-message__body {
+    color: var(--ftp2-accent);
+    font-size: 0.9rem;
+}
+
+/* —— Composer —— */
+
+.ftp2-composer {
+    border-top: 1px solid var(--ftp2-border);
+    padding: 1.25rem 2rem 2rem;
+    max-width: 56rem;
+    width: 100%;
+    margin: 0 auto;
+    background: var(--ftp2-bg);
+}
+
+.ftp2-composer__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.ftp2-composer__row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.ftp2-input {
+    flex: 1;
+    resize: vertical;
+    min-height: 3rem;
+    max-height: 12rem;
+    padding: 0.75rem 1rem;
+    font-family: var(--ftp2-font-ui);
+    font-size: 1rem;
+    color: var(--ftp2-text);
+    background: var(--ftp2-bg-elevated);
+    border: 1px solid var(--ftp2-border);
+    border-radius: 2px;
+    outline: none;
+    transition: border-color var(--ftp2-transition);
+}
+
+.ftp2-input:focus {
+    border-color: var(--ftp2-accent-soft);
+}
+
+.ftp2-input:disabled {
+    opacity: 0.45;
+}
+
+/* —— Buttons —— */
+
+.ftp2-btn {
+    font-family: var(--ftp2-font-ui);
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid var(--ftp2-border);
+    background: transparent;
+    color: var(--ftp2-text);
+    padding: 0.85rem 1.75rem;
+    border-radius: 2px;
+    transition:
+        background var(--ftp2-transition),
+        border-color var(--ftp2-transition),
+        color var(--ftp2-transition);
+}
+
+.ftp2-btn:hover:not(:disabled) {
+    border-color: var(--ftp2-accent-soft);
+    color: var(--ftp2-text);
+}
+
+.ftp2-btn:focus-visible {
+    outline: 1px solid var(--ftp2-accent);
+    outline-offset: 2px;
+}
+
+.ftp2-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.ftp2-btn--primary {
+    border-color: var(--ftp2-accent-soft);
+}
+
+.ftp2-btn--primary:hover:not(:disabled) {
+    background: rgba(139, 46, 53, 0.12);
+    border-color: var(--ftp2-accent);
+}
+
+.ftp2-btn--send {
+    flex-shrink: 0;
+    align-self: flex-end;
+    min-width: 5.5rem;
+}
+
+/* —— Responsive (installation displays) —— */
+
+@media (min-width: 1280px) {
+    .ftp2-conversation {
+        padding-top: 2.5rem;
+    }
+
+    .ftp2-header,
+    .ftp2-composer {
+        padding-left: 3rem;
+        padding-right: 3rem;
+    }
+
+    .ftp2-main {
+        padding-left: 3rem;
+        padding-right: 3rem;
+    }
+}
+
+@media (min-width: 1440px) {
+    .ftp2-title {
+        letter-spacing: 0.14em;
+    }
+
+    .ftp2-conversation {
+        gap: 2rem;
+    }
+}

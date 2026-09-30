@@ -12,7 +12,7 @@ import datetime
 import random
 from pathlib import Path
 
-from flask import Flask, jsonify, request, render_template_string
+from flask import Flask, jsonify, request, render_template, render_template_string
 from navarasa_engine import analyse_text
 from main_watcher import process_image, update_scan_status
 def detect_gate_state(text, analysis):
@@ -3005,7 +3005,8 @@ def end_conversation(session):
 # HTML
 # ============================================================
 
-HTML = r"""
+# Legacy arcade/terminal participant UI (fallback: GET /legacy).
+HTML_LEGACY = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4716,7 +4717,13 @@ inputBox.focus();
 
 @app.route("/")
 def home():
-    return render_template_string(HTML)
+    return render_template("index.html")
+
+
+@app.route("/legacy")
+def home_legacy():
+    """Previous participant interface (scan, telemetry panels, arcade UI)."""
+    return render_template_string(HTML_LEGACY)
 
 
 @app.route("/api/chat", methods=["POST"])
