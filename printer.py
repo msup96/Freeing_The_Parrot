@@ -7,12 +7,14 @@ import datetime
 import textwrap
 from pathlib import Path
 
+from runtime_config import get_data_dir
+
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
 
-BASE_DIR = Path(r"C:\freeing_the_parrot")
+BASE_DIR = get_data_dir()
 
 RECEIPT_DIR = BASE_DIR / "receipts"
 

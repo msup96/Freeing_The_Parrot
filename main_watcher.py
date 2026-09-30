@@ -15,13 +15,14 @@ import cv2
 import pytesseract
 
 from navarasa_engine import analyse_text
+from runtime_config import get_data_dir, resolve_tesseract_cmd
 
 
 # ============================================================
 # PATHS
 # ============================================================
 
-BASE_DIR = r"C:\freeing_the_parrot"
+BASE_DIR = str(get_data_dir())
 
 WATCH_DIR = os.path.join(BASE_DIR, "input_scans")
 DB_FILE = os.path.join(BASE_DIR, "emotional_database.db")
@@ -93,14 +94,12 @@ def update_scan_status(
 # TESSERACT
 # ============================================================
 
-TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
-if os.path.exists(TESSERACT_PATH):
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+_tess_cmd = resolve_tesseract_cmd()
+if _tess_cmd:
+    pytesseract.pytesseract.tesseract_cmd = _tess_cmd
 else:
-    print("[WARNING] Tesseract executable not found at:")
-    print(TESSERACT_PATH)
-    print("[WARNING] Using Tesseract from PATH instead.")
+    print("[WARNING] Tesseract executable not configured.")
+    print("[WARNING] Set TESSERACT_CMD or install tesseract on PATH.")
 
 
 # ============================================================

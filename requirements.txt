@@ -1,0 +1,7 @@
+# Runtime dependencies (interface_server import graph)
+Flask==3.1.3
+gunicorn==23.0.0
+numpy==2.5.2
+opencv-python-headless==5.0.0.93
+pytesseract==0.3.13
+vaderSentiment==3.3.2

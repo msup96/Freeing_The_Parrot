@@ -1,0 +1,25 @@
+.git
+.gitignore
+.pytest_cache
+__pycache__
+*.py[cod]
+*.pyo
+.venv
+venv
+env
+.env
+.cursor
+terminals
+*.md
+!changelog.md
+docs
+tests
+scripts/cutout_apparatus.py
+index.html
+*.patch.py
+parrot_behaviour_patch_v3.py
+patch_print_realtime.py
+audit_parrot_behaviour.py
+trigger_scan.py
+inspect_*.py
+Final success state.txt

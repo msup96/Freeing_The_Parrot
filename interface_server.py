@@ -14,6 +14,8 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, render_template, render_template_string
 
+from runtime_config import get_data_dir, get_port
+
 from ftp.input.raw import build_raw_ingest_payload, save_session_media, sha256_bytes
 from ftp.session.coordinator import SessionCoordinator, SessionLockedError
 from ftp.session.states import SessionState
@@ -39,7 +41,7 @@ def detect_gate_state(text, analysis):
 # CONFIG
 # ============================================================
 
-BASE_DIR = Path(r"C:\freeing_the_parrot")
+BASE_DIR = get_data_dir()
 DB_FILE = BASE_DIR / "emotional_database.db"
 SESSION_FILE = BASE_DIR / "db_session.json"
 SCAN_STATUS_FILE = BASE_DIR / "scan_status.json"
@@ -48,12 +50,17 @@ INPUT_SCAN_DIR = BASE_DIR / "input_scans"
 INGEST_MEDIA_DIR = BASE_DIR / "session_ingest"
 MAX_INGEST_BYTES = 15 * 1024 * 1024
 
-PORT = 5000
+PORT = get_port()
 PRINTER_NAME = None
 
 app = Flask(__name__)
 SESSIONS = {}
 FTP2_COORDINATORS: dict[str, SessionCoordinator] = {}
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 
 # ============================================================
@@ -5253,7 +5260,7 @@ if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-        port=5000,
+        port=PORT,
         debug=False
     )
 
