@@ -17,6 +17,7 @@ from flask import Flask, jsonify, request, render_template, render_template_stri
 from ftp.input.raw import build_raw_ingest_payload, save_session_media, sha256_bytes
 from ftp.session.coordinator import SessionCoordinator, SessionLockedError
 from ftp.session.states import SessionState
+from ftp.timeline.silent_reader_pass import run_silent_reader_pass
 from ftp.timeline.wiring import record_chat_timeline_events
 from navarasa_engine import analyse_text
 from main_watcher import process_image, update_scan_status
@@ -4851,6 +4852,11 @@ def input_ingest():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    try:
+        run_silent_reader_pass(coordinator)
+    except Exception:
+        pass
+
     return jsonify({
         "ok": True,
         "session_id": session_id,
@@ -4871,11 +4877,19 @@ def chat():
 
     result = process_chat_message(session, message)
 
+    coordinator = get_ftp2_coordinator(session["id"])
+
     try:
-        record_chat_timeline_events(
-            get_ftp2_coordinator(session["id"]),
-            message,
-            result,
+        record_chat_timeline_events(coordinator, message, result)
+    except Exception:
+        pass
+
+    try:
+        run_silent_reader_pass(
+            coordinator,
+            user_message=message,
+            chat_result=result,
+            composer_telemetry=data.get("composer_telemetry"),
         )
     except Exception:
         pass

@@ -195,6 +195,22 @@ class SessionCoordinator:
             payload=payload,
         )
 
+    def record_silent_reader_observation(self, payload: dict) -> InteractionEvent:
+        """Record a Silent Reader OBSERVED payload (never visible to Parrot)."""
+        if self._machine.is_locked():
+            raise SessionLockedError(
+                "Cannot record Silent Reader observations after lock."
+            )
+        if self._machine.state != SessionState.LIVE_CONVERSATION:
+            raise ValueError(
+                "Observations may only be recorded during LIVE_CONVERSATION."
+            )
+        return self.record(
+            event_type=EventType.TELEMETRY_RECORDED,
+            provenance_level=ProvenanceLevel.OBSERVED,
+            payload=payload,
+        )
+
     def record_turn_telemetry(
         self,
         *,
@@ -203,20 +219,14 @@ class SessionCoordinator:
         pause_before_submit_ms: float,
         message_length: int,
     ) -> InteractionEvent:
-        """Record Silent Reader telemetry (observation only; no state change)."""
-        if self._machine.state != SessionState.LIVE_CONVERSATION:
-            raise ValueError(
-                "Telemetry may only be recorded during LIVE_CONVERSATION."
-            )
-        return self.record(
-            event_type=EventType.TELEMETRY_RECORDED,
-            provenance_level=ProvenanceLevel.OBSERVED,
-            payload=build_telemetry_payload(
+        """Record Silent Reader composer telemetry (Phase 3A API)."""
+        return self.record_silent_reader_observation(
+            build_telemetry_payload(
                 turn_index,
                 typing_duration_ms,
                 pause_before_submit_ms,
                 message_length,
-            ),
+            )
         )
 
     def record_observed_parrot_turn(
