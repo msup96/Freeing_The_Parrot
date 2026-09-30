@@ -1,19 +1,35 @@
-/* FTP 2.0 — participant shell (first UI checkpoint) */
+/* FTP 2.0 — Kili Josyam apparatus visual shell */
 
 :root {
-    --ftp2-bg: #0a0e0c;
-    --ftp2-bg-elevated: #111816;
-    --ftp2-border: rgba(180, 200, 190, 0.12);
-    --ftp2-text: #e8ebe9;
-    --ftp2-text-muted: rgba(232, 235, 233, 0.55);
-    --ftp2-accent: #8b2e35;
-    --ftp2-accent-soft: rgba(139, 46, 53, 0.35);
-    --ftp2-user: #d4d8d6;
-    --ftp2-parrot: #c5cbc8;
-    --ftp2-font-display: "Georgia", "Times New Roman", serif;
-    --ftp2-font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
-    --ftp2-max-width: 42rem;
-    --ftp2-transition: 280ms ease;
+    --ftp2-bg: #07110d;
+    --ftp2-forest: #102019;
+    --ftp2-paper: #e6d7b8;
+    --ftp2-parchment: #d8c49d;
+    --ftp2-crimson: #8f1d2c;
+    --ftp2-red-muted: #b53a43;
+    --ftp2-ink: #171411;
+    --ftp2-text: #e6d7b8;
+    --ftp2-text-muted: rgba(230, 215, 184, 0.55);
+    --ftp2-border: rgba(230, 215, 184, 0.12);
+    --ftp2-border-strong: rgba(230, 215, 184, 0.22);
+    --ftp2-accent-soft: rgba(143, 29, 44, 0.55);
+    --ftp2-accent-glow: rgba(143, 29, 44, 0.12);
+    --ftp2-font-display: "Georgia", "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --ftp2-font-meta: "Consolas", "Courier New", monospace;
+    --ftp2-font-ui: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --ftp2-max-read: 40rem;
+    --ftp2-transition: 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --ftp2-transition: 0ms;
+    }
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 *,
@@ -30,11 +46,22 @@ body {
     color: var(--ftp2-text);
     font-family: var(--ftp2-font-ui);
     font-size: 16px;
-    line-height: 1.5;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
 }
 
+.ftp2-grain {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 .ftp2-app {
+    position: relative;
+    z-index: 1;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -53,84 +80,163 @@ body {
     opacity: 1;
 }
 
-/* —— Entry —— */
+.ftp2-screen[hidden] {
+    display: none !important;
+}
 
-.ftp2-entry {
+.ftp2-meta {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ftp2-text-muted);
+}
+
+.ftp2-meta-row {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.ftp2-meta-row--entry {
+    margin-bottom: 2rem;
+}
+
+/* —— 01 Entry —— */
+
+.ftp2-entry-frame {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 3rem 1.5rem;
+    padding: 3rem 2rem 4rem;
     text-align: center;
     max-width: 36rem;
     margin: 0 auto;
 }
 
+.ftp2-apparatus {
+    color: var(--ftp2-parchment);
+    margin-bottom: 2rem;
+    opacity: 0.7;
+}
+
+.ftp2-apparatus__svg {
+    width: 5.5rem;
+    height: auto;
+}
+
 .ftp2-title {
     font-family: var(--ftp2-font-display);
-    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-size: clamp(1.6rem, 3.2vw, 2.4rem);
     font-weight: 400;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.2em;
+    margin: 0 0 0.35rem;
+}
+
+.ftp2-edition {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.75rem;
+    letter-spacing: 0.35em;
+    color: var(--ftp2-red-muted);
     margin: 0 0 2rem;
-    color: var(--ftp2-text);
 }
 
 .ftp2-tagline {
     font-family: var(--ftp2-font-display);
-    font-size: clamp(0.95rem, 2vw, 1.1rem);
-    letter-spacing: 0.06em;
-    line-height: 1.65;
+    font-size: clamp(0.9rem, 1.6vw, 1.05rem);
+    letter-spacing: 0.04em;
+    line-height: 1.75;
     color: var(--ftp2-text-muted);
     margin: 0 0 2.5rem;
 }
 
 .ftp2-invite {
-    font-size: 0.875rem;
-    letter-spacing: 0.04em;
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: var(--ftp2-text-muted);
     margin: 0 0 2rem;
 }
 
-/* —— Conversation layout —— */
+.ftp2-entry-error {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    color: var(--ftp2-red-muted);
+    margin: 1.25rem 0 0;
+    max-width: 20rem;
+}
 
-.ftp2-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem 2rem;
-    border-bottom: 1px solid var(--ftp2-border);
-    max-width: 56rem;
+.ftp2-entry-error[hidden] {
+    display: none !important;
+}
+
+/* —— 02 Conversation record —— */
+
+.ftp2-record-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr;
+    max-width: 72rem;
     width: 100%;
     margin: 0 auto;
+    padding: 0 1.5rem;
+    min-height: 0;
+}
+
+@media (min-width: 1024px) {
+    .ftp2-record-layout {
+        grid-template-columns: 1fr min(14rem, 22vw);
+        gap: 2.5rem;
+        padding: 0 2.5rem;
+    }
+}
+
+.ftp2-record-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+}
+
+.ftp2-record-header {
+    padding: 1.75rem 0 1rem;
+    border-bottom: 1px solid var(--ftp2-border);
+}
+
+.ftp2-record-title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
 }
 
 .ftp2-wordmark {
     font-family: var(--ftp2-font-display);
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
+    font-size: 0.62rem;
+    letter-spacing: 0.26em;
     color: var(--ftp2-text-muted);
 }
 
-.ftp2-parrot-mark {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
+.ftp2-session-id {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    color: var(--ftp2-parchment);
+    opacity: 0.65;
 }
 
-.ftp2-parrot-mark__bar {
-    display: block;
-    width: 1.5rem;
-    height: 1px;
-    background: var(--ftp2-border);
-}
-
-.ftp2-parrot-mark__node {
-    display: block;
-    width: 5px;
-    height: 5px;
-    border: 1px solid var(--ftp2-accent);
-    transform: rotate(45deg);
+.ftp2-listening {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ftp2-crimson);
+    margin: 1rem 0 0;
+    opacity: 0.85;
 }
 
 .ftp2-main {
@@ -138,10 +244,7 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    width: 100%;
-    max-width: 56rem;
-    margin: 0 auto;
-    padding: 0 2rem;
+    min-height: 0;
 }
 
 .ftp2-conversation {
@@ -150,16 +253,18 @@ body {
     padding: 2rem 0 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 0;
     scroll-behavior: smooth;
 }
 
-.ftp2-message {
-    max-width: var(--ftp2-max-width);
-    animation: ftp2-fade-in var(--ftp2-transition) ease;
+.ftp2-record-entry {
+    padding: 1.35rem 0;
+    border-bottom: 1px solid var(--ftp2-border);
+    max-width: var(--ftp2-max-read);
+    animation: ftp2-arrive var(--ftp2-transition) ease;
 }
 
-@keyframes ftp2-fade-in {
+@keyframes ftp2-arrive {
     from {
         opacity: 0;
         transform: translateY(6px);
@@ -170,42 +275,151 @@ body {
     }
 }
 
-.ftp2-message__label {
-    font-size: 0.65rem;
-    letter-spacing: 0.18em;
+.ftp2-record-entry__head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 0.65rem;
+}
+
+.ftp2-record-entry__who {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--ftp2-text-muted);
-    margin-bottom: 0.5rem;
 }
 
-.ftp2-message--user .ftp2-message__body {
-    color: var(--ftp2-user);
-    font-size: 1rem;
-    white-space: pre-wrap;
-}
-
-.ftp2-message--parrot .ftp2-message__body {
-    font-family: var(--ftp2-font-display);
-    font-size: 1.05rem;
-    line-height: 1.65;
-    color: var(--ftp2-parrot);
-    white-space: pre-wrap;
-    padding-left: 0.75rem;
-    border-left: 2px solid var(--ftp2-accent-soft);
-}
-
-.ftp2-message--error .ftp2-message__body {
-    color: var(--ftp2-accent);
-    font-size: 0.9rem;
-}
-
-.ftp2-message--notice .ftp2-message__body {
-    font-size: 0.9rem;
+.ftp2-record-entry__time {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
     color: var(--ftp2-text-muted);
-    font-style: italic;
+    opacity: 0.7;
+}
+
+.ftp2-record-entry__body {
+    font-family: var(--ftp2-font-display);
+    font-size: 1.02rem;
+    line-height: 1.65;
+    color: var(--ftp2-paper);
+    white-space: pre-wrap;
+    margin: 0;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--ftp2-border-strong);
+}
+
+.ftp2-record-entry--user .ftp2-record-entry__body {
+    font-family: var(--ftp2-font-ui);
+    font-size: 0.95rem;
+}
+
+.ftp2-record-entry--parrot .ftp2-record-entry__body {
+    border-left-color: var(--ftp2-accent-soft);
+}
+
+.ftp2-record-entry--ack .ftp2-record-entry__body {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border-left: none;
+    padding-left: 0;
+    color: var(--ftp2-text-muted);
+}
+
+.ftp2-record-entry--error .ftp2-record-entry__body {
+    color: var(--ftp2-red-muted);
+    border-left-color: var(--ftp2-crimson);
+}
+
+/* —— Trace —— */
+
+.ftp2-trace {
+    padding: 1.75rem 0 2rem;
+    border-top: 1px solid var(--ftp2-border);
+}
+
+@media (min-width: 1024px) {
+    .ftp2-trace {
+        border-top: none;
+        border-left: 1px solid var(--ftp2-border);
+        padding: 2rem 0 2rem 1.5rem;
+    }
+}
+
+.ftp2-trace__title {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ftp2-text-muted);
+    margin: 0 0 1.25rem;
+    font-weight: 400;
+}
+
+.ftp2-trace__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.ftp2-trace__list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.35rem 0;
+    font-size: 0.62rem;
+}
+
+.ftp2-trace__key {
+    font-family: var(--ftp2-font-meta);
+    letter-spacing: 0.14em;
+    color: var(--ftp2-text-muted);
+}
+
+.ftp2-trace__val {
+    font-family: var(--ftp2-font-meta);
+    color: var(--ftp2-parchment);
+}
+
+.ftp2-trace__rule {
+    height: 1px;
+    background: var(--ftp2-border);
+    margin: 0.5rem 0;
+    padding: 0 !important;
+}
+
+.ftp2-trace__note {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+    line-height: 1.5;
+    color: var(--ftp2-text-muted);
+    margin: 1.25rem 0 0;
+    opacity: 0.65;
 }
 
 /* —— Composer —— */
+
+.ftp2-composer {
+    border-top: 1px solid var(--ftp2-border);
+    padding: 1.25rem 0 2.5rem;
+}
+
+.ftp2-status {
+    min-height: 1.25rem;
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ftp2-text-muted);
+    margin-bottom: 0.85rem;
+}
+
+.ftp2-status--recording {
+    color: var(--ftp2-red-muted);
+}
 
 .ftp2-hidden {
     position: absolute;
@@ -216,28 +430,60 @@ body {
 }
 
 .ftp2-modality {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
 
-.ftp2-modality__btn {
-    font-size: 0.65rem;
-    letter-spacing: 0.12em;
-    padding: 0.45rem 0.85rem;
-    border: 1px solid var(--ftp2-border);
-    background: transparent;
-    color: var(--ftp2-text-muted);
-    cursor: pointer;
-    border-radius: 2px;
-    transition: border-color var(--ftp2-transition), color var(--ftp2-transition);
+@media (min-width: 640px) {
+    .ftp2-modality {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
-.ftp2-modality__btn--active,
-.ftp2-modality__btn:hover:not(:disabled) {
+.ftp2-modality__btn {
+    font-family: var(--ftp2-font-ui);
+    text-align: left;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--ftp2-border);
+    background: var(--ftp2-forest);
+    color: var(--ftp2-text-muted);
+    cursor: pointer;
+    border-radius: 0;
+    transition: border-color var(--ftp2-transition), color var(--ftp2-transition);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.ftp2-modality__verb {
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+}
+
+.ftp2-modality__hint {
+    font-size: 0.55rem;
+    letter-spacing: 0.04em;
+    opacity: 0.75;
+    font-style: italic;
+    font-family: var(--ftp2-font-display);
+    text-transform: none;
+}
+
+.ftp2-modality__btn--active {
+    color: var(--ftp2-paper);
     border-color: var(--ftp2-accent-soft);
-    color: var(--ftp2-text);
+}
+
+.ftp2-modality__btn:hover:not(:disabled) {
+    border-color: var(--ftp2-border-strong);
+    color: var(--ftp2-paper);
+}
+
+.ftp2-modality__btn:focus-visible {
+    outline: 1px solid var(--ftp2-crimson);
+    outline-offset: 2px;
 }
 
 .ftp2-modality__btn:disabled {
@@ -245,85 +491,37 @@ body {
     cursor: not-allowed;
 }
 
-.ftp2-camera-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(5, 8, 7, 0.92);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-}
-
-.ftp2-camera-panel {
-    width: min(32rem, 92vw);
-    padding: 1.5rem;
-    border: 1px solid var(--ftp2-border);
-    background: var(--ftp2-bg-elevated);
-}
-
-.ftp2-camera-title {
-    font-size: 0.7rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--ftp2-text-muted);
-    margin: 0 0 1rem;
-}
-
-.ftp2-camera-preview {
-    width: 100%;
-    max-height: 50vh;
-    background: #000;
-    display: block;
-}
-
-.ftp2-camera-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1rem;
-    justify-content: flex-end;
-}
-
-/* —— Composer —— */
-
-.ftp2-composer {
-    border-top: 1px solid var(--ftp2-border);
-    padding: 1.25rem 2rem 2rem;
-    max-width: 56rem;
-    width: 100%;
-    margin: 0 auto;
-    background: var(--ftp2-bg);
+.ftp2-modality__btn--recording {
+    border-color: var(--ftp2-crimson);
+    color: var(--ftp2-red-muted);
 }
 
 .ftp2-composer__label {
     position: absolute;
     width: 1px;
     height: 1px;
-    padding: 0;
-    margin: -1px;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
-    border: 0;
 }
 
 .ftp2-composer__row {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.85rem;
     align-items: flex-end;
 }
 
 .ftp2-input {
     flex: 1;
     resize: vertical;
-    min-height: 3rem;
-    max-height: 12rem;
-    padding: 0.75rem 1rem;
+    min-height: 3.25rem;
+    max-height: 11rem;
+    padding: 0.85rem 1rem;
     font-family: var(--ftp2-font-ui);
     font-size: 1rem;
-    color: var(--ftp2-text);
-    background: var(--ftp2-bg-elevated);
+    color: var(--ftp2-paper);
+    background: var(--ftp2-forest);
     border: 1px solid var(--ftp2-border);
-    border-radius: 2px;
+    border-radius: 0;
     outline: none;
     transition: border-color var(--ftp2-transition);
 }
@@ -333,35 +531,30 @@ body {
 }
 
 .ftp2-input:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
 }
 
-/* —— Buttons —— */
-
 .ftp2-btn {
-    font-family: var(--ftp2-font-ui);
-    font-size: 0.75rem;
-    letter-spacing: 0.14em;
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     cursor: pointer;
-    border: 1px solid var(--ftp2-border);
+    border: 1px solid var(--ftp2-border-strong);
     background: transparent;
-    color: var(--ftp2-text);
-    padding: 0.85rem 1.75rem;
-    border-radius: 2px;
-    transition:
-        background var(--ftp2-transition),
-        border-color var(--ftp2-transition),
-        color var(--ftp2-transition);
+    color: var(--ftp2-paper);
+    padding: 0.9rem 1.4rem;
+    border-radius: 0;
+    transition: background var(--ftp2-transition), border-color var(--ftp2-transition);
 }
 
 .ftp2-btn:hover:not(:disabled) {
     border-color: var(--ftp2-accent-soft);
-    color: var(--ftp2-text);
+    background: var(--ftp2-accent-glow);
 }
 
 .ftp2-btn:focus-visible {
-    outline: 1px solid var(--ftp2-accent);
+    outline: 1px solid var(--ftp2-crimson);
     outline-offset: 2px;
 }
 
@@ -370,13 +563,14 @@ body {
     cursor: not-allowed;
 }
 
-.ftp2-btn--primary {
-    border-color: var(--ftp2-accent-soft);
+.ftp2-btn--apparatus {
+    border-color: var(--ftp2-crimson);
+    padding: 1rem 2.5rem;
+    color: var(--ftp2-paper);
 }
 
-.ftp2-btn--primary:hover:not(:disabled) {
-    background: rgba(139, 46, 53, 0.12);
-    border-color: var(--ftp2-accent);
+.ftp2-btn--primary {
+    border-color: var(--ftp2-crimson);
 }
 
 .ftp2-btn--send {
@@ -385,31 +579,297 @@ body {
     min-width: 5.5rem;
 }
 
-/* —— Responsive (installation displays) —— */
+.ftp2-continue {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--ftp2-border);
+    text-align: center;
+}
+
+.ftp2-continue[hidden] {
+    display: none !important;
+}
+
+.ftp2-continue__label {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    color: var(--ftp2-text-muted);
+    margin: 0 0 1rem;
+}
+
+/* —— 05 Deck —— */
+
+.ftp2-deck-header {
+    text-align: center;
+    padding: 2rem 1.5rem 1rem;
+    max-width: 48rem;
+    margin: 0 auto;
+}
+
+.ftp2-deck-title {
+    font-family: var(--ftp2-font-display);
+    font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    margin: 0.75rem 0 0.5rem;
+}
+
+.ftp2-deck-sub {
+    font-family: var(--ftp2-font-display);
+    font-size: 0.9rem;
+    color: var(--ftp2-text-muted);
+    margin: 0;
+    font-style: italic;
+}
+
+.ftp2-deck-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+    gap: 1rem;
+    padding: 1.5rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.ftp2-deck-card {
+    background: linear-gradient(145deg, var(--ftp2-paper) 0%, var(--ftp2-parchment) 100%);
+    color: var(--ftp2-ink);
+    border: 1px solid rgba(23, 20, 17, 0.15);
+    padding: 1rem 0.85rem 1.1rem;
+    min-height: 9rem;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    position: relative;
+}
+
+.ftp2-deck-card::before {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border: 1px solid rgba(23, 20, 17, 0.08);
+    pointer-events: none;
+}
+
+.ftp2-deck-card__num {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.5rem;
+    letter-spacing: 0.15em;
+    opacity: 0.55;
+    margin-bottom: 0.5rem;
+}
+
+.ftp2-deck-card__text {
+    font-family: var(--ftp2-font-display);
+    font-size: 0.72rem;
+    line-height: 1.45;
+    flex: 1;
+    margin: 0 0 0.75rem;
+}
+
+.ftp2-deck-card__resonate {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.5rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border: 1px solid var(--ftp2-crimson);
+    background: transparent;
+    color: var(--ftp2-crimson);
+    padding: 0.4rem 0.5rem;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.ftp2-deck-card__resonate:hover,
+.ftp2-deck-card--chosen .ftp2-deck-card__resonate {
+    background: var(--ftp2-crimson);
+    color: var(--ftp2-paper);
+}
+
+.ftp2-deck-card--chosen {
+    outline: 1px solid var(--ftp2-crimson);
+    outline-offset: 2px;
+}
+
+.ftp2-deck-footer {
+    padding: 1rem 1.5rem 2rem;
+    text-align: center;
+}
+
+/* —— 06 Reveal —— */
+
+.ftp2-reveal-inner {
+    flex: 1;
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 3rem;
+}
+
+.ftp2-reveal-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.ftp2-reveal-title {
+    font-family: var(--ftp2-font-display);
+    font-size: clamp(1.1rem, 2vw, 1.45rem);
+    letter-spacing: 0.08em;
+    font-weight: 400;
+    margin: 0.75rem 0 0;
+}
+
+.ftp2-reveal-card {
+    background: linear-gradient(160deg, var(--ftp2-paper), var(--ftp2-parchment));
+    color: var(--ftp2-ink);
+    padding: 2rem 1.75rem;
+    border: 1px solid rgba(23, 20, 17, 0.12);
+    margin-bottom: 2.5rem;
+}
+
+.ftp2-card-index {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.ftp2-reveal-statement {
+    font-family: var(--ftp2-font-display);
+    font-size: 1.15rem;
+    line-height: 1.55;
+    margin: 0 0 1.5rem;
+}
+
+.ftp2-reveal-evidence__title {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.55rem;
+    letter-spacing: 0.18em;
+    margin: 0 0 0.75rem;
+}
+
+.ftp2-reveal-evidence__list {
+    margin: 0;
+    padding: 0 0 0 1rem;
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.62rem;
+    line-height: 1.7;
+}
+
+.ftp2-journey__title {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 400;
+    margin: 0 0 1rem;
+    color: var(--ftp2-text-muted);
+}
+
+.ftp2-journey__steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-family: var(--ftp2-font-display);
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+}
+
+.ftp2-journey__steps li {
+    padding: 0.5rem 0;
+    border-left: 1px solid var(--ftp2-border-strong);
+    padding-left: 1rem;
+    margin-left: 0.25rem;
+}
+
+.ftp2-journey__steps li::after {
+    content: "↓";
+    display: block;
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.55rem;
+    color: var(--ftp2-text-muted);
+    margin-top: 0.25rem;
+    opacity: 0.5;
+}
+
+.ftp2-journey__steps li:last-child::after {
+    display: none;
+}
+
+/* —— Blackout —— */
+
+.ftp2-blackout {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+}
+
+.ftp2-blackout--visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ftp2-blackout[hidden] {
+    display: none !important;
+}
+
+/* —— Camera —— */
+
+.ftp2-camera-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 17, 13, 0.96);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.ftp2-camera-overlay[hidden] {
+    display: none !important;
+}
+
+.ftp2-camera-panel {
+    width: min(34rem, 92vw);
+    padding: 1.75rem;
+    border: 1px solid var(--ftp2-border);
+    background: var(--ftp2-forest);
+}
+
+.ftp2-camera-title {
+    font-family: var(--ftp2-font-meta);
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ftp2-text-muted);
+    margin: 0 0 1rem;
+}
+
+.ftp2-camera-preview {
+    width: 100%;
+    max-height: 48vh;
+    background: #000;
+    display: block;
+}
+
+.ftp2-camera-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    justify-content: flex-end;
+}
 
 @media (min-width: 1280px) {
     .ftp2-conversation {
         padding-top: 2.5rem;
-    }
-
-    .ftp2-header,
-    .ftp2-composer {
-        padding-left: 3rem;
-        padding-right: 3rem;
-    }
-
-    .ftp2-main {
-        padding-left: 3rem;
-        padding-right: 3rem;
-    }
-}
-
-@media (min-width: 1440px) {
-    .ftp2-title {
-        letter-spacing: 0.14em;
-    }
-
-    .ftp2-conversation {
-        gap: 2rem;
     }
 }
