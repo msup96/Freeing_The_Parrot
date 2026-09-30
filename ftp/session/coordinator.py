@@ -39,6 +39,14 @@ from ftp.events.store import EventStore, StrictBoundaryViolationError
 from ftp.session.identity import SessionIdentity
 from ftp.session.machine import IllegalTransitionError, SessionStateMachine
 from ftp.session.states import SessionState
+from ftp.silent_reader.observer import (
+    SilentReaderObserver,
+    build_telemetry_payload,
+)
+
+
+class SessionLockedError(Exception):
+    """Raised when a Parrot turn is recorded after the session is locked."""
 
 
 # Keys that must NEVER appear in the Parrot context dict.
@@ -94,6 +102,7 @@ class SessionCoordinator:
             on_transition=self._on_state_change,
         )
         self._turn_count: int = 0
+        self._silent_reader = SilentReaderObserver(self)
 
     # ------------------------------------------------------------------
     # Properties
@@ -120,6 +129,11 @@ class SessionCoordinator:
     def machine(self) -> SessionStateMachine:
         """Read-only reference to the state machine (for inspectors)."""
         return self._machine
+
+    @property
+    def silent_reader(self) -> SilentReaderObserver:
+        """Passive telemetry observer for this session."""
+        return self._silent_reader
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -165,6 +179,30 @@ class SessionCoordinator:
         )
         return self._store.append(event)
 
+    def record_turn_telemetry(
+        self,
+        *,
+        turn_index: int,
+        typing_duration_ms: float,
+        pause_before_submit_ms: float,
+        message_length: int,
+    ) -> InteractionEvent:
+        """Record Silent Reader telemetry (observation only; no state change)."""
+        if self._machine.state != SessionState.LIVE_CONVERSATION:
+            raise ValueError(
+                "Telemetry may only be recorded during LIVE_CONVERSATION."
+            )
+        return self.record(
+            event_type=EventType.TELEMETRY_RECORDED,
+            provenance_level=ProvenanceLevel.OBSERVED,
+            payload=build_telemetry_payload(
+                turn_index,
+                typing_duration_ms,
+                pause_before_submit_ms,
+                message_length,
+            ),
+        )
+
     def record_parrot_turn(
         self,
         turn_text: str,
@@ -173,6 +211,10 @@ class SessionCoordinator:
         gate: str = "",
     ) -> InteractionEvent:
         """Record one completed Parrot turn and increment the turn counter."""
+        if self._machine.is_locked():
+            raise SessionLockedError(
+                "Cannot record Parrot turns after the session is locked."
+            )
         self._turn_count += 1
         return self.record(
             event_type=EventType.PARROT_TURN_GENERATED,
