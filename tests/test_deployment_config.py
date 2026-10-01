@@ -52,4 +52,5 @@ class TestDeploymentHttp:
 
         response = server.app.test_client().get("/")
         assert response.status_code == 200
-        assert b"FREEING THE PARROT" in response.data
+        assert b"Freeing the Parrot" in response.data
+        assert b'id="s1"' in response.data

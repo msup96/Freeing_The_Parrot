@@ -102,6 +102,7 @@ class SessionCoordinator:
             on_transition=self._on_state_change,
         )
         self._turn_count: int = 0
+        self._analysis_ready: bool = False
         self._silent_reader = SilentReaderObserver(self)
 
     # ------------------------------------------------------------------
@@ -119,6 +120,11 @@ class SessionCoordinator:
     @property
     def turn_count(self) -> int:
         return self._turn_count
+
+    @property
+    def analysis_ready(self) -> bool:
+        """Whether the initial hidden analysis has completed."""
+        return self._analysis_ready
 
     @property
     def store(self) -> EventStore:
@@ -185,15 +191,33 @@ class SessionCoordinator:
             raise SessionLockedError(
                 "Cannot record raw input after the session is locked."
             )
-        if self._machine.state != SessionState.LIVE_CONVERSATION:
+        if self._machine.state not in (
+            SessionState.INPUT_INGESTION,
+            SessionState.LIVE_CONVERSATION,
+        ):
             raise ValueError(
-                "Raw input may only be recorded during LIVE_CONVERSATION."
+                "Raw input may only be recorded during INPUT_INGESTION "
+                "or LIVE_CONVERSATION."
             )
         return self.record(
             event_type=EventType.INPUT_RAW_INGESTED,
             provenance_level=ProvenanceLevel.RAW,
             payload=payload,
         )
+
+    def mark_analysis_ready(self, analysis: dict) -> InteractionEvent:
+        """Record hidden initial analysis without exposing it to the Parrot."""
+        if self._machine.state != SessionState.INPUT_INGESTION:
+            raise ValueError(
+                "Initial analysis may only complete during INPUT_INGESTION."
+            )
+        event = self.record(
+            event_type=EventType.NAVARASA_CLASSIFIED,
+            provenance_level=ProvenanceLevel.INTERPRETED,
+            payload=analysis,
+        )
+        self._analysis_ready = True
+        return event
 
     def record_silent_reader_observation(self, payload: dict) -> InteractionEvent:
         """Record a Silent Reader OBSERVED payload (never visible to Parrot)."""

@@ -1,3 +1,13 @@
+FROM node:24-bookworm-slim AS kimi-build
+
+WORKDIR /frontend
+
+COPY frontend/kimi/package*.json ./
+RUN npm ci
+
+COPY frontend/kimi/ ./
+RUN npm run build
+
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
@@ -16,6 +26,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+COPY --from=kimi-build /frontend/dist /app/frontend/kimi/dist
 
 RUN mkdir -p /data
 

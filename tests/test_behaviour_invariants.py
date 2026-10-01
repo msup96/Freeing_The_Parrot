@@ -172,3 +172,50 @@ def test_unstable_behaviour_does_not_immediately_repeat():
                 )
 
             previous = current
+
+
+def test_chat_api_reports_selected_parrot_behavior(monkeypatch, tmp_path):
+    import interface_server as server
+
+    monkeypatch.setattr(server, "DB_FILE", tmp_path / "chat.sqlite3")
+    client = server.app.test_client()
+    session_id = client.post("/api/session/start").get_json()["session_id"]
+    client.post(
+        "/api/input/text",
+        json={"session_id": session_id, "text": "Initial offering."},
+    )
+    client.post(
+        "/api/session-lifecycle",
+        json={"session_id": session_id, "action": "input_complete"},
+    )
+
+    greeting = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "message": "hello"},
+    ).get_json()
+    assert greeting["parrot_behavior"] == "listening"
+    assert greeting["turn"] == 0
+
+    first_turn = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "message": "I feel uncertain."},
+    ).get_json()
+    assert first_turn["parrot_behavior"] == "understanding"
+
+    second_turn = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "message": "I am thinking about it."},
+    ).get_json()
+    third_turn = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "message": "It is hard to explain."},
+    ).get_json()
+    assert second_turn["parrot_behavior"] == "understanding"
+    assert third_turn["parrot_behavior"] == "understanding"
+
+    monkeypatch.setattr(server, "choose_behaviour", lambda _session: "mirroring")
+    next_turn = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "message": "I keep thinking about it."},
+    ).get_json()
+    assert next_turn["parrot_behavior"] == "mirroring"

@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Freeing the Parrot runtime data
+C:\\freeing_the_parrot/

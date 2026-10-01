@@ -143,6 +143,14 @@ class TestFlaskChatTimeline:
         session_id = start.get_json()["session_id"]
         assert session_id in SESSIONS
         assert session_id in FTP2_COORDINATORS
+        client.post(
+            "/api/input/text",
+            json={"session_id": session_id, "text": "Initial offering."},
+        )
+        client.post(
+            "/api/session-lifecycle",
+            json={"session_id": session_id, "action": "input_complete"},
+        )
 
         chat = client.post(
             "/api/chat",
@@ -162,6 +170,14 @@ class TestFlaskChatTimeline:
 
         client = app.test_client()
         session_id = client.post("/api/session/start").get_json()["session_id"]
+        client.post(
+            "/api/input/text",
+            json={"session_id": session_id, "text": "Initial offering."},
+        )
+        client.post(
+            "/api/session-lifecycle",
+            json={"session_id": session_id, "action": "input_complete"},
+        )
 
         with patch(
             "interface_server.record_chat_timeline_events",

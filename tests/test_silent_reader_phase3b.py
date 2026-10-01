@@ -126,6 +126,14 @@ class TestFlaskSilentReaderPass:
         client = app.test_client()
         sid = client.post("/api/session/start").get_json()["session_id"]
         client.post(
+            "/api/input/text",
+            json={"session_id": sid, "text": "Initial offering."},
+        )
+        client.post(
+            "/api/session-lifecycle",
+            json={"session_id": sid, "action": "input_complete"},
+        )
+        client.post(
             "/api/chat",
             json={
                 "session_id": sid,

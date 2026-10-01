@@ -12,15 +12,26 @@ import datetime
 import random
 from pathlib import Path
 
-from flask import Flask, jsonify, request, render_template, render_template_string
+from flask import (
+    Flask,
+    jsonify,
+    request,
+    render_template,
+    render_template_string,
+    send_from_directory,
+)
 
 from runtime_config import get_data_dir, get_port
 
 from ftp.input.raw import build_raw_ingest_payload, save_session_media, sha256_bytes
+from ftp.events.model import EventType, ProvenanceLevel
 from ftp.session.coordinator import SessionCoordinator, SessionLockedError
 from ftp.session.states import SessionState
 from ftp.timeline.silent_reader_pass import run_silent_reader_pass
-from ftp.timeline.wiring import record_chat_timeline_events
+from ftp.timeline.wiring import (
+    build_text_raw_ingest_payload,
+    record_chat_timeline_events,
+)
 from navarasa_engine import analyse_text
 from main_watcher import process_image, update_scan_status
 def detect_gate_state(text, analysis):
@@ -42,6 +53,7 @@ def detect_gate_state(text, analysis):
 # ============================================================
 
 BASE_DIR = get_data_dir()
+KIMI_DIST_DIR = Path(__file__).resolve().parent / "frontend" / "kimi" / "dist"
 DB_FILE = BASE_DIR / "emotional_database.db"
 SESSION_FILE = BASE_DIR / "db_session.json"
 SCAN_STATUS_FILE = BASE_DIR / "scan_status.json"
@@ -2010,18 +2022,71 @@ def get_session(session_id):
 
 
 def begin_ftp2_participant_session() -> str:
-    """Create legacy chat session and FTP 2.0 coordinator (ENTER flow)."""
+    """Create the legacy session and coordinator in INPUT_INGESTION."""
     session = create_session()
     session_id = session["id"]
     coordinator = SessionCoordinator(session_id=session_id)
     coordinator.start()
-    coordinator.advance(SessionState.LIVE_CONVERSATION)
     FTP2_COORDINATORS[session_id] = coordinator
     return session_id
 
 
 def get_ftp2_coordinator(session_id: str) -> SessionCoordinator | None:
     return FTP2_COORDINATORS.get(session_id)
+
+
+def advance_participant_lifecycle(session_id, action, payload=None):
+    """Advance one participant action through the canonical state machine."""
+    coordinator = get_ftp2_coordinator(session_id)
+    if coordinator is None:
+        raise ValueError("Session not found.")
+
+    payload = payload or {}
+    if action == "input_complete":
+        if coordinator.state != SessionState.INPUT_INGESTION:
+            raise ValueError("Input offering is already complete.")
+        if not coordinator.analysis_ready:
+            raise ValueError("Initial analysis is not ready.")
+        coordinator.advance(SessionState.LIVE_CONVERSATION)
+        return coordinator
+
+    actions = {
+        "card_selection": (
+            SessionState.PROFILE_REVEAL,
+            EventType.CARD_RESONANCE_MARKED,
+            ProvenanceLevel.VALIDATED,
+            {
+                "card_index": payload.get("card_index"),
+                "card_text": payload.get("card_text", ""),
+            },
+        ),
+        "reveal": (
+            SessionState.DATA_WALL_CONSENT,
+            EventType.PROFILE_REVEAL_VIEWED,
+            ProvenanceLevel.OBSERVED,
+            {},
+        ),
+        "consent": (
+            SessionState.OUTPUT_GENERATION,
+            EventType.CONSENT_RECORDED,
+            ProvenanceLevel.OBSERVED,
+            {"consent_type": payload.get("consent_type")},
+        ),
+    }
+
+    if action not in actions:
+        raise ValueError("Unsupported lifecycle action.")
+
+    target, event_type, provenance, event_payload = actions[action]
+    if action == "consent" and event_payload["consent_type"] not in {
+        "SHARE",
+        "KEEP_PRIVATE",
+    }:
+        raise ValueError("consent_type must be SHARE or KEEP_PRIVATE.")
+
+    coordinator.advance(target)
+    coordinator.record(event_type, provenance, event_payload)
+    return coordinator
 
 
 # ============================================================
@@ -2422,6 +2487,7 @@ def process_chat_message(session, text):
             },
             "printer": None,
             "closed": True,
+            "parrot_behavior": "idle",
         }
 
     # ========================================================
@@ -2480,6 +2546,7 @@ def process_chat_message(session, text):
             "waiting_for_answer": False,
             "printer": None,
             "closed": False,
+            "parrot_behavior": "listening",
         }
 
     # ========================================================
@@ -2566,6 +2633,7 @@ def process_chat_message(session, text):
             "closed": True,
             "auto_print": True,
             "close_reason": "health_abort",
+            "parrot_behavior": "intervention",
         }
 
     # ========================================================
@@ -2639,6 +2707,7 @@ def process_chat_message(session, text):
             "closed": True,
             "auto_print": True,
             "close_reason": "expletive",
+            "parrot_behavior": "intervention",
         }
 
     # ========================================================
@@ -2660,6 +2729,13 @@ def process_chat_message(session, text):
     # ========================================================
 
     if session["turn"] == 1:
+
+        # The first substantive response is the first understanding interaction,
+        # even though its established response path bypasses choose_behaviour().
+        session["understanding_turns"] = max(
+            session.get("understanding_turns", 0),
+            1,
+        )
 
         if detect_opening_help(text):
 
@@ -2741,6 +2817,7 @@ def process_chat_message(session, text):
             "roast_level": session["roast_level"],
             "printer": None,
             "closed": False,
+            "parrot_behavior": "understanding",
         }
 
     # ========================================================
@@ -2957,6 +3034,7 @@ def process_chat_message(session, text):
         "printer": None,
         "closed":
             session["intervention_closed"],
+        "parrot_behavior": behaviour,
     }
 
 # ============================================================
@@ -4751,6 +4829,20 @@ def home():
     return render_template("index.html")
 
 
+@app.route("/kimi/", defaults={"filename": ""})
+@app.route("/kimi/<path:filename>")
+def kimi_frontend(filename):
+    """Serve the optional production Kimi bundle without changing the root UI."""
+    if not KIMI_DIST_DIR.exists():
+        return jsonify({
+            "error": "Kimi production bundle is not built.",
+            "build_directory": str(KIMI_DIST_DIR),
+        }), 503
+
+    requested = filename or "index.html"
+    return send_from_directory(str(KIMI_DIST_DIR), requested)
+
+
 @app.route("/legacy")
 def home_legacy():
     """Previous participant interface (scan, telemetry panels, arcade UI)."""
@@ -4764,6 +4856,43 @@ def session_start():
     return jsonify({
         "ok": True,
         "session_id": session_id,
+        "state": SessionState.INPUT_INGESTION.value,
+        "analysis_ready": False,
+    })
+
+
+@app.route("/api/input/text", methods=["POST"])
+def input_text():
+    """Analyze the initial written offering without invoking the Parrot."""
+    data = request.get_json(silent=True) or {}
+    session_id = str(data.get("session_id") or "").strip()
+    text = str(data.get("text") or "").strip()
+
+    if not session_id:
+        return jsonify({"error": "session_id is required."}), 400
+    if not text:
+        return jsonify({"error": "text is required."}), 400
+
+    coordinator = get_ftp2_coordinator(session_id)
+    session = SESSIONS.get(session_id)
+    if coordinator is None or session is None:
+        return jsonify({"error": "Session not found."}), 404
+    if coordinator.state != SessionState.INPUT_INGESTION:
+        return jsonify({
+            "error": "Initial offering is no longer accepted.",
+            "state": coordinator.state.value,
+        }), 409
+
+    analysis, _gate_state = analyse_message(text)
+    coordinator.record_raw_input(build_text_raw_ingest_payload(text))
+    event = coordinator.mark_analysis_ready(analysis)
+
+    return jsonify({
+        "ok": True,
+        "session_id": session_id,
+        "state": coordinator.state.value,
+        "analysis_ready": coordinator.analysis_ready,
+        "event_id": event.event_id,
     })
 
 
@@ -4859,10 +4988,11 @@ def input_ingest():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    try:
-        run_silent_reader_pass(coordinator)
-    except Exception:
-        pass
+    if coordinator.state == SessionState.LIVE_CONVERSATION:
+        try:
+            run_silent_reader_pass(coordinator)
+        except Exception:
+            pass
 
     return jsonify({
         "ok": True,
@@ -4870,6 +5000,8 @@ def input_ingest():
         "ingest_id": payload["ingest_id"],
         "event_id": event.event_id,
         "message": "Received.",
+        "state": coordinator.state.value,
+        "analysis_ready": coordinator.analysis_ready,
     })
 
 
@@ -4879,6 +5011,16 @@ def chat():
 
     message = data.get("message", "")
     session_id = data.get("session_id")
+
+    coordinator = get_ftp2_coordinator(session_id)
+    if coordinator is None:
+        return jsonify({"error": "Session not found."}), 404
+    if coordinator.state != SessionState.LIVE_CONVERSATION:
+        return jsonify({
+            "error": "Session is not ready for live conversation.",
+            "state": coordinator.state.value,
+            "analysis_ready": coordinator.analysis_ready,
+        }), 409
 
     session = get_session(session_id)
 
@@ -4915,6 +5057,14 @@ def end_conversation_route():
             "error": "Session not found."
         }), 404
 
+    coordinator = get_ftp2_coordinator(session_id)
+    if coordinator is not None and coordinator.state != SessionState.LIVE_CONVERSATION:
+        return jsonify({
+            "error": "Session is not in live conversation.",
+            "state": coordinator.state.value,
+            "analysis_ready": coordinator.analysis_ready,
+        }), 409
+
     if session.get("intervention_closed"):
         return jsonify({
             "closed": True,
@@ -4924,7 +5074,41 @@ def end_conversation_route():
             "close_reason": "already_closed",
         })
 
-    return jsonify(end_conversation(session))
+    result = end_conversation(session)
+    if coordinator is not None:
+        coordinator.lock()
+        coordinator.advance(SessionState.POST_SESSION_INTERPRETATION)
+        coordinator.record(
+            EventType.CARDS_GENERATED,
+            ProvenanceLevel.INTERPRETED,
+            {"card_count": 27, "source": "participant_shell_baseline"},
+        )
+        coordinator.advance(SessionState.CARD_SELECTION)
+        result["lifecycle_state"] = coordinator.state.value
+    return jsonify(result)
+
+
+@app.route("/api/session-lifecycle", methods=["POST"])
+def session_lifecycle():
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id")
+    try:
+        coordinator = advance_participant_lifecycle(
+            session_id,
+            data.get("action"),
+            data,
+        )
+    except ValueError as exc:
+        status = 409 if data.get("action") == "input_complete" else 400
+        return jsonify({"error": str(exc)}), status
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 409
+
+    return jsonify({
+        "ok": True,
+        "session_id": session_id,
+        "lifecycle_state": coordinator.state.value,
+    })
 
 # Kept for manual PowerShell testing.
 
@@ -5008,13 +5192,31 @@ def session_output_status():
 
 @app.route("/api/session-output-reset", methods=["POST"])
 def session_output_reset():
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id")
+    if session_id:
+        coordinator = get_ftp2_coordinator(session_id)
+        if coordinator is None:
+            return jsonify({"ok": False, "error": "Session not found."}), 404
+        try:
+            coordinator.record(
+                EventType.SESSION_PURGED,
+                ProvenanceLevel.OBSERVED,
+                {"consent_type": data.get("consent_type")},
+            )
+            coordinator.advance(SessionState.PURGE_AND_RESET)
+            coordinator.advance(SessionState.IDLE_STANDBY)
+        except Exception as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 409
+        FTP2_COORDINATORS.pop(session_id, None)
+
     write_session_output_status(
         "idle",
         0,
         "DIGITAL OUTPUT STANDBY.",
         lines=["DIGITAL OUTPUT STANDBY."]
     )
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "lifecycle_state": SessionState.IDLE_STANDBY.value})
 
 
 @app.route("/api/session-output", methods=["POST"])
@@ -5034,6 +5236,13 @@ def session_output():
             "success": False,
             "error": "There is no conversation to export."
         }), 400
+
+    coordinator = get_ftp2_coordinator(session_id)
+    if coordinator is not None and coordinator.state != SessionState.OUTPUT_GENERATION:
+        return jsonify({
+            "success": False,
+            "error": "Session is not ready for output.",
+        }), 409
 
     receipt_text = build_conversation_receipt(session)
 
@@ -5062,6 +5271,13 @@ def session_output():
             "path": str(output_path),
         },
     )
+
+    if coordinator is not None:
+        coordinator.record(
+            EventType.RECEIPT_PRINTED,
+            ProvenanceLevel.OBSERVED,
+            {"output_type": "digital_mirror_report"},
+        )
 
     return jsonify({
         "success": True,

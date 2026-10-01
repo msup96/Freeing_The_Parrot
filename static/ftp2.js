@@ -1,703 +1,424 @@
-/**
- * FTP 2.0 participant shell — apparatus visual + existing API wiring.
- */
-
+/* FTP 2.0 reference visual layer backed by the existing Flask lifecycle. */
 (function () {
     "use strict";
 
-    const DECK_STATEMENTS = [
-        "You speak as if someone is always listening.",
-        "Certainty arrives late, if at all.",
-        "You rehearse answers before the question lands.",
-        "Silence is not empty for you.",
-        "You measure yourself against invisible standards.",
-        "The day leaves a residue you cannot name.",
-        "You perform ease more often than you feel it.",
-        "What you withhold is as telling as what you share.",
-        "You return to the same worry in different clothes.",
-        "You ask permission without using the word.",
-        "Your humour arrives before your honesty.",
-        "You notice small slights and large absences.",
-        "You are tired of being legible.",
-        "You want to be understood without explaining.",
-        "You test the room before you test yourself.",
-        "You speak in lists when feelings overflow.",
-        "You mistrust praise that arrives too quickly.",
-        "You keep one door open, always.",
-        "You translate pain into practicality.",
-        "You are more observant than you admit.",
-        "You fear being ordinary and being singular.",
-        "You collect evidence against your own hope.",
-        "You speak to the machine as if it could absolve.",
-        "You arrive with a story and leave with a question.",
-        "You repeat yourself when no one contradicts you.",
-        "You are building a case for who you are.",
-        "You already know what the Parrot will say.",
+    const CARDS = [
+        ["The Rewritten Talk", "A conversation you keep editing in your head long after it ended."],
+        ["The Quiet Ledger", "Favours given are remembered more carefully than favours received."],
+        ["The Open Door", "Openness to people is real, though it stops at certain rooms."],
+        ["The Borrowed Voice", "Some opinions were tried on before they became yours."],
+        ["The Late Reply", "A message left unanswered says more than one sent quickly."],
+        ["The Two Rooms", "A public self and a private self do not always agree."],
+        ["The Held Breath", "Some decisions are made long before they are announced."],
+        ["The Small Ritual", "One habit is kept mostly because stopping feels unlucky."],
+        ["The Careful Kindness", "Kindness is given freely, but a limit sits beneath it."],
+        ["The Doubt at Night", "Certainty is easier by day than after midnight."],
+        ["The Old Photograph", "Some pictures hold a version of you that is still argued with."],
+        ["The Unsaid Thing", "A truth is nearly said, then postponed once more."],
+        ["The Chosen Distance", "Closeness is wanted, in measured amounts."],
+        ["The Sharp Memory", "A remark from years ago can still be quoted exactly."],
+        ["The Second Draft", "Work is quietly judged harsher than anyone else would judge it."],
+        ["The Restless Map", "Somewhere else has always looked slightly more possible."],
+        ["The Kept Promise", "A vow made lightly ended up costing something."],
+        ["The Mask Drawer", "Different rooms get different versions of the same person."],
+        ["The Slow Forgiveness", "Some wrongs are forgiven in words but not in habit."],
+        ["The Hidden Talent", "A gift is used less often than it deserves."],
+        ["The Waiting Room", "Some part of life feels like it is waiting to begin."],
+        ["The Loud Silence", "Being unasked has felt heavier than being refused."],
+        ["The Inherited Rule", "A family rule is still obeyed, though nobody remembers its reason."],
+        ["The Held Hand", "Support is offered easily and asked for rarely."],
+        ["The Unfinished Song", "Something started with great energy is still unfinished."],
+        ["The Turned Key", "A change of mind is possible, but never announced."],
+        ["The Last Light", "Comfort arrives in small things at the end of the day."],
     ];
-
-    const SCREEN_IDS = {
-        entry: "screen-entry",
-        conversation: "screen-conversation",
-        deck: "screen-deck",
-        reveal: "screen-reveal",
+    const BEHAVIOR_PRESENTATION = {
+        understanding: ["understanding", "I am listening."],
+        mirroring: ["mirroring", "I hear you."],
+        absurd: ["absurd", "I was saying something."],
+        memory_loss: ["memory_loss", "Where were we?"],
+        roast: ["roast", "Are you sure?"],
+        system_glitch: ["system_glitch", "..."],
+        help_me: ["help_me", "Help me follow."],
+        mixed: ["mixed", "I am still listening."],
+        banana: ["banana", "..."],
+        listening: ["listening", "I am listening."],
+        idle: ["idle", ""],
+        intervention: ["intervention", "..."]
     };
-
-    let sessionId = null;
-    let conversationClosed = false;
-    let mediaRecorder = null;
+    const session = {
+        id: null,
+        startedAt: Date.now(),
+        text: "",
+        modalities: {},
+        messages: [],
+        card: null,
+        trace: { turns: 0, pauses: 0, questions: 0, repeats: 0 },
+        previousText: "",
+        previousSubmitAt: null
+    };
+    let audioRecorder = null;
     let audioChunks = [];
     let cameraStream = null;
-    let composerFocusedAt = null;
-    let firstInputAt = null;
-    let lastUserTexts = [];
-    let chosenCardIndex = null;
-    let chosenCardText = "";
+    let processing = false;
 
-    const trace = {
-        text: 0,
-        voice: 0,
-        image: 0,
-        camera: 0,
-        questions: 0,
-        pauses: 0,
-        repeats: 0,
-        reflections: 0,
-    };
+    const $ = (selector) => document.querySelector(selector);
+    const screens = [1, 2, 3, 4, 6, 7, 8, 9];
 
-    const screenEntry = document.getElementById(SCREEN_IDS.entry);
-    const screenConversation = document.getElementById(SCREEN_IDS.conversation);
-    const screenDeck = document.getElementById(SCREEN_IDS.deck);
-    const screenReveal = document.getElementById(SCREEN_IDS.reveal);
-    const btnEnter = document.getElementById("btn-enter");
-    const btnSend = document.getElementById("btn-send");
-    const btnVoice = document.getElementById("btn-voice");
-    const btnImage = document.getElementById("btn-image");
-    const btnCamera = document.getElementById("btn-camera");
-    const btnToDeck = document.getElementById("btn-to-deck");
-    const btnDeckContinue = document.getElementById("btn-deck-continue");
-    const conversationContinue = document.getElementById("conversation-continue");
-    const imageFileInput = document.getElementById("image-file-input");
-    const messageInput = document.getElementById("message-input");
-    const conversationEl = document.getElementById("conversation");
-    const modalityStatus = document.getElementById("modality-status");
-    const cameraOverlay = document.getElementById("camera-overlay");
-    const cameraPreview = document.getElementById("camera-preview");
-    const btnCameraCapture = document.getElementById("btn-camera-capture");
-    const btnCameraCancel = document.getElementById("btn-camera-cancel");
-    const modalityButtons = document.querySelectorAll(".ftp2-modality__btn");
-    const entryError = document.getElementById("entry-error");
-    const sessionLabel = document.getElementById("session-label");
-    const deckGrid = document.getElementById("deck-grid");
-    const blackout = document.getElementById("blackout");
-    const revealStatement = document.getElementById("reveal-statement");
-    const revealCardNum = document.getElementById("reveal-card-num");
-    const revealEvidenceList = document.getElementById("reveal-evidence-list");
-
-    function showScreen(name) {
-        const targets = {
-            entry: screenEntry,
-            conversation: screenConversation,
-            deck: screenDeck,
-            reveal: screenReveal,
-        };
-        Object.keys(targets).forEach(function (key) {
-            const el = targets[key];
-            if (!el) {
-                return;
-            }
-            const active = key === name;
-            el.hidden = !active;
-            el.classList.toggle("ftp2-screen--active", active);
+    function go(number) {
+        screens.forEach((value) => {
+            const screen = $("#s" + value);
+            if (screen) screen.classList.toggle("on", value === number);
         });
+        if (number === 4) $("#say").focus();
+        if (number === 6) buildCards();
+        if (number === 7) reveal();
+        if (number === 8) buildWall();
     }
 
-    function formatTime(date) {
-        const h = String(date.getHours()).padStart(2, "0");
-        const m = String(date.getMinutes()).padStart(2, "0");
-        const s = String(date.getSeconds()).padStart(2, "0");
-        return h + ":" + m + ":" + s;
-    }
-
-    function formatDuration(ms) {
-        const totalSec = Math.max(0, Math.floor(ms / 1000));
-        const min = Math.floor(totalSec / 60);
-        const sec = totalSec % 60;
-        const cs = Math.floor((ms % 1000) / 10);
-        return String(min).padStart(2, "0") + ":" + String(sec).padStart(2, "0") + "." + String(cs).padStart(2, "0");
-    }
-
-    function updateTraceUI() {
-        const map = {
-            "trace-text": trace.text,
-            "trace-voice": trace.voice,
-            "trace-image": trace.image,
-            "trace-camera": trace.camera,
-            "trace-questions": trace.questions,
-            "trace-pauses": trace.pauses,
-            "trace-repeats": trace.repeats,
-            "trace-reflections": trace.reflections,
-        };
-        Object.keys(map).forEach(function (id) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.textContent = String(map[id]);
-            }
-        });
-    }
-
-    function notePauseBeforeSend() {
-        const pauseMs = composerFocusedAt ? Date.now() - composerFocusedAt : 0;
-        if (pauseMs > 4000) {
-            trace.pauses += 1;
-            updateTraceUI();
-        }
-    }
-
-    function noteUserText(text) {
-        const trimmed = text.trim();
-        if (trimmed.endsWith("?")) {
-            trace.questions += 1;
-        }
-        if (lastUserTexts.indexOf(trimmed) !== -1 && trimmed.length > 0) {
-            trace.repeats += 1;
-        }
-        lastUserTexts.push(trimmed);
-        if (/\b(i feel|i think|i wonder|i'm not sure|i am not sure)\b/i.test(trimmed)) {
-            trace.reflections += 1;
-        }
-        trace.text += 1;
-        updateTraceUI();
-    }
-
-    function setEntryError(message) {
-        if (!entryError) {
-            return;
-        }
-        if (message) {
-            entryError.textContent = message;
-            entryError.hidden = false;
-        } else {
-            entryError.textContent = "";
-            entryError.hidden = true;
-        }
-    }
-
-    function setStatus(text, recording) {
-        modalityStatus.textContent = text || "";
-        modalityStatus.classList.toggle("ftp2-status--recording", Boolean(recording));
-    }
-
-    function setModalityActive(modality) {
-        modalityButtons.forEach(function (btn) {
-            const active = btn.getAttribute("data-modality") === modality;
-            btn.classList.toggle("ftp2-modality__btn--active", active);
-            if (btn.id === "btn-voice") {
-                btn.setAttribute(
-                    "aria-pressed",
-                    active && btn.classList.contains("ftp2-modality__btn--recording") ? "true" : "false"
-                );
-            }
-        });
-    }
-
-    function resetComposerTiming() {
-        composerFocusedAt = Date.now();
-        firstInputAt = null;
-    }
-
-    function composerTelemetryFor(text) {
-        const now = Date.now();
-        const typingStart = firstInputAt || composerFocusedAt || now;
-        const focusStart = composerFocusedAt || typingStart;
-        return {
-            typing_duration_ms: Math.max(0, now - typingStart),
-            pause_before_submit_ms: Math.max(0, now - focusStart),
-            message_length: text.length,
-        };
-    }
-
-    function scrollConversationToEnd() {
-        conversationEl.scrollTop = conversationEl.scrollHeight;
-    }
-
-    function appendMessage(role, text, extra) {
-        const block = document.createElement("article");
-        let modClass = "parrot";
-        let who = "PARROT";
-        if (role === "user") {
-            modClass = "user";
-            who = "YOU";
-        } else if (role === "error") {
-            modClass = "error";
-            who = "NOTICE";
-        } else if (role === "ack") {
-            modClass = "ack";
-            who = "";
-        }
-        block.className = "ftp2-record-entry ftp2-record-entry--" + modClass;
-
-        const head = document.createElement("div");
-        head.className = "ftp2-record-entry__head";
-
-        if (who) {
-            const whoEl = document.createElement("span");
-            whoEl.className = "ftp2-record-entry__who";
-            whoEl.textContent = who;
-            head.appendChild(whoEl);
-        }
-
-        const timeEl = document.createElement("span");
-        timeEl.className = "ftp2-record-entry__time";
-        timeEl.textContent = formatTime(new Date());
-        head.appendChild(timeEl);
-
-        const body = document.createElement("p");
-        body.className = "ftp2-record-entry__body";
-        if (role === "user" || role === "parrot") {
-            body.textContent = "\"" + text + "\"";
-        } else {
-            body.textContent = text;
-        }
-
-        if (role !== "ack" || who) {
-            block.appendChild(head);
-        } else {
-            block.appendChild(head);
-        }
-        block.appendChild(body);
-        conversationEl.appendChild(block);
-        scrollConversationToEnd();
-
-        if (extra && role === "ack") {
-            body.textContent = extra;
-        }
-    }
-
-    function showReceived(kind, detail) {
-        let line = "THE PARROT HAS RECEIVED THIS.";
-        if (kind === "voice" && detail) {
-            line = "RECEIVED — VOICE " + detail;
-        } else if (kind === "image") {
-            line = "RECEIVED — IMAGE";
-        } else if (kind === "camera") {
-            line = "RECEIVED — LOOK";
-        }
-        appendMessage("ack", line);
-        setStatus("");
-    }
-
-    function setComposerEnabled(enabled) {
-        messageInput.disabled = !enabled;
-        btnSend.disabled = !enabled;
-        btnVoice.disabled = !enabled;
-        btnImage.disabled = !enabled;
-        btnCamera.disabled = !enabled;
-    }
-
-    function sessionDisplayId(id) {
-        if (!id) {
-            return "SESSION — —";
-        }
-        return "SESSION " + id.slice(0, 8).toUpperCase();
-    }
-
-    function buildDeck() {
-        if (!deckGrid || deckGrid.childElementCount > 0) {
-            return;
-        }
-        DECK_STATEMENTS.forEach(function (statement, index) {
-            const num = index + 1;
-            const card = document.createElement("div");
-            card.className = "ftp2-deck-card";
-            card.setAttribute("role", "listitem");
-            card.dataset.cardIndex = String(num);
-
-            const numEl = document.createElement("span");
-            numEl.className = "ftp2-deck-card__num";
-            numEl.textContent = "NO. " + String(num).padStart(2, "0");
-
-            const textEl = document.createElement("p");
-            textEl.className = "ftp2-deck-card__text";
-            textEl.textContent = statement;
-
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "ftp2-deck-card__resonate";
-            btn.textContent = "RESONATES";
-            btn.addEventListener("click", function () {
-                deckGrid.querySelectorAll(".ftp2-deck-card").forEach(function (c) {
-                    c.classList.remove("ftp2-deck-card--chosen");
-                });
-                card.classList.add("ftp2-deck-card--chosen");
-                chosenCardIndex = num;
-                chosenCardText = statement;
-                btnDeckContinue.disabled = false;
-            });
-
-            card.appendChild(numEl);
-            card.appendChild(textEl);
-            card.appendChild(btn);
-            deckGrid.appendChild(card);
-        });
-    }
-
-    function runBlackoutThenReveal() {
-        if (!blackout) {
-            showScreen("reveal");
-            populateReveal();
-            return;
-        }
-        blackout.hidden = false;
-        requestAnimationFrame(function () {
-            blackout.classList.add("ftp2-blackout--visible");
-        });
-        const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 200 : 1400;
-        setTimeout(function () {
-            showScreen("reveal");
-            populateReveal();
-            blackout.classList.remove("ftp2-blackout--visible");
-            setTimeout(function () {
-                blackout.hidden = true;
-            }, duration);
-        }, duration);
-    }
-
-    function populateReveal() {
-        const num = chosenCardIndex || 7;
-        const statement = chosenCardText || DECK_STATEMENTS[num - 1];
-        if (revealCardNum) {
-            revealCardNum.textContent = "CARD " + String(num).padStart(2, "0");
-        }
-        if (revealStatement) {
-            revealStatement.textContent = statement.toUpperCase();
-        }
-        if (revealEvidenceList) {
-            revealEvidenceList.innerHTML = "";
-            const items = [
-                String(trace.text) + " conversational turns",
-                String(trace.pauses) + " hesitation events",
-                String(trace.reflections) + " uncertainty markers",
-                String(Math.min(trace.repeats, 9)) + " contradictions",
-                String(trace.questions + trace.pauses) + " delayed responses",
-            ];
-            items.forEach(function (line) {
-                const li = document.createElement("li");
-                li.textContent = line;
-                revealEvidenceList.appendChild(li);
-            });
-        }
-    }
-
-    async function beginSession() {
-        setEntryError("");
-        btnEnter.disabled = true;
-        btnEnter.textContent = "…";
-        try {
-            const response = await fetch("/api/session/start", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-            });
-            let data = {};
-            try {
-                data = await response.json();
-            } catch (parseErr) {
-                if (!response.ok) {
-                    throw new Error("Could not start session.");
-                }
-            }
-            if (!response.ok || !data.session_id) {
-                throw new Error(data.error || "Could not start session.");
-            }
-            sessionId = data.session_id;
-            setEntryError("");
-            if (sessionLabel) {
-                sessionLabel.textContent = sessionDisplayId(sessionId);
-            }
-            showScreen("conversation");
-            resetComposerTiming();
-            messageInput.focus();
-        } catch (err) {
-            btnEnter.disabled = false;
-            btnEnter.textContent = "ENTER";
-            setEntryError(err.message || "Connection failed.");
-        }
-    }
-
-    async function ingestBlob(modality, blob, filename, metadata) {
-        if (!sessionId || conversationClosed) {
-            return;
-        }
-        const form = new FormData();
-        form.append("session_id", sessionId);
-        form.append("modality", modality);
-        form.append("file", blob, filename);
-        if (metadata) {
-            form.append("metadata", JSON.stringify(metadata));
-        }
-        const response = await fetch("/api/input/ingest", {
-            method: "POST",
-            body: form,
-        });
+    async function requestJson(url, options) {
+        const response = await fetch(url, options);
         const data = await response.json();
-        if (!response.ok || !data.ok) {
-            throw new Error(data.error || "Upload failed.");
-        }
+        if (!response.ok) throw new Error(data.error || "The apparatus could not complete that action.");
         return data;
     }
 
-    async function sendMessage() {
-        if (conversationClosed) {
-            return;
-        }
-
-        const text = messageInput.value.trim();
-        if (!text) {
-            return;
-        }
-
-        notePauseBeforeSend();
-        noteUserText(text);
-        appendMessage("user", text);
-        const telemetry = composerTelemetryFor(text);
-        messageInput.value = "";
-        setComposerEnabled(false);
-        btnSend.textContent = "…";
-        setStatus("");
-
-        try {
-            const response = await fetch("/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    message: text,
-                    composer_telemetry: telemetry,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok || data.error) {
-                appendMessage("error", data.error || "The request could not be completed.");
-                return;
-            }
-
-            if (data.session_id) {
-                sessionId = data.session_id;
-                if (sessionLabel) {
-                    sessionLabel.textContent = sessionDisplayId(sessionId);
-                }
-            }
-
-            if (data.response) {
-                appendMessage("parrot", data.response);
-            }
-
-            if (data.closed) {
-                conversationClosed = true;
-                setComposerEnabled(false);
-                messageInput.placeholder = "This record is closed.";
-                const listening = document.getElementById("listening-status");
-                if (listening) {
-                    listening.textContent = "THE RECORD IS CLOSED";
-                }
-                if (conversationContinue) {
-                    conversationContinue.hidden = false;
-                }
-            }
-        } catch (err) {
-            appendMessage("error", err.message || "Connection failed.");
-        } finally {
-            resetComposerTiming();
-            if (!conversationClosed) {
-                setComposerEnabled(true);
-                btnSend.textContent = "RECORD";
-                messageInput.focus();
-            } else {
-                btnSend.textContent = "RECORD";
-            }
-        }
+    function formDataFor(modality, blob, filename, metadata) {
+        const form = new FormData();
+        form.append("session_id", session.id);
+        form.append("modality", modality);
+        form.append("file", blob, filename);
+        if (metadata) form.append("metadata", JSON.stringify(metadata));
+        return form;
     }
 
-    async function toggleVoiceRecording() {
-        if (conversationClosed || !sessionId) {
+    async function ingest(modality, blob, filename, metadata) {
+        await requestJson("/api/input/ingest", { method: "POST", body: formDataFor(modality, blob, filename, metadata) });
+        session.modalities[modality] = true;
+    }
+
+    function slotMarkup(name, description, graphic) {
+        return "<div class=\"mono\">" + name + "</div>" + graphic + "<div class=\"vt\">" + description + "</div><div class=\"row\" style=\"gap:8px\"></div>";
+    }
+
+    function setSlot(slot, state) {
+        const row = slot.querySelector(".row");
+        const description = slot.querySelector(".vt");
+        slot.classList.remove("live", "got");
+        row.innerHTML = "";
+        if (state === "got") {
+            slot.classList.add("got");
+            description.innerHTML = '<span class="st">RECEIVED</span>';
+            const undo = button("Undo", "dk");
+            undo.onclick = () => { delete session.modalities[slot.dataset.modality]; setSlot(slot, "idle"); checkReady(); };
+            row.appendChild(undo);
             return;
         }
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-            mediaRecorder.stop();
-            return;
-        }
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioChunks = [];
-            const startedAt = Date.now();
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.ondataavailable = function (event) {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
-            };
-            mediaRecorder.onstop = async function () {
-                stream.getTracks().forEach(function (t) { t.stop(); });
-                btnVoice.classList.remove("ftp2-modality__btn--recording");
-                const verb = btnVoice.querySelector(".ftp2-modality__verb");
-                if (verb) {
-                    verb.textContent = "SPEAK";
-                }
-                btnVoice.setAttribute("aria-pressed", "false");
-                setStatus("");
-                const blob = new Blob(audioChunks, { type: "audio/webm" });
-                const durationMs = Date.now() - startedAt;
-                try {
-                    setStatus("Receiving…");
-                    await ingestBlob("AUDIO", blob, "voice.webm", { duration_ms: durationMs });
-                    trace.voice += 1;
-                    updateTraceUI();
-                    showReceived("voice", formatDuration(durationMs));
-                } catch (err) {
-                    appendMessage("error", err.message);
-                }
-            };
-            mediaRecorder.start();
-            const verb = btnVoice.querySelector(".ftp2-modality__verb");
-            if (verb) {
-                verb.textContent = "STOP";
-            }
-            btnVoice.classList.add("ftp2-modality__btn--recording");
-            btnVoice.setAttribute("aria-pressed", "true");
-            setModalityActive("voice");
-            setStatus("Recording", true);
-        } catch (err) {
-            setStatus("Microphone unavailable");
-            appendMessage("error", err.message || "Microphone unavailable.");
-        }
+        const action = button(slot.dataset.modality === "WRITE" ? "Keep" : slot.dataset.modality, "dk");
+        action.onclick = () => activateSlot(slot);
+        row.appendChild(action);
     }
 
-    async function handleImageFile(file) {
-        if (!file || conversationClosed) {
-            return;
-        }
-        try {
-            setStatus("Receiving…");
-            await ingestBlob("IMAGE", file, file.name || "image.jpg", {});
-            trace.image += 1;
-            updateTraceUI();
-            showReceived("image");
-        } catch (err) {
-            appendMessage("error", err.message);
-        }
-        imageFileInput.value = "";
-        setModalityActive("text");
-        setStatus("");
+    function button(label, style) {
+        const element = document.createElement("button");
+        element.type = "button";
+        element.className = "act" + (style === "dk" ? " dk" : "");
+        element.style.cssText = "padding:8px 16px;font-size:11px";
+        element.textContent = label;
+        return element;
     }
 
-    async function openCamera() {
-        if (conversationClosed || !sessionId) {
-            return;
-        }
-        try {
-            setStatus("Opening…");
-            cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" },
-            });
-            cameraPreview.srcObject = cameraStream;
-            cameraOverlay.hidden = false;
-            setModalityActive("camera");
-            setStatus("");
-        } catch (err) {
-            setStatus("Camera unavailable");
-            appendMessage("error", err.message || "Camera unavailable.");
-        }
-    }
-
-    function closeCamera() {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(function (t) { t.stop(); });
-            cameraStream = null;
-        }
-        cameraPreview.srcObject = null;
-        cameraOverlay.hidden = true;
-        setModalityActive("text");
-        setStatus("");
-    }
-
-    async function captureCameraFrame() {
-        const video = cameraPreview;
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(async function (blob) {
-            closeCamera();
-            if (!blob) {
-                appendMessage("error", "Capture failed.");
-                return;
-            }
-            try {
-                setStatus("Receiving…");
-                await ingestBlob("CAMERA", blob, "camera.jpg", {});
-                trace.camera += 1;
-                updateTraceUI();
-                showReceived("camera");
-            } catch (err) {
-                appendMessage("error", err.message);
-            }
-        }, "image/jpeg", 0.92);
-    }
-
-    btnEnter.addEventListener("click", beginSession);
-    btnSend.addEventListener("click", sendMessage);
-    btnVoice.addEventListener("click", toggleVoiceRecording);
-    btnImage.addEventListener("click", function () {
-        setModalityActive("image");
-        imageFileInput.click();
-    });
-    btnCamera.addEventListener("click", openCamera);
-    btnCameraCapture.addEventListener("click", captureCameraFrame);
-    btnCameraCancel.addEventListener("click", closeCamera);
-
-    if (btnToDeck) {
-        btnToDeck.addEventListener("click", function () {
-            buildDeck();
-            showScreen("deck");
+    function buildSlots() {
+        const definitions = [
+            ["WRITE", "Paper receives your words", '<textarea class="paperin" aria-label="Write" placeholder="Write here"></textarea>'],
+            ["SPEAK", "Ceramic listens", '<div class="mat"><svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="38" fill="#E6D7B8"/><circle cx="48" cy="48" r="26" fill="none" stroke="#171411" stroke-dasharray="2 5" stroke-width="3"/><circle cx="48" cy="48" r="8" fill="#171411"/></svg></div>'],
+            ["SHOW", "The tray takes an object", '<div class="mat"><svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true"><rect x="6" y="40" width="84" height="16" fill="#000"/><rect x="10" y="44" width="76" height="8" fill="#07110D" stroke="#C4A035"/><path d="M20 40V16h56v24" fill="#D8C49D" stroke="#171411"/></svg></div>'],
+            ["LOOK", "The glass observes", '<div class="mat"><svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true"><rect x="8" y="16" width="80" height="64" fill="#102019" stroke="#C4A035" stroke-width="3"/><circle cx="48" cy="48" r="20" fill="#07110D" stroke="#2A6B5C" stroke-width="3"/><ellipse cx="41" cy="41" rx="6" ry="3" fill="#E6D7B8" opacity=".5"/></svg></div>'],
+        ];
+        const container = $("#slots");
+        definitions.forEach(([name, description, graphic]) => {
+            const slot = document.createElement("div");
+            slot.className = "slot";
+            slot.dataset.modality = name;
+            slot.innerHTML = slotMarkup(name, description, graphic);
+            container.appendChild(slot);
+            setSlot(slot, "idle");
         });
     }
 
-    if (btnDeckContinue) {
-        btnDeckContinue.addEventListener("click", runBlackoutThenReveal);
+    async function activateSlot(slot) {
+        const modality = slot.dataset.modality;
+        const description = slot.querySelector(".vt");
+        if (modality === "WRITE") {
+            const text = slot.querySelector("textarea").value.trim();
+            if (!text) { description.innerHTML = '<span class="err">Nothing written yet. Write a few words, then keep.</span>'; return; }
+            session.text = text;
+            session.modalities.WRITE = true;
+            setSlot(slot, "got");
+            checkReady();
+            return;
+        }
+        slot.classList.add("live");
+        description.textContent = modality === "SPEAK" ? "RECORDING" : "OPEN";
+        try {
+            if (modality === "SPEAK") await recordAudio(slot);
+            if (modality === "SHOW") await chooseImage(slot);
+            if (modality === "LOOK") await captureCamera(slot);
+        } catch (error) {
+            description.textContent = error.message || "Unavailable in this environment.";
+            slot.classList.remove("live");
+        }
     }
 
-    imageFileInput.addEventListener("change", function () {
-        const file = imageFileInput.files && imageFileInput.files[0];
-        if (file) {
-            handleImageFile(file);
-        }
-    });
+    function chooseImage(slot) {
+        return new Promise((resolve, reject) => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+            input.onchange = async () => {
+                const file = input.files && input.files[0];
+                if (!file) return reject(new Error("No image selected."));
+                try { await ingest("IMAGE", file, file.name || "image.jpg"); setSlot(slot, "got"); checkReady(); resolve(); }
+                catch (error) { reject(error); }
+            };
+            input.click();
+        });
+    }
 
-    modalityButtons.forEach(function (btn) {
-        if (btn.getAttribute("data-modality") === "text") {
-            btn.addEventListener("click", function () {
-                setModalityActive("text");
-                messageInput.focus();
-            });
-        }
-    });
+    function recordAudio(slot) {
+        return new Promise(async (resolve, reject) => {
+            if (!navigator.mediaDevices || !window.MediaRecorder) return reject(new Error("Microphone unavailable."));
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioChunks = [];
+                const startedAt = Date.now();
+                audioRecorder = new MediaRecorder(stream);
+                audioRecorder.ondataavailable = (event) => { if (event.data.size) audioChunks.push(event.data); };
+                audioRecorder.onstop = async () => {
+                    stream.getTracks().forEach((track) => track.stop());
+                    try { await ingest("AUDIO", new Blob(audioChunks, { type: "audio/webm" }), "voice.webm", { duration_ms: Date.now() - startedAt }); setSlot(slot, "got"); checkReady(); resolve(); }
+                    catch (error) { reject(error); }
+                };
+                audioRecorder.start();
+                const stop = button("Done", "");
+                slot.querySelector(".row").appendChild(stop);
+                stop.onclick = () => audioRecorder.stop();
+            } catch (error) { reject(error); }
+        });
+    }
 
-    messageInput.addEventListener("focus", resetComposerTiming);
-    messageInput.addEventListener("input", function () {
-        if (!firstInputAt) {
-            firstInputAt = Date.now();
-        }
-    });
+    async function captureCamera(slot) {
+        if (!navigator.mediaDevices) throw new Error("Camera unavailable.");
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const video = document.createElement("video");
+        video.autoplay = true;
+        video.playsInline = true;
+        video.srcObject = cameraStream;
+        slot.querySelector(".mat").replaceChildren(video);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", .92));
+        cameraStream.getTracks().forEach((track) => track.stop());
+        cameraStream = null;
+        if (!blob) throw new Error("Capture failed.");
+        await ingest("CAMERA", blob, "camera.jpg");
+        setSlot(slot, "got");
+        checkReady();
+    }
 
-    messageInput.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            sendMessage();
-        }
-    });
+    function checkReady() { $("#go3").disabled = !Object.values(session.modalities).some(Boolean); }
 
-    buildDeck();
-    updateTraceUI();
+    function setParrotPresentation(behavior, phase) {
+        const presentation = BEHAVIOR_PRESENTATION[behavior] || BEHAVIOR_PRESENTATION.listening;
+        const parrot = $("#par");
+        parrot.dataset.behavior = presentation[0];
+        parrot.dataset.phase = phase || "settled";
+        parrot.closest(".stage").dataset.behavior = presentation[0];
+        $("#pst").textContent = presentation[1];
+    }
+
+    function observeMessage(text) {
+        const normalized = text.trim().toLowerCase();
+        const now = Date.now();
+        session.trace.turns += 1;
+        session.trace.questions += text.includes("?") ? 1 : 0;
+        session.trace.repeats += normalized && normalized === session.previousText ? 1 : 0;
+        session.trace.pauses += session.previousSubmitAt && now - session.previousSubmitAt > 4000 ? 1 : 0;
+        session.previousText = normalized;
+        session.previousSubmitAt = now;
+        updateObservationTrace();
+    }
+
+    function updateObservationTrace() {
+        Object.entries(session.trace).forEach(([name, count]) => {
+            const mark = document.querySelector('[data-mark="' + name + '"]');
+            if (mark) mark.style.setProperty("--mark-length", Math.min(12, 2 + count) + "ch");
+        });
+    }
+
+    async function beginSession() {
+        try {
+            const data = await requestJson("/api/session/start", { method: "POST", headers: { "Content-Type": "application/json" } });
+            session.id = data.session_id;
+            session.startedAt = Date.now();
+            go(2);
+        } catch (error) { showError(error.message); }
+    }
+
+    async function beginProcessing() {
+        if (processing) return;
+        processing = true;
+        go(3);
+        try {
+            if (session.text) {
+                const result = await requestJson("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id, message: session.text }) });
+                session.messages.push({ role: "user", text: session.text }, { role: "parrot", text: result.response || "" });
+                observeMessage(session.text);
+                setParrotPresentation(result.parrot_behavior, "responding");
+            }
+            go(4);
+            if (session.messages.length) line(session.messages[session.messages.length - 1].text, "");
+        } catch (error) { processing = false; showError(error.message); go(2); }
+    }
+
+    function showError(message) { const error = $("#flow-error"); error.textContent = message; error.hidden = false; }
+    function line(text, className) { const element = document.createElement("div"); element.className = "pl " + (className || ""); element.textContent = text; $("#log").appendChild(element); while ($("#log").children.length > 6) $("#log").firstChild.remove(); }
+    function slip(text) { const element = document.createElement("div"); element.className = "slip"; element.textContent = text; $("#log").appendChild(element); }
+
+    async function say() {
+        const input = $("#say");
+        const text = input.value.trim();
+        if (!text || !session.id) return;
+        input.value = "";
+        slip(text);
+        $("#par").dataset.phase = "thinking";
+        try {
+            const result = await requestJson("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id, message: text }) });
+            observeMessage(text);
+            session.messages.push({ role: "user", text }, { role: "parrot", text: result.response || "" });
+            setParrotPresentation(result.parrot_behavior, "responding");
+            const glitch = ["system_glitch", "intervention"].includes(result.parrot_behavior);
+            line(result.response || "", glitch ? "g" : "");
+            if (result.closed) {
+                $("#say").disabled = true;
+                $("#send").disabled = true;
+                $("#done").hidden = false;
+            }
+            if (session.messages.filter((message) => message.role === "user").length >= 2) $("#done").hidden = false;
+        } catch (error) { $("#par").dataset.phase = "settled"; showError(error.message); }
+    }
+
+    async function finishConversation() {
+        try {
+            const result = await requestJson("/api/end-conversation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id }) });
+            if (result.message) line(result.message, "g");
+            go(6);
+        } catch (error) { showError(error.message); }
+    }
+
+    function buildCards() {
+        const vitrine = $("#vit");
+        if (vitrine.children.length) return;
+        CARDS.forEach(([title, description], index) => {
+            const card = document.createElement("button");
+            card.type = "button";
+            card.className = "card";
+            card.innerHTML = "<b>CARD " + String(index + 1).padStart(2, "0") + "</b><span>" + title + "</span>";
+            card.onclick = () => openCard(index, card);
+            vitrine.appendChild(card);
+        });
+    }
+
+    function openCard(index, card) {
+        document.querySelectorAll(".card").forEach((element) => element.classList.remove("up"));
+        card.classList.add("up");
+        const box = $("#cardbox");
+        box.innerHTML = "";
+        const detail = document.createElement("div");
+        detail.className = "big";
+        detail.innerHTML = '<span class="mono">Card ' + String(index + 1).padStart(2, "0") + " of 27</span><h3>" + CARDS[index][0] + "</h3><p>" + CARDS[index][1] + "</p>";
+        const resonate = button("Resonates", "");
+        detail.appendChild(resonate);
+        resonate.onclick = async () => {
+            try {
+                await requestJson("/api/session-lifecycle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id, action: "card_selection", card_index: index + 1, card_text: CARDS[index][1] }) });
+                session.card = index;
+                go(7);
+            } catch (error) { showError(error.message); }
+        };
+        box.appendChild(detail);
+    }
+
+    function record(text, tag) { return '<div class="rec"><span>' + escapeHtml(text) + '</span><span class="tag">' + tag + '</span></div>'; }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character])); }
+
+    function reveal() {
+        const container = $("#dt");
+        const screen = $("#s7");
+        screen.style.opacity = 0;
+        setTimeout(() => {
+            screen.style.opacity = 1;
+            container.innerHTML = '<div class="stmt" id="st">You played your cards.<br>Now I play mine.</div>';
+            setTimeout(() => {
+                $("#st").classList.add("m", "gl");
+                const ladder = document.createElement("div");
+                ladder.className = "lad";
+                const userMessages = session.messages.filter((message) => message.role === "user");
+                const rows = [
+                    ["What you gave", (session.text ? record('Written: "' + session.text + '"', "GIVEN") : "") + userMessages.map((message) => record('To the Parrot: "' + message.text + '"', "GIVEN")).join("") + (session.card !== null ? record("Card " + String(session.card + 1).padStart(2, "0") + " marked as resonating", "GIVEN") : "")],
+                    ["What we received", record(Object.keys(session.modalities).length + " input slot(s) marked received", "OBSERVED") + record(userMessages.length + " message(s) to the Parrot", "OBSERVED")],
+                    ["What we observed", record("Session length so far: " + Math.round((Date.now() - session.startedAt) / 1000) + " seconds", "OBSERVED") + record("Interaction count: " + (Object.keys(session.modalities).length + userMessages.length + (session.card === null ? 0 : 1)), "OBSERVED") + record(session.trace.pauses + " pauses between messages", "OBSERVED") + record(session.trace.questions + " questions", "OBSERVED") + record(session.trace.repeats + " repeated messages", "OBSERVED")],
+                    ["What we derived", session.card === null ? '<div class="none">No card was marked.</div>' : record("Card " + String(session.card + 1).padStart(2, "0") + " is one you said resonates. That is all it shows.", "DERIVED")],
+                    ["What we constructed", '<div class="none">The existing system records patterns and responses. It does not know what you felt.</div>'],
+                    ["What we cannot know", record("Whether the card fits you or fits almost anyone.", "LIMIT") + record("What you felt. Only what you did.", "LIMIT") + record("Whether you were understood or interpreted.", "LIMIT")],
+                ];
+                rows.forEach(([heading, body], index) => { const rung = document.createElement("div"); rung.className = "rung"; rung.style.animationDelay = (index * .6) + "s"; rung.innerHTML = "<h4>" + heading.toUpperCase() + "</h4>" + (body || '<div class="none">Nothing.</div>'); ladder.appendChild(rung); });
+                container.appendChild(ladder);
+                const continueButton = button("Continue", "");
+                continueButton.style.margin = "48px auto 0";
+                continueButton.onclick = async () => {
+                    try { await requestJson("/api/session-lifecycle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id, action: "reveal" }) }); go(8); }
+                    catch (error) { showError(error.message); }
+                };
+                container.appendChild(continueButton);
+            }, 1400);
+        }, 1200);
+    }
+
+    function buildWall() {
+        const tiles = [];
+        if (session.text) tiles.push(['"' + session.text + '"', "Original input", "GIVEN · WRITE"]);
+        session.messages.filter((message) => message.role === "user").forEach((message) => tiles.push(['"' + message.text + '"', "To the Parrot", "GIVEN · CONVERSATION"]));
+        if (session.card !== null) tiles.push([CARDS[session.card][0] + ": " + CARDS[session.card][1], "Card " + String(session.card + 1).padStart(2, "0"), "CHOSEN"]);
+        tiles.push([Math.round((Date.now() - session.startedAt) / 1000) + " seconds, " + session.messages.length + " interactions", "Session trace", "OBSERVED"]);
+        $("#tiles").innerHTML = tiles.map(([text, label, tag]) => '<div class="tile"><span class="tag">' + escapeHtml(tag) + '</span><div>' + escapeHtml(text) + '</div><span class="tag">' + escapeHtml(label) + '</span></div>').join("");
+    }
+
+    async function endSession(consentType) {
+        $("#private").disabled = true;
+        $("#wall").disabled = true;
+        try {
+            await requestJson("/api/session-lifecycle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id, action: "consent", consent_type: consentType }) });
+            await requestJson("/api/session-output", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id }) });
+            go(9);
+            const end = $("#s9");
+            end.style.opacity = 1;
+            setTimeout(async () => {
+                try { await requestJson("/api/session-output-reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: session.id, consent_type: consentType }) }); }
+                catch (error) { showError(error.message); }
+                setTimeout(() => { end.innerHTML = ""; end.style.opacity = 1; }, 3000);
+            }, 1200);
+        } catch (error) { $("#private").disabled = false; $("#wall").disabled = false; showError(error.message); }
+    }
+
+    $("#enter").onclick = beginSession;
+    $("#go3").onclick = beginProcessing;
+    $("#send").onclick = say;
+    $("#say").onkeydown = (event) => { if (event.key === "Enter") { event.preventDefault(); say(); } };
+    $("#done").onclick = finishConversation;
+    $("#private").onclick = () => endSession("KEEP_PRIVATE");
+    $("#wall").onclick = () => endSession("SHARE");
+    buildSlots();
 })();

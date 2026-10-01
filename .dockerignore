@@ -23,3 +23,5 @@ audit_parrot_behaviour.py
 trigger_scan.py
 inspect_*.py
 Final success state.txt
+frontend/kimi/node_modules
+frontend/kimi/dist
