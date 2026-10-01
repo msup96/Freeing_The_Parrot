@@ -9,30 +9,50 @@
 <body>
     <div class="ftp2-grain" aria-hidden="true"></div>
     <div id="app" class="ftp2-app">
-        <!-- 01 ENTRY — THE APPARATUS -->
-        <section id="screen-entry" class="ftp2-screen ftp2-screen--active" aria-label="Entry">
-            <div class="ftp2-entry-frame">
-                <div class="ftp2-meta-row ftp2-meta-row--entry">
+        <!-- 01 ENTRY — THE APPARATUS (Scene 01) -->
+        <section id="screen-entry" class="ftp2-screen ftp2-screen--active" aria-label="Entry — the apparatus">
+            <div class="ftp2-entry-scene">
+                <figure class="ftp2-apparatus ftp2-motion-wake" aria-labelledby="ftp2-apparatus-caption">
+                    <picture>
+                        <source
+                            srcset="{{ url_for('static', filename='images/ftp2-apparatus-hero.png') }}"
+                            type="image/png"
+                        />
+                        <img
+                            class="ftp2-apparatus__img"
+                            src="{{ url_for('static', filename='images/ftp2-apparatus-hero.jpg') }}"
+                            alt=""
+                            width="960"
+                            height="1200"
+                            decoding="async"
+                            fetchpriority="high"
+                        />
+                    </picture>
+                    <figcaption id="ftp2-apparatus-caption" class="ftp2-visually-hidden">
+                        Ornate fortune apparatus — archival specimen
+                    </figcaption>
+                </figure>
+
+                <header class="ftp2-entry-ident">
+                    <h1 class="ftp2-title">FREEING THE PARROT</h1>
+                    <p class="ftp2-edition">2.0</p>
+                </header>
+
+                <div class="ftp2-entry-copy">
+                    <p class="ftp2-tagline">THE MACHINE IS NOT YOUR ORACLE.<br>IT IS YOUR MIRROR.</p>
+                    <p class="ftp2-invite">Approach the apparatus.</p>
+                </div>
+
+                <div class="ftp2-meta-row ftp2-meta-row--entry" aria-label="Session metadata">
                     <span class="ftp2-meta">No. 027</span>
-                    <span class="ftp2-meta">APPARATUS</span>
+                    <span class="ftp2-meta ftp2-meta--scene">APPARATUS</span>
                     <span class="ftp2-meta">ARCHIVE</span>
                 </div>
-                <div class="ftp2-apparatus" aria-hidden="true">
-                    <svg class="ftp2-apparatus__svg" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="28" y="20" width="64" height="88" stroke="currentColor" stroke-width="0.75" opacity="0.35"/>
-                        <path d="M32 108 H88" stroke="currentColor" stroke-width="0.5" opacity="0.25"/>
-                        <circle cx="60" cy="52" r="14" stroke="currentColor" stroke-width="0.75" opacity="0.4"/>
-                        <path d="M48 48 Q60 38 72 48 Q68 58 60 62 Q52 58 48 48" stroke="currentColor" stroke-width="0.6" opacity="0.5"/>
-                        <line x1="60" y1="66" x2="60" y2="78" stroke="currentColor" stroke-width="0.5" opacity="0.35"/>
-                        <rect x="52" y="118" width="16" height="4" fill="currentColor" opacity="0.2"/>
-                    </svg>
+
+                <div class="ftp2-entry-action">
+                    <button type="button" id="btn-enter" class="ftp2-btn ftp2-btn--apparatus">ENTER</button>
+                    <p id="entry-error" class="ftp2-entry-error" role="alert" hidden></p>
                 </div>
-                <h1 class="ftp2-title">FREEING THE PARROT</h1>
-                <p class="ftp2-edition">2.0</p>
-                <p class="ftp2-tagline">THE MACHINE IS NOT YOUR ORACLE.<br>IT IS YOUR MIRROR.</p>
-                <p class="ftp2-invite">Approach the apparatus.</p>
-                <button type="button" id="btn-enter" class="ftp2-btn ftp2-btn--apparatus">ENTER</button>
-                <p id="entry-error" class="ftp2-entry-error" role="alert" hidden></p>
             </div>
         </section>
 

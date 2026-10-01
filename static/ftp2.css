@@ -14,6 +14,8 @@
     --ftp2-border-strong: rgba(230, 215, 184, 0.22);
     --ftp2-accent-soft: rgba(143, 29, 44, 0.55);
     --ftp2-accent-glow: rgba(143, 29, 44, 0.12);
+    --ftp2-gold: #c4a35a;
+    --ftp2-gold-muted: rgba(196, 163, 90, 0.45);
     --ftp2-font-display: "Georgia", "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
     --ftp2-font-meta: "Consolas", "Courier New", monospace;
     --ftp2-font-ui: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -100,66 +102,204 @@ body {
 }
 
 .ftp2-meta-row--entry {
-    margin-bottom: 2rem;
+    margin: 0 0 2rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--ftp2-border);
+    width: 100%;
+    max-width: 22rem;
 }
 
-/* —— 01 Entry —— */
+.ftp2-meta--scene {
+    color: var(--ftp2-gold-muted);
+}
 
-.ftp2-entry-frame {
+.ftp2-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* —— 01 Entry — Scene 01 APPARATUS —— */
+
+/* Motion vocabulary: WAKE, TACTILE_PRESS, SETTLE */
+
+@keyframes ftp2-wake {
+    from {
+        opacity: 0;
+        transform: translateY(1.25rem) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes ftp2-settle {
+    from {
+        transform: translateY(0) scale(1.008);
+    }
+    to {
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes ftp2-breathe {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.006);
+    }
+}
+
+.ftp2-motion-wake {
+    animation: ftp2-wake 1.4s cubic-bezier(0.22, 1, 0.36, 1) both,
+        ftp2-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) 1.4s both;
+}
+
+.ftp2-entry-scene {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 3rem 2rem 4rem;
+    padding: clamp(1.5rem, 4vh, 3rem) clamp(1.25rem, 4vw, 2.5rem) clamp(2rem, 5vh, 4rem);
     text-align: center;
-    max-width: 36rem;
+    width: 100%;
+    max-width: min(56rem, 100vw);
     margin: 0 auto;
+    overflow-x: hidden;
+    min-height: min(100vh, 100dvh);
 }
 
 .ftp2-apparatus {
-    color: var(--ftp2-parchment);
-    margin-bottom: 2rem;
-    opacity: 0.7;
+    position: relative;
+    margin: 0 0 clamp(1.25rem, 3vh, 2.5rem);
+    width: min(88vw, 38rem);
+    max-width: 100%;
 }
 
-.ftp2-apparatus__svg {
-    width: 5.5rem;
+.ftp2-apparatus::after {
+    content: "";
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: -0.35rem;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--ftp2-gold-muted) 20%,
+        var(--ftp2-gold-muted) 80%,
+        transparent
+    );
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.ftp2-apparatus__img {
+    display: block;
+    width: 100%;
     height: auto;
+    max-height: min(52vh, 36rem);
+    object-fit: contain;
+    object-position: center bottom;
+    margin: 0 auto;
+    filter: drop-shadow(0 1.25rem 2.5rem rgba(0, 0, 0, 0.55));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .ftp2-apparatus__img {
+        animation: ftp2-breathe 11s ease-in-out 2.3s infinite;
+    }
+}
+
+.ftp2-entry-ident {
+    width: 100%;
+    max-width: 28rem;
+    margin: 0 0 clamp(1rem, 2.5vh, 1.75rem);
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(196, 163, 90, 0.22);
 }
 
 .ftp2-title {
     font-family: var(--ftp2-font-display);
-    font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+    font-size: clamp(1.45rem, 2.8vw, 2.35rem);
     font-weight: 400;
-    letter-spacing: 0.2em;
-    margin: 0 0 0.35rem;
+    letter-spacing: 0.22em;
+    margin: 0 0 0.4rem;
+    color: var(--ftp2-paper);
 }
 
 .ftp2-edition {
     font-family: var(--ftp2-font-meta);
-    font-size: 0.75rem;
-    letter-spacing: 0.35em;
-    color: var(--ftp2-red-muted);
-    margin: 0 0 2rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.38em;
+    color: var(--ftp2-gold);
+    margin: 0;
+}
+
+.ftp2-entry-copy {
+    max-width: var(--ftp2-max-read);
+    margin: 0 0 clamp(1.25rem, 3vh, 2rem);
 }
 
 .ftp2-tagline {
     font-family: var(--ftp2-font-display);
-    font-size: clamp(0.9rem, 1.6vw, 1.05rem);
-    letter-spacing: 0.04em;
+    font-size: clamp(0.88rem, 1.5vw, 1.05rem);
+    letter-spacing: 0.05em;
     line-height: 1.75;
     color: var(--ftp2-text-muted);
-    margin: 0 0 2.5rem;
+    margin: 0 0 1rem;
 }
 
 .ftp2-invite {
     font-family: var(--ftp2-font-meta);
     font-size: 0.62rem;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--ftp2-text-muted);
-    margin: 0 0 2rem;
+    color: rgba(230, 215, 184, 0.42);
+    margin: 0;
+}
+
+.ftp2-entry-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+@media (max-width: 480px) {
+    .ftp2-apparatus {
+        width: min(94vw, 22rem);
+    }
+
+    .ftp2-apparatus__img {
+        max-height: min(46vh, 22rem);
+    }
+
+    .ftp2-title {
+        letter-spacing: 0.14em;
+    }
+}
+
+@media (min-width: 1280px) {
+    .ftp2-apparatus {
+        width: min(42vw, 40rem);
+    }
+}
+
+@media (min-width: 1920px) {
+    .ftp2-apparatus__img {
+        max-height: 38rem;
+    }
 }
 
 .ftp2-entry-error {
@@ -565,8 +705,23 @@ body {
 
 .ftp2-btn--apparatus {
     border-color: var(--ftp2-crimson);
-    padding: 1rem 2.5rem;
+    padding: 1rem 2.75rem;
     color: var(--ftp2-paper);
+    transition: background var(--ftp2-transition), border-color var(--ftp2-transition),
+        transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 0 0 transparent;
+}
+
+.ftp2-btn--apparatus:hover:not(:disabled) {
+    border-color: var(--ftp2-crimson);
+    background: rgba(143, 29, 44, 0.14);
+    box-shadow: 0 0 0 1px rgba(196, 163, 90, 0.15);
+}
+
+/* TACTILE_PRESS */
+.ftp2-btn--apparatus:active:not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+    background: rgba(143, 29, 44, 0.22);
 }
 
 .ftp2-btn--primary {
