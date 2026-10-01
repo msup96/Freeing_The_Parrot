@@ -1,48 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Freeing the Parrot 2.0</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='ftp2.css') }}">
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-<symbol id="ap" viewBox="0 0 200 260">
-<ellipse cx="100" cy="246" rx="70" ry="8" fill="#000" opacity=".5"/>
-<rect x="44" y="206" width="112" height="30" rx="4" fill="#E6D7B8"/><rect x="44" y="206" width="112" height="6" fill="#D8C49D"/><rect x="60" y="222" width="80" height="1.5" fill="#171411" opacity=".4"/>
-<g fill="none" stroke="#C4A035" stroke-width="2.5"><path d="M46 206C34 90 70 46 100 46S166 90 154 206"/><path d="M62 206C58 100 82 46 100 46S142 100 138 206"/><path d="M80 206C80 110 92 50 100 46S120 110 120 206"/><path d="M100 46V206"/><ellipse cx="100" cy="150" rx="58" ry="10" stroke-width="1.5"/></g>
-<g class="head"><path d="M78 62C82 34 118 30 128 62C116 54 100 52 90 66C86 74 90 84 96 90C82 88 74 76 78 62Z" fill="#8F1D2C" stroke="#C4A035" stroke-width="1.5"/></g>
-<g class="lens"><circle cx="100" cy="130" r="38" fill="#171411" stroke="#C4A035" stroke-width="3"/><circle cx="100" cy="130" r="28" fill="#102019" stroke="#2A6B5C" stroke-width="3"/><g class="iris"><circle cx="100" cy="130" r="13" fill="#07110D" stroke="#B53A43" stroke-width="2"/></g><ellipse cx="91" cy="119" rx="6" ry="3" fill="#E6D7B8" opacity=".55" transform="rotate(-35 91 119)"/></g>
-</symbol></defs></svg>
+    <div class="ftp2-grain" aria-hidden="true"></div>
+    <div id="app" class="ftp2-app">
+        <!-- 01 ENTRY — THE APPARATUS (Scene 01) -->
+        <section id="screen-entry" class="ftp2-screen ftp2-screen--active" aria-label="Entry — the apparatus">
+            <div class="ftp2-entry-scene">
+                <figure class="ftp2-apparatus ftp2-motion-wake" aria-labelledby="ftp2-apparatus-caption">
+                    <picture>
+                        <source
+                            srcset="{{ url_for('static', filename='images/ftp2-apparatus-hero.png') }}"
+                            type="image/png"
+                        />
+                        <img
+                            class="ftp2-apparatus__img"
+                            src="{{ url_for('static', filename='images/ftp2-apparatus-hero.jpg') }}"
+                            alt=""
+                            width="960"
+                            height="1200"
+                            decoding="async"
+                            fetchpriority="high"
+                        />
+                    </picture>
+                    <figcaption id="ftp2-apparatus-caption" class="ftp2-visually-hidden">
+                        Ornate fortune apparatus — archival specimen
+                    </figcaption>
+                </figure>
 
-<section class="scr on" id="s1" aria-label="Splash"><div class="wrap">
-<div class="meta mono"><span>No. 027</span><span>Apparatus</span><span>Archive</span></div>
-<svg class="app breathe" role="img" aria-label="The apparatus: a cage with a glass lens and a beak"><use href="#ap"/></svg>
-<h1>Freeing the Parrot</h1><div class="ver">2.0</div><button class="act" id="enter">Enter</button></div></section>
+                <header class="ftp2-entry-ident">
+                    <h1 class="ftp2-title">FREEING THE PARROT</h1>
+                    <p class="ftp2-edition">2.0</p>
+                </header>
 
-<section class="scr" id="s2" aria-label="Input"><div class="wrap">
-<div class="mono">The machine receives</div><h2>Give it something</h2><div class="slots" id="slots"></div>
-<button class="act" id="go3" disabled>I am done</button></div></section>
+                <div class="ftp2-entry-copy">
+                    <p class="ftp2-tagline">THE MACHINE IS NOT YOUR ORACLE.<br>IT IS YOUR MIRROR.</p>
+                    <p class="ftp2-invite">Approach the apparatus.</p>
+                </div>
 
-<section class="scr" id="s3" aria-label="Waiting"><i class="reg a"></i><i class="reg b"></i><i class="reg c"></i><i class="reg d"></i>
-<div class="wrap"><svg class="app" aria-hidden="true"><use href="#ap"/></svg><h2>Hold on for a moment.</h2>
-<p class="sub">Wait until the parrot steps out of the cage.</p><div class="tape" aria-hidden="true"><i></i></div></div></section>
+                <div class="ftp2-meta-row ftp2-meta-row--entry" aria-label="Session metadata">
+                    <span class="ftp2-meta">No. 027</span>
+                    <span class="ftp2-meta ftp2-meta--scene">APPARATUS</span>
+                    <span class="ftp2-meta">ARCHIVE</span>
+                </div>
 
-<section class="scr" id="s4" aria-label="The Parrot"><div class="room">
-<div class="stage" data-behavior="listening"><svg class="app par" id="par" data-behavior="listening" data-phase="idle" role="img" aria-label="The Parrot"><use href="#ap"/></svg><div class="mono" id="pst">I am listening.</div><div class="observation" aria-label="Observation trace"><span class="observation__mark" data-mark="turns"></span><span class="observation__mark" data-mark="pauses"></span><span class="observation__mark" data-mark="questions"></span><span class="observation__mark" data-mark="repeats"></span><span class="observation__status">OBSERVATION ACTIVE</span></div></div>
-<div class="wrap" style="align-items:stretch"><div class="log" id="log" aria-live="polite"></div><div class="tray"><input id="say" aria-label="Write to the Parrot" placeholder="Write to the Parrot"><button class="act" id="send">Write</button></div>
-<div class="row" style="justify-content:flex-end"><button class="act dk" id="done" hidden>I am done</button></div></div></div></section>
+                <div class="ftp2-entry-action">
+                    <button type="button" id="btn-enter" class="ftp2-btn ftp2-btn--apparatus">ENTER</button>
+                    <p id="entry-error" class="ftp2-entry-error" role="alert" hidden></p>
+                </div>
+            </div>
+        </section>
 
-<section class="scr" id="s6" aria-label="The 27 cards"><div class="wrap"><div class="mono">Twenty-seven cards</div><h2>Turn the one that sounds like you</h2><div class="vit" id="vit"></div><div id="cardbox" class="row"></div></div></section>
+        <!-- 02 CONVERSATION + 04 TRACE -->
+        <section id="screen-conversation" class="ftp2-screen" aria-label="Conversation" hidden>
+            <div class="ftp2-record-layout">
+                <div class="ftp2-record-main">
+                    <header class="ftp2-record-header">
+                        <div class="ftp2-record-title">
+                            <span class="ftp2-wordmark">FREEING THE PARROT 2.0</span>
+                            <span id="session-label" class="ftp2-session-id">SESSION — —</span>
+                        </div>
+                        <p id="listening-status" class="ftp2-listening">THE PARROT IS LISTENING</p>
+                    </header>
+                    <main class="ftp2-main">
+                        <div id="conversation" class="ftp2-conversation" role="log" aria-live="polite"></div>
+                    </main>
+                    <footer class="ftp2-composer">
+                        <div id="modality-status" class="ftp2-status" aria-live="polite"></div>
+                        <div class="ftp2-modality" role="group" aria-label="Ways to respond">
+                            <button type="button" class="ftp2-modality__btn ftp2-modality__btn--active" data-modality="text" id="btn-write">
+                                <span class="ftp2-modality__verb">WRITE</span>
+                                <span class="ftp2-modality__hint">Give it language.</span>
+                            </button>
+                            <button type="button" class="ftp2-modality__btn" data-modality="voice" id="btn-voice" aria-pressed="false">
+                                <span class="ftp2-modality__verb">SPEAK</span>
+                                <span class="ftp2-modality__hint">Give it your voice.</span>
+                            </button>
+                            <button type="button" class="ftp2-modality__btn" data-modality="image" id="btn-image">
+                                <span class="ftp2-modality__verb">SHOW</span>
+                                <span class="ftp2-modality__hint">Give it something.</span>
+                            </button>
+                            <button type="button" class="ftp2-modality__btn" data-modality="camera" id="btn-camera">
+                                <span class="ftp2-modality__verb">LOOK</span>
+                                <span class="ftp2-modality__hint">Let it look back.</span>
+                            </button>
+                        </div>
+                        <input type="file" id="image-file-input" class="ftp2-hidden" accept="image/*" />
+                        <label class="ftp2-composer__label" for="message-input">Your message</label>
+                        <div class="ftp2-composer__row">
+                            <textarea
+                                id="message-input"
+                                class="ftp2-input"
+                                rows="2"
+                                placeholder="Write here…"
+                                autocomplete="off"
+                                spellcheck="true"
+                            ></textarea>
+                            <button type="button" id="btn-send" class="ftp2-btn ftp2-btn--send">RECORD</button>
+                        </div>
+                        <div id="conversation-continue" class="ftp2-continue" hidden>
+                            <p class="ftp2-continue__label">THE RECORD IS CLOSED.</p>
+                            <button type="button" id="btn-to-deck" class="ftp2-btn ftp2-btn--primary">THE PARROT&apos;S DECK</button>
+                        </div>
+                    </footer>
+                </div>
+                <aside class="ftp2-trace" aria-label="Session trace">
+                    <h2 class="ftp2-trace__title">SESSION TRACE</h2>
+                    <ul class="ftp2-trace__list" id="trace-list">
+                        <li><span class="ftp2-trace__key">TEXT</span><span id="trace-text" class="ftp2-trace__val">0</span></li>
+                        <li><span class="ftp2-trace__key">VOICE</span><span id="trace-voice" class="ftp2-trace__val">0</span></li>
+                        <li><span class="ftp2-trace__key">IMAGE</span><span id="trace-image" class="ftp2-trace__val">0</span></li>
+                        <li><span class="ftp2-trace__key">CAMERA</span><span id="trace-camera" class="ftp2-trace__val">0</span></li>
+                        <li class="ftp2-trace__rule"></li>
+                        <li><span class="ftp2-trace__key">QUESTIONS</span><span id="trace-questions" class="ftp2-trace__val">0</span></li>
+                        <li><span class="ftp2-trace__key">PAUSES</span><span id="trace-pauses" class="ftp2-trace__val">0</span></li>
+                        <li><span class="ftp2-trace__key">REPEATS</span><span id="trace-repeats" class="ftp2-trace__val">0</span></li>
+                        <li><span class="ftp2-trace__key">REFLECTIONS</span><span id="trace-reflections" class="ftp2-trace__val">0</span></li>
+                    </ul>
+                    <p class="ftp2-trace__note">Observational record. Not shown to the apparatus.</p>
+                </aside>
+            </div>
+        </section>
 
-<section class="scr" id="s7" aria-label="The reveal"><div class="dt" id="dt"></div></section>
+        <!-- 05 THE PARROT'S DECK -->
+        <section id="screen-deck" class="ftp2-screen" aria-label="The Parrot's deck" hidden>
+            <header class="ftp2-deck-header">
+                <span class="ftp2-meta">DECK / 27</span>
+                <h2 class="ftp2-deck-title">THE PARROT&apos;S DECK</h2>
+                <p class="ftp2-deck-sub">Identify what resonates. The Parrot produced these.</p>
+            </header>
+            <div id="deck-grid" class="ftp2-deck-grid" role="list"></div>
+            <footer class="ftp2-deck-footer">
+                <button type="button" id="btn-deck-continue" class="ftp2-btn ftp2-btn--primary" disabled>CONTINUE</button>
+            </footer>
+        </section>
 
-<section class="scr" id="s8" aria-label="Wall of Fame"><div class="wrap"><div class="mono">Wall of Fame</div><div class="tiles" id="tiles"></div>
-<h2 class="ask">Do you consent your data to be added to the Wall of Fame?</h2><p class="ask2">If you add it, the material above stays on the wall. If you keep it private, it does not.</p>
-<div class="row"><button class="act same" id="private">Keep private</button><button class="act same" id="wall">Add to Wall of Fame</button></div><p class="err" id="flow-error" hidden></p></div></section>
+        <!-- 06 REVEAL -->
+        <section id="screen-reveal" class="ftp2-screen" aria-label="Reveal" hidden>
+            <div class="ftp2-reveal-inner">
+                <header class="ftp2-reveal-header">
+                    <span class="ftp2-meta">CONSTRUCTED SELF</span>
+                    <h2 class="ftp2-reveal-title">THE MACHINE BUILT A VERSION OF YOU</h2>
+                </header>
+                <article id="reveal-card" class="ftp2-reveal-card">
+                    <span class="ftp2-card-index" id="reveal-card-num">CARD 00</span>
+                    <p class="ftp2-reveal-statement" id="reveal-statement"></p>
+                    <div class="ftp2-reveal-evidence">
+                        <p class="ftp2-reveal-evidence__title">CONSTRUCTED FROM</p>
+                        <ul id="reveal-evidence-list" class="ftp2-reveal-evidence__list"></ul>
+                    </div>
+                </article>
+                <section class="ftp2-journey" aria-label="The journey of your data">
+                    <h3 class="ftp2-journey__title">THE JOURNEY OF YOUR DATA</h3>
+                    <ol class="ftp2-journey__steps">
+                        <li>YOU</li>
+                        <li>SAID</li>
+                        <li>SHOWED</li>
+                        <li>HOW YOU RESPONDED</li>
+                        <li>WHAT WE EXTRACTED</li>
+                        <li>WHAT WE INFERRED</li>
+                        <li>WHAT WE CONSTRUCTED</li>
+                    </ol>
+                </section>
+            </div>
+        </section>
 
-<section class="scr" id="s9" aria-label="End"><div style="width:32px;height:32px;border-top:1px solid var(--gold);border-left:1px solid var(--gold)" id="mark"></div></section>
-<script src="{{ url_for('static', filename='ftp2.js') }}"></script>
+        <div id="blackout" class="ftp2-blackout" hidden aria-hidden="true"></div>
+
+        <div id="camera-overlay" class="ftp2-camera-overlay" hidden>
+            <div class="ftp2-camera-panel" role="dialog" aria-label="Look — camera capture">
+                <p class="ftp2-camera-title">LOOK — LET IT LOOK BACK</p>
+                <video id="camera-preview" class="ftp2-camera-preview" autoplay playsinline muted></video>
+                <div class="ftp2-camera-actions">
+                    <button type="button" id="btn-camera-capture" class="ftp2-btn">CAPTURE</button>
+                    <button type="button" id="btn-camera-cancel" class="ftp2-btn">CLOSE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='ftp2.js') }}"></script>
 </body>
 </html>
