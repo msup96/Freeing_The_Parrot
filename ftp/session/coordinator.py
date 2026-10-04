@@ -393,6 +393,28 @@ class SessionCoordinator:
 
         return TemporalTrajectorySynthesizer(self).synthesize()
 
+    def synthesize_linguistic_trajectories(self) -> dict:
+        """Build session-level linguistic trajectories after lock."""
+        if not self._machine.is_locked():
+            raise ValueError(
+                "Linguistic trajectories may only be synthesized after "
+                "the session is locked."
+            )
+        from ftp.silent_reader.linguistic import LinguisticTrajectorySynthesizer
+
+        return LinguisticTrajectorySynthesizer(self).synthesize()
+
+    def synthesize_navarasa_trajectories(self) -> dict:
+        """Build post-session Navarasa trajectories after lock."""
+        if not self._machine.is_locked():
+            raise ValueError(
+                "Navarasa trajectories may only be synthesized after "
+                "the session is locked."
+            )
+        from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
+
+        return NavarasaTrajectorySynthesizer(self).synthesize()
+
     def generate_post_session_interpretation(self) -> dict:
         """Create the hidden post-session deck without exposing it to the Parrot."""
         if self._machine.state != SessionState.POST_SESSION_INTERPRETATION:
