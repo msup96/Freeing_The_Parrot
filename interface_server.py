@@ -2050,6 +2050,14 @@ def advance_participant_lifecycle(session_id, action, payload=None):
         coordinator.advance(SessionState.LIVE_CONVERSATION)
         return coordinator
 
+    if action in {"interpret", "post_session_interpretation"}:
+        if coordinator.state != SessionState.SESSION_CONCLUDED:
+            raise ValueError("Session must be concluded before post-session interpretation.")
+        coordinator.advance(SessionState.POST_SESSION_INTERPRETATION)
+        coordinator.generate_post_session_interpretation()
+        coordinator.advance(SessionState.CARD_SELECTION)
+        return coordinator
+
     actions = {
         "card_selection": (
             SessionState.PROFILE_REVEAL,
@@ -5078,11 +5086,7 @@ def end_conversation_route():
     if coordinator is not None:
         coordinator.lock()
         coordinator.advance(SessionState.POST_SESSION_INTERPRETATION)
-        coordinator.record(
-            EventType.CARDS_GENERATED,
-            ProvenanceLevel.INTERPRETED,
-            {"card_count": 27, "source": "participant_shell_baseline"},
-        )
+        coordinator.generate_post_session_interpretation()
         coordinator.advance(SessionState.CARD_SELECTION)
         result["lifecycle_state"] = coordinator.state.value
     return jsonify(result)

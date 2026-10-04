@@ -5,6 +5,8 @@
     --ftp2-forest: #102019;
     --ftp2-paper: #e6d7b8;
     --ftp2-parchment: #d8c49d;
+    --paper:#E6D7B8;
+    --gold:#C4A035;
     --ftp2-crimson: #8f1d2c;
     --ftp2-red-muted: #b53a43;
     --ftp2-ink: #171411;
@@ -23,7 +25,7 @@
     --ftp2-transition: 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media(prefers-reduced-motion:reduce) {
     :root {
         --ftp2-transition: 0ms;
     }
@@ -163,6 +165,12 @@ body {
     animation: ftp2-wake 1.4s cubic-bezier(0.22, 1, 0.36, 1) both,
         ftp2-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) 1.4s both;
 }
+
+.reg { position:absolute; width:32px; height:32px; border:0 solid var(--gold); }
+.reg.a { top:32px; left:32px; border-top-width:1px; border-left-width:1px; }
+.reg.b { top:32px; right:32px; border-top-width:1px; border-right-width:1px; }
+.reg.c { bottom:32px; left:32px; border-bottom-width:1px; border-left-width:1px; }
+.reg.d { bottom:32px; right:32px; border-bottom-width:1px; border-right-width:1px; }
 
 .ftp2-entry-scene {
     flex: 1;

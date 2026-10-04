@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Freeing the Parrot 2.0</title>
+<style>
+:root{--deep:#07110D;--forest:#102019;--emerald:#1A3D32;--paper:#E6D7B8;--parch:#D8C49D;--ink:#171411;--teal:#2A6B5C;--crim:#8F1D2C;--crim2:#B53A43;--gold:#C4A035;
+--serif:Georgia,Palatino,"Iowan Old Style",serif;--mono:Consolas,"Courier New",monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;margin:0}
+body{height:100%;background:var(--deep);color:var(--paper);font-family:var(--sans);overflow:hidden}
+.scr{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;overflow:auto;background:var(--deep)}
+.scr.on{display:flex;animation:wake .5s ease-out both}
+@keyframes wake{from{opacity:0}to{opacity:1}}
+@keyframes discover{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes settle{from{transform:translateY(-8px);opacity:.4}to{transform:none;opacity:1}}
+.wrap{width:100%;max-width:72rem;margin:auto;display:flex;flex-direction:column;align-items:center;gap:24px}
+.mono{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.meta{display:flex;gap:32px;justify-content:center}
+h1,h2,.disp{font-family:var(--serif);font-weight:400;letter-spacing:.18em;text-transform:uppercase;text-align:center}
+h1{font-size:clamp(28px,5.2vw,64px);line-height:1.1}
+h2{font-size:clamp(20px,2.6vw,32px);line-height:1.3;letter-spacing:.12em}
+.ver{font-family:var(--mono);color:var(--gold);border:1px solid var(--gold);padding:4px 12px;font-size:14px;letter-spacing:.2em}
+.sub{font-family:var(--serif);font-size:18px;line-height:1.6;text-align:center;max-width:40rem;color:var(--paper)}
+/* action = stamped rectangle */
+.act{font-family:var(--mono);font-size:13px;letter-spacing:.24em;text-transform:uppercase;background:var(--paper);color:var(--ink);border:2px solid var(--ink);outline:1px solid var(--paper);outline-offset:2px;padding:16px 32px;cursor:pointer;box-shadow:0 4px 0 var(--ink);transition:transform .1s ease-in,box-shadow .1s ease-in}
+.act:active{transform:translateY(4px);box-shadow:0 0 0 var(--ink)}
+.act:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.act.dk{background:var(--forest);color:var(--paper);border-color:var(--gold);outline-color:var(--gold);box-shadow:0 4px 0 #000}
+:focus-visible{outline:3px solid var(--gold)!important;outline-offset:3px}
+svg.app{width:min(46vh,320px);height:auto;display:block}
+.breathe .lens{transform-origin:100px 130px;animation:br 6s ease-in-out infinite}
+@keyframes br{50%{transform:scale(1.04)}}
+/* S2 slots */
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;width:100%}
+.slot{position:relative;border:2px solid #000;background:linear-gradient(0deg,#0b1712,#102019);box-shadow:inset 0 0 0 6px var(--forest),inset 0 0 0 7px var(--gold);min-height:260px;padding:32px 16px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:16px;text-align:center}
+.slot .vt{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--parch);min-height:32px}
+.slot.live{box-shadow:inset 0 0 0 6px var(--forest),inset 0 0 0 7px var(--crim2)}
+.slot.got{box-shadow:inset 0 0 0 6px var(--forest),inset 0 0 0 7px var(--teal)}
+.slot .st{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--gold);animation:discover .6s ease-out both}
+.mat{width:100%;height:96px;display:flex;align-items:center;justify-content:center}
+.paperin{width:100%;height:96px;background:var(--paper);color:var(--ink);border:0;padding:8px;font-family:var(--serif);font-size:15px;resize:none;box-shadow:inset 0 0 0 1px var(--parch)}
+.err{font-family:var(--mono);font-size:11px;color:var(--crim2)}
+.row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+/* S3 */
+.reg{position:absolute;width:32px;height:32px;border:0 solid var(--gold)}
+.reg.a{top:32px;left:32px;border-top-width:1px;border-left-width:1px}.reg.b{top:32px;right:32px;border-top-width:1px;border-right-width:1px}
+.reg.c{bottom:32px;left:32px;border-bottom-width:1px;border-left-width:1px}.reg.d{bottom:32px;right:32px;border-bottom-width:1px;border-right-width:1px}
+.iris{transform-origin:100px 130px;animation:iris 4s steps(4,end) infinite}
+@keyframes iris{25%{transform:translateX(5px)}50%{transform:translateX(-4px) scale(1.06)}75%{transform:translateY(-4px)}}
+.tape{width:min(28rem,80vw);height:32px;border:1px solid var(--gold);overflow:hidden;position:relative}
+.tape i{position:absolute;inset:0;background:repeating-linear-gradient(90deg,var(--gold) 0 1px,transparent 1px 16px);animation:tp 3s steps(12,end) infinite}
+@keyframes tp{to{transform:translateX(-192px)}}
+/* S4/5 */
+.room{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,40rem);gap:48px;align-items:center;width:100%;max-width:72rem}
+.stage{background:var(--forest);border:1px solid #000;box-shadow:inset 0 0 0 8px var(--deep),inset 0 0 0 9px var(--gold);padding:48px 16px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.par{transition:transform .4s ease-out}
+.par[data-s="1"] .head,.par[data-s="0"] .head{transform:rotate(-4deg)}
+.head{transform-origin:100px 130px;transition:transform .4s ease-out}
+.par[data-s="2"] .head{transform:rotate(6deg)}.par[data-s="3"] .head{transform:rotate(-14deg) translateY(4px)}
+.par[data-s="4"] .lens{opacity:.35}.par[data-s="5"] .head{transform:translateX(8px) skewX(-6deg)}
+.par[data-s="6"] .head{transform:rotate(22deg) translateX(-8px)}.par[data-s="6"] .lens{transform:translateX(10px)}
+.par[data-s="5"],.par[data-s="6"]{filter:drop-shadow(-4px 0 0 var(--crim))}
+.log{display:flex;flex-direction:column;gap:16px;min-height:200px;justify-content:flex-end}
+.pl{font-family:var(--serif);font-size:20px;line-height:1.5;color:var(--paper);border-left:2px solid var(--gold);padding-left:16px;animation:settle .35s ease-out both}
+.pl.g{font-family:var(--mono);letter-spacing:.06em;color:var(--crim2);border-color:var(--crim2)}
+.slip{align-self:flex-end;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:8px 16px;max-width:85%;box-shadow:2px 2px 0 #000;animation:settle .35s ease-out both}
+.tray{display:flex;gap:16px;align-items:stretch}
+.tray input{flex:1;background:var(--paper);border:0;color:var(--ink);font-family:var(--serif);font-size:17px;padding:16px;min-width:0}
+/* S6 cards */
+.vit{width:100%;max-width:72rem;display:grid;grid-template-columns:repeat(9,1fr);gap:8px;padding:24px;background:#0b1712;border:2px solid #000;box-shadow:inset 0 0 0 1px var(--gold)}
+.card{background:var(--paper);color:var(--ink);border:1px solid var(--parch);text-align:left;font-family:var(--serif);padding:8px;min-height:120px;display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:transform .1s ease-in;box-shadow:inset 0 0 40px rgba(120,90,40,.18)}
+.card b{font-family:var(--mono);font-size:10px;font-weight:400;letter-spacing:.14em;color:var(--crim)}
+.card span{font-size:12px;line-height:1.3;font-weight:700}
+.card.up{transform:translateY(-16px);outline:2px solid var(--gold);animation:settle .35s ease-out}
+.big{background:var(--paper);color:var(--ink);width:min(34rem,100%);padding:32px;font-family:var(--serif);box-shadow:0 0 0 1px var(--parch),6px 6px 0 #000;display:flex;flex-direction:column;gap:16px}
+.big h3{font-size:22px;font-weight:400;letter-spacing:.1em;text-transform:uppercase}.big p{font-size:19px;line-height:1.6}.big .mono{color:var(--crim)}
+/* S7 */
+#s7{background:#000;font-family:var(--mono)}
+#s7 .dt{max-width:56rem;width:100%;display:flex;flex-direction:column;gap:0;margin:auto;padding:32px 0}
+.stmt{font-family:var(--serif);font-size:clamp(26px,4.4vw,52px);letter-spacing:.14em;text-align:center;line-height:1.3;text-transform:uppercase;margin-bottom:48px}
+.stmt.m{font-family:var(--mono);letter-spacing:.04em;font-size:clamp(20px,3.2vw,38px)}
+.stmt.gl{animation:gl .4s steps(2,end) 1}
+@keyframes gl{0%{transform:translateX(-12px);clip-path:inset(0 0 60% 0)}50%{transform:translateX(12px);clip-path:inset(40% 0 0 0)}100%{transform:none;clip-path:none}}
+.lad{border-left:1px solid var(--crim);margin-left:16px;display:flex;flex-direction:column;gap:32px}
+.rung{position:relative;padding-left:32px;animation:discover .6s ease-out both}
+.rung:before{content:"";position:absolute;left:-5px;top:6px;width:9px;height:9px;background:var(--crim);}
+.rung h4{font-size:13px;letter-spacing:.2em;color:var(--paper);font-weight:400;margin-bottom:8px}
+.rec{background:var(--paper);color:var(--ink);padding:8px 16px;font-size:13px;line-height:1.6;margin-bottom:4px;border-left:4px solid var(--crim);display:flex;gap:16px;justify-content:space-between}
+.tag{font-size:10px;letter-spacing:.14em;color:var(--crim);white-space:nowrap}
+.none{font-size:12px;color:var(--parch)}
+/* S8 */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;width:100%}
+.tile{background:var(--paper);color:var(--ink);padding:16px;font-family:var(--serif);font-size:14px;line-height:1.5;min-height:120px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;box-shadow:3px 3px 0 #000}
+.tile .tag{color:var(--crim)}
+.ask{font-size:clamp(17px,2vw,24px);max-width:40rem}
+.ask2{font-family:var(--serif);font-size:16px;color:var(--paper);max-width:40rem;text-align:center;line-height:1.6}
+.same{min-width:240px}
+#s9{transition:opacity 1.4s ease-in-out}
+@media(max-width:820px){.slots{grid-template-columns:1fr 1fr;gap:16px}.vit{grid-template-columns:repeat(3,1fr)}.room{grid-template-columns:1fr;gap:24px}.meta{gap:16px}.reg{display:none}svg.app{width:min(34vh,220px)}.stage{padding:24px 16px}.stmt{margin-bottom:32px}}
+@media(max-width:480px){.slots{grid-template-columns:1fr}.slot{min-height:200px}.tray{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){*,*:before{animation:none!important;transition:none!important}}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="ap" viewBox="0 0 200 260">
+<ellipse cx="100" cy="246" rx="70" ry="8" fill="#000" opacity=".5"/>
+<rect x="44" y="206" width="112" height="30" rx="4" fill="#E6D7B8"/><rect x="44" y="206" width="112" height="6" fill="#D8C49D"/><rect x="60" y="222" width="80" height="1.5" fill="#171411" opacity=".4"/>
+<g fill="none" stroke="#C4A035" stroke-width="2.5">
+<path d="M46 206C34 90 70 46 100 46S166 90 154 206"/><path d="M62 206C58 100 82 46 100 46S142 100 138 206"/><path d="M80 206C80 110 92 50 100 46S120 110 120 206"/><path d="M100 46V206"/>
+<ellipse cx="100" cy="150" rx="58" ry="10" stroke-width="1.5"/></g>
+<g class="head"><path d="M78 62C82 34 118 30 128 62C116 54 100 52 90 66C86 74 90 84 96 90C82 88 74 76 78 62Z" fill="#8F1D2C" stroke="#C4A035" stroke-width="1.5"/></g>
+<g class="lens"><circle cx="100" cy="130" r="38" fill="#171411" stroke="#C4A035" stroke-width="3"/><circle cx="100" cy="130" r="28" fill="#102019" stroke="#2A6B5C" stroke-width="3"/><g class="iris"><circle cx="100" cy="130" r="13" fill="#07110D" stroke="#B53A43" stroke-width="2"/></g><ellipse cx="91" cy="119" rx="6" ry="3" fill="#E6D7B8" opacity=".55" transform="rotate(-35 91 119)"/></g>
+</symbol></defs></svg>
+
+<!-- S1 -->
+<section class="scr on" id="s1" aria-label="Splash"><div class="wrap">
+<div class="meta mono"><span>No. 027</span><span>Apparatus</span><span>Archive</span></div>
+<svg class="app breathe" role="img" aria-label="The apparatus: a cage with a glass lens and a beak"><use href="#ap"/></svg>
+<h1>Freeing the Parrot</h1><div class="ver">2.0</div>
+<button class="act" data-go="2">Enter</button></div></section>
+
+<!-- S2 -->
+<section class="scr" id="s2" aria-label="Input"><div class="wrap">
+<div class="mono">The machine receives</div><h2>Give it something</h2>
+<div class="slots" id="slots"></div>
+<button class="act" id="go3" data-go="3" disabled>I am done</button></div></section>
+
+<!-- S3 -->
+<section class="scr" id="s3" aria-label="Waiting"><i class="reg a"></i><i class="reg b"></i><i class="reg c"></i><i class="reg d"></i>
+<div class="wrap"><svg class="app" aria-hidden="true"><use href="#ap"/></svg><h2>Hold on for a moment.</h2>
+<p class="sub">Wait until the parrot steps out of the cage.</p><div class="tape" aria-hidden="true"><i></i></div></div></section>
+
+<!-- S4-5 -->
+<section class="scr" id="s4" aria-label="The Parrot"><div class="room">
+<div class="stage"><svg class="app par" id="par" data-s="0" role="img" aria-label="The Parrot"><use href="#ap"/></svg><div class="mono" id="pst">Listening</div></div>
+<div class="wrap" style="align-items:stretch"><div class="log" id="log" aria-live="polite"></div>
+<div class="tray"><input id="say" aria-label="Write to the Parrot" placeholder="Write to the Parrot"><button class="act" id="send">Write</button></div>
+<div class="row" style="justify-content:flex-end"><button class="act dk" id="done" hidden data-go="6">I am done</button></div></div></div></section>
+
+<!-- S6 -->
+<section class="scr" id="s6" aria-label="The 27 cards"><div class="wrap">
+<div class="mono">Twenty-seven cards</div><h2>Turn the one that sounds like you</h2>
+<div class="vit" id="vit"></div><div id="cardbox" class="row"></div></div></section>
+
+<!-- S7 -->
+<section class="scr" id="s7" aria-label="The reveal"><div class="dt" id="dt"></div></section>
+
+<!-- S8 -->
+<section class="scr" id="s8" aria-label="Wall of Fame"><div class="wrap">
+<div class="mono">Wall of Fame</div><div class="tiles" id="tiles"></div>
+<h2 class="ask">Do you consent your data to be added to the Wall of Fame?</h2>
+<p class="ask2">If you add it, the material above stays on the wall. If you keep it private, it does not.</p>
+<div class="row"><button class="act same" data-end="private">Keep private</button><button class="act same" data-end="wall">Add to Wall of Fame</button></div></div></section>
+
+<!-- S9 -->
+<section class="scr" id="s9" aria-label="End"><div style="width:32px;height:32px;border-top:1px solid var(--gold);border-left:1px solid var(--gold)" id="mark"></div></section>
+
+<script>
+const $=s=>document.querySelector(s),S={t0:Date.now(),text:"",wrote:0,mods:{},sent:[],card:null,ptxt:[]};
+function go(n){document.querySelectorAll('.scr').forEach(e=>e.classList.remove('on'));$('#s'+n).classList.add('on');if(n==3)setTimeout(()=>go(4),5000);if(n==6)cards();if(n==7)reveal();if(n==8)wall();if(n==4)$('#say').focus()}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b&&!b.disabled)go(b.dataset.go);const d=e.target.closest('[data-end]');if(d)end(d.dataset.end)});
+/* S2 */
+const SL=[['WRITE','paper'],['SPEAK','ceramic'],['SHOW','tray'],['LOOK','glass']];
+const sh=$('#slots');
+SL.forEach(([v,m])=>{const d=document.createElement('div');d.className='slot';d.id='sl'+v;
+const mat=v=='WRITE'?'<textarea class="paperin" aria-label="Write" placeholder="Write here"></textarea>':'<div class="mat"><svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">'+({SPEAK:'<circle cx="48" cy="48" r="38" fill="#E6D7B8"/><circle cx="48" cy="48" r="26" fill="none" stroke="#171411" stroke-dasharray="2 5" stroke-width="3"/><circle cx="48" cy="48" r="8" fill="#171411"/>',SHOW:'<rect x="6" y="40" width="84" height="16" fill="#000"/><rect x="10" y="44" width="76" height="8" fill="#07110D" stroke="#C4A035"/><path d="M20 40V16h56v24" fill="#D8C49D" stroke="#171411"/>',LOOK:'<rect x="8" y="16" width="80" height="64" fill="#102019" stroke="#C4A035" stroke-width="3"/><circle cx="48" cy="48" r="20" fill="#07110D" stroke="#2A6B5C" stroke-width="3"/><ellipse cx="41" cy="41" rx="6" ry="3" fill="#E6D7B8" opacity=".5"/>'})[v]+'</svg></div>';
+d.innerHTML='<div class="mono">'+v+'</div>'+mat+'<div class="vt">'+({WRITE:'Paper receives your words',SPEAK:'Ceramic listens',SHOW:'The tray takes an object',LOOK:'The glass observes'})[v]+'</div><div class="row" style="gap:8px"></div>';
+sh.appendChild(d);const r=d.querySelector('.row');
+const set=(st)=>{d.classList.remove('live','got');r.innerHTML='';const vt=d.querySelector('.vt');
+if(st=='idle'){vt.textContent=vt.dataset.o||vt.textContent;r.innerHTML='<button class="act dk" style="padding:8px 16px;font-size:11px">'+(v=='WRITE'?'Keep':v)+'</button>';r.firstChild.onclick=()=>v=='WRITE'?got():live();}
+if(st=='live'){d.classList.add('live');vt.dataset.o=vt.dataset.o||vt.textContent;vt.textContent=(v=='SPEAK'?'RECORDING':'OPEN')+' · NOT CAPTURED IN THIS PROTOTYPE';r.innerHTML='<button class="act dk" style="padding:8px 16px;font-size:11px">Cancel</button><button class="act" style="padding:8px 16px;font-size:11px">Done</button>';r.children[0].onclick=()=>set('idle');r.children[1].onclick=got}
+if(st=='got'){d.classList.add('got');vt.innerHTML='<span class="st">RECEIVED</span>';r.innerHTML='<button class="act dk" style="padding:8px 16px;font-size:11px">Undo</button>';r.firstChild.onclick=()=>{S.mods[v]=0;if(v=='WRITE')d.querySelector('textarea').value='';set('idle');chk()};}
+};
+function got(){if(v=='WRITE'){const t=d.querySelector('textarea').value.trim();if(!t){vtErr();return}S.text=t}S.mods[v]=1;set('got');chk()}
+function vtErr(){d.querySelector('.vt').innerHTML='<span class="err">Nothing written yet. Write a few words, then keep.</span>'}
+function live(){set('live')}
+set('idle')});
+function chk(){$('#go3').disabled=!Object.values(S.mods).some(x=>x)}
+/* S4/5 Parrot */
+const PS=['Listening','Understanding','Mirroring','Absurd','Memory loss','System glitch','Chaos'];let pi=0;
+const log=$('#log');
+function line(t,c){const p=document.createElement('div');p.className='pl '+(c||'');p.textContent=t;log.appendChild(p);while(log.children.length>6)log.firstChild.remove()}
+function slip(t){const p=document.createElement('div');p.className='slip';p.textContent=t;log.appendChild(p)}
+setTimeout(()=>{if(!log.children.length)line(S.text?'I read what you left. Go on.':'I am here. Go on.')},500);
+function say(){const v=$('#say').value.trim();if(!v)return;$('#say').value='';S.ptxt.push(v);S.sent.push(Date.now());slip(v);
+const R=[()=>'I understand.',()=>'That sounds important to you.',()=>v,()=>'Important, like a Tuesday. Or a spoon.',()=>'Sorry. Who were we speaking to?',()=>'understand understand understand under',()=>'—  cage  —  lens  —  '+v.split('').reverse().join('')];
+const i=Math.min(pi,6);setTimeout(()=>{$('#par').dataset.s=i;$('#pst').textContent=PS[i];line(R[i](),i>4?'g':'');},500);pi++;if(pi>=2)$('#done').hidden=false}
+$('#send').onclick=say;$('#say').onkeydown=e=>{if(e.key=='Enter')say()};
+/* S6 */
+const C=[["The Rewritten Talk","A conversation you keep editing in your head long after it ended."],["The Quiet Ledger","Favours given are remembered more carefully than favours received."],["The Open Door","Openness to people is real, though it stops at certain rooms."],["The Borrowed Voice","Some opinions were tried on before they became yours."],["The Late Reply","A message left unanswered says more than one sent quickly."],["The Two Rooms","A public self and a private self do not always agree."],["The Held Breath","Some decisions are made long before they are announced."],["The Small Ritual","One habit is kept mostly because stopping feels unlucky."],["The Careful Kindness","Kindness is given freely, but a limit sits beneath it."],["The Doubt at Night","Certainty is easier by day than after midnight."],["The Old Photograph","Some pictures hold a version of you that is still argued with."],["The Unsaid Thing","A truth is nearly said, then postponed once more."],["The Chosen Distance","Closeness is wanted, in measured amounts."],["The Sharp Memory","A remark from years ago can still be quoted exactly."],["The Second Draft","Work is quietly judged harsher than anyone else would judge it."],["The Restless Map","Somewhere else has always looked slightly more possible."],["The Kept Promise","A vow made lightly ended up costing something."],["The Mask Drawer","Different rooms get different versions of the same person."],["The Slow Forgiveness","Some wrongs are forgiven in words but not in habit."],["The Hidden Talent","A gift is used less often than it deserves."],["The Waiting Room","Some part of life feels like it is waiting to begin."],["The Loud Silence","Being unasked has felt heavier than being refused."],["The Inherited Rule","A family rule is still obeyed, though nobody remembers its reason."],["The Held Hand","Support is offered easily and asked for rarely."],["The Unfinished Song","Something started with great energy is still unfinished."],["The Turned Key","A change of mind is possible, but never announced."],["The Last Light","Comfort arrives in small things at the end of the day."]];
+function cards(){const v=$('#vit');if(v.children.length)return;C.forEach((c,i)=>{const b=document.createElement('button');b.className='card';const n=String(i+1).padStart(2,'0');b.innerHTML='<b>CARD '+n+'</b><span>'+c[0]+'</span>';b.onclick=()=>open(i,b);v.appendChild(b)})}
+function open(i,b){document.querySelectorAll('.card').forEach(x=>x.classList.remove('up'));b.classList.add('up');const n=String(i+1).padStart(2,'0');
+$('#cardbox').innerHTML='<div class="big"><span class="mono">Card '+n+' of 27</span><h3>'+C[i][0]+'</h3><p>'+C[i][1]+'</p><button class="act" id="res">Resonates</button></div>';$('#res').onclick=()=>{S.card=i;go(7)}}
+/* S7 */
+function reveal(){const d=$('#dt');d.innerHTML='';const sc=$('#s7');sc.style.opacity=0;
+setTimeout(()=>{sc.style.opacity=1;d.innerHTML='<div class="stmt" id="st">You played your cards.<br>Now I play mine.</div>';setTimeout(()=>{const s=$('#st');s.classList.add('m','gl');
+const mod=Object.keys(S.mods).filter(k=>S.mods[k]),sec=Math.round((Date.now()-S.t0)/1000),cn=S.card!=null?String(S.card+1).padStart(2,'0'):null;
+const R=(t,g)=>'<div class="rec"><span>'+t+'</span><span class="tag">'+g+'</span></div>';
+const L=[['What you gave',[S.text?R('Written: "'+S.text.replace(/</g,'&lt;')+'"','GIVEN'):'',...mod.filter(m=>m!='WRITE').map(m=>R(m+' slot marked as used','GIVEN')),...S.ptxt.map(t=>R('To the Parrot: "'+t.replace(/</g,'&lt;')+'"','GIVEN')),cn?R('Card '+cn+' marked as resonating','GIVEN'):''].join('')||'<div class="none">Nothing.</div>'],
+['What we received',R(mod.length+' input slot(s) marked received','OBSERVED')+R(S.ptxt.length+' message(s) to the Parrot','OBSERVED')+R('Text captured as typed. No OCR ran in this prototype.','OBSERVED')],
+['What we observed',R('Session length so far: '+sec+' seconds','OBSERVED')+R('Interaction count: '+(mod.length+S.ptxt.length+(cn?1:0)),'OBSERVED')],
+['What we derived',R(cn?'Card '+cn+' is one you said resonates. That is all it shows.':'No card was marked.','DERIVED')],
+['What we constructed','<div class="none">In the full system a profile would appear here. This visual build has no analysis behind it, so nothing is invented.</div>'],
+['What we cannot know',R('Whether card '+(cn||'—')+' fits you or fits almost anyone.','LIMIT')+R('What you felt. Only what you did.','LIMIT')+R('Whether you were understood or interpreted.','LIMIT')]];
+const lad=document.createElement('div');lad.className='lad';L.forEach(([h,b],i)=>{const r=document.createElement('div');r.className='rung';r.style.animationDelay=(i*.6)+'s';r.innerHTML='<h4>'+h.toUpperCase()+'</h4>'+b;lad.appendChild(r)});d.appendChild(lad);
+const nb=document.createElement('button');nb.className='act';nb.textContent='Continue';nb.style.margin='48px auto 0';nb.style.display='block';nb.onclick=()=>go(8);d.appendChild(nb)},1400)},1200)}
+/* S8 */
+function wall(){const T=[];const e=x=>String(x).replace(/</g,'&lt;');
+if(S.text)T.push(['"'+e(S.text)+'"','Original input','GIVEN · WRITE']);S.ptxt.forEach(t=>T.push(['"'+e(t)+'"','To the Parrot','GIVEN · CONVERSATION']));
+if(S.card!=null)T.push([C[S.card][0]+': '+C[S.card][1],'Card '+String(S.card+1).padStart(2,'0'),'CHOSEN']);
+T.push([Math.round((Date.now()-S.t0)/1000)+' seconds, '+(Object.values(S.mods).filter(x=>x).length+S.ptxt.length)+' interactions','Session trace','OBSERVED']);
+$('#tiles').innerHTML=T.map(t=>'<div class="tile"><span class="tag">'+t[2]+'</span><div>'+t[0]+'</div><span class="tag">'+t[1]+'</span></div>').join('')}
+/* S9 */
+function end(c){S.consent=c;go(9);const s=$('#s9');s.style.opacity=1;setTimeout(()=>s.style.opacity=0,1200);setTimeout(()=>{s.innerHTML='';s.style.opacity=1},3000)}
+</script></body></html>

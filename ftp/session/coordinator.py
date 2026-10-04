@@ -378,6 +378,29 @@ class SessionCoordinator:
             },
         )
 
+    def generate_post_session_interpretation(self) -> dict:
+        """Create the hidden post-session deck without exposing it to the Parrot."""
+        if self._machine.state != SessionState.POST_SESSION_INTERPRETATION:
+            raise ValueError(
+                "Post-session interpretation may only be generated during "
+                "POST_SESSION_INTERPRETATION."
+            )
+
+        from ftp.silent_reader.post_session import PostSessionInterpreter
+
+        deck = PostSessionInterpreter(self).generate_deck()
+        self.record(
+            event_type=EventType.CARDS_GENERATED,
+            provenance_level=ProvenanceLevel.INTERPRETED,
+            payload={
+                "session_id": self._identity.session_id,
+                "card_count": deck["total_cards"],
+                "source": "deterministic_post_session_interpreter",
+                "cards": deck["cards"],
+            },
+        )
+        return deck
+
     # ------------------------------------------------------------------
     # Internal callbacks
     # ------------------------------------------------------------------
