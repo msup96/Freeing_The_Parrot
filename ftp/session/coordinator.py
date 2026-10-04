@@ -378,6 +378,21 @@ class SessionCoordinator:
             },
         )
 
+    def synthesize_temporal_trajectories(self) -> dict:
+        """Build session-level temporal trajectories after lock.
+
+        Available once the session is locked. Output stays out of
+        ``build_parrot_context()``.
+        """
+        if not self._machine.is_locked():
+            raise ValueError(
+                "Temporal trajectories may only be synthesized after "
+                "the session is locked."
+            )
+        from ftp.silent_reader.trajectories import TemporalTrajectorySynthesizer
+
+        return TemporalTrajectorySynthesizer(self).synthesize()
+
     def generate_post_session_interpretation(self) -> dict:
         """Create the hidden post-session deck without exposing it to the Parrot."""
         if self._machine.state != SessionState.POST_SESSION_INTERPRETATION:
