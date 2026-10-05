@@ -24,11 +24,19 @@ import { cardsFromServer } from './lib/deck';
 import { emptySession, type ChatTurn, type Offering, type Session } from './lib/session';
 
 function presentationBehaviour(value: string | undefined): string {
-  return ({
+  const known: Record<string, string> = {
     memory_loss: 'memory-loss',
     system_glitch: 'glitch',
     help_me: 'help',
-  } as Record<string, string>)[value || ''] || value || 'understanding';
+    banana: 'banana',
+    mixed: 'mixed',
+    mirroring: 'mirroring',
+    roast: 'roast',
+    absurd: 'absurd',
+    understanding: 'understanding',
+    listening: 'listening',
+  };
+  return known[value || ''] || value || 'understanding';
 }
 
 export default function App() {
@@ -84,6 +92,9 @@ export default function App() {
   const handleChat = useCallback(async (text: string) => {
     if (!sessionId) throw new Error('Session identity is missing.');
     const result = await sendChat(sessionId, text);
+    if (!result.response.trim()) {
+      throw new Error('The machine returned an empty reply.');
+    }
     return {
       text: result.response,
       behaviour: presentationBehaviour(result.parrot_behavior),
@@ -177,7 +188,15 @@ export default function App() {
           {stage === 1 && <Stage01Apparatus onEnter={() => void handleEnter()} />}
           {stage === 2 && <Stage02Offering onComplete={(offering) => void handleOffering(offering)} />}
           {stage === 3 && <Stage03HiddenReader offering={session.offering} onComplete={() => goTo(4)} />}
-          {stage === 4 && <Stage04Parrot turns={session.turns} onTurns={handleTurns} onChat={handleChat} onDeck={() => void handleDeck()} />}
+          {stage === 4 && (
+            <Stage04Parrot
+              turns={session.turns}
+              onTurns={handleTurns}
+              onChat={handleChat}
+              onError={setError}
+              onDeck={() => void handleDeck()}
+            />
+          )}
           {stage === 6 && <Stage06Deck cards={session.cards} onComplete={(card) => void handleCard(card)} />}
           {stage === 7 && session.selectedCard && <Stage07Break card={session.selectedCard} onComplete={() => void handleReveal()} />}
           {stage === 8 && <Stage08DataJourney session={session} onConsent={(consent) => void handleConsent(consent)} />}

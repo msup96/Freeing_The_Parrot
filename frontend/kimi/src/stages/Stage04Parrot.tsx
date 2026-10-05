@@ -17,8 +17,8 @@ const STATE_GLOW: Record<ParrotState, string> = {
 };
 
 function stateForBehaviour(b: string): ParrotState {
-  if (b === 'roast') return 'UNSTABLE';
-  if (b === 'glitch' || b === 'memory-loss') return 'GLITCHING';
+  if (b === 'roast' || b === 'banana') return 'UNSTABLE';
+  if (b === 'glitch' || b === 'memory-loss' || b === 'mixed') return 'GLITCHING';
   if (b === 'absurd' || b === 'help') return 'UNCERTAIN';
   return 'RESPONDING';
 }
@@ -37,8 +37,12 @@ function ParrotLine({ turn }: { turn: ChatTurn }) {
       className="max-w-[92%] md:max-w-[85%]"
     >
       <motion.p
-        className={`font-serif text-base md:text-lg leading-relaxed ${
-          b === 'roast' ? 'text-parchment' : b === 'glitch' ? 'font-mono text-sm text-crimson/90' : 'text-parchment'
+        className={`whitespace-pre-wrap font-serif text-base md:text-lg leading-relaxed ${
+          b === 'roast' || b === 'banana'
+            ? 'text-parchment'
+            : b === 'glitch' || b === 'memory-loss' || b === 'mixed'
+              ? 'font-mono text-sm text-crimson/90'
+              : 'text-parchment'
         }`}
         style={style}
         animate={b === 'glitch' ? { x: [0, -2, 3, -1, 0] } : {}}
@@ -55,11 +59,13 @@ export default function Stage04Parrot({
   turns,
   onTurns,
   onChat,
+  onError,
   onDeck,
 }: {
   turns: ChatTurn[];
   onTurns: (t: ChatTurn[]) => void;
   onChat: (text: string) => Promise<{ text: string; behaviour: string; closed: boolean }>;
+  onError?: (message: string) => void;
   onDeck: () => void;
 }) {
   const [state, setState] = useState<ParrotState>('IDLE');
@@ -86,7 +92,7 @@ export default function Stage04Parrot({
 
   const send = async () => {
     const text = input.trim();
-    if (!text || state === 'THINKING' || state === 'RESPONDING') return;
+    if (!text || state === 'THINKING') return;
     const next: ChatTurn[] = [...turns, { role: 'participant', text }];
     onTurns(next);
     setInput('');
@@ -94,17 +100,14 @@ export default function Stage04Parrot({
 
       try {
         const reply = await onChat(text);
-        if (reply.behaviour === 'memory-loss' || reply.behaviour === 'glitch') {
-          setState('UNCERTAIN');
-        } else {
-          setState(stateForBehaviour(reply.behaviour));
-        }
+        setState(stateForBehaviour(reply.behaviour));
         onTurns([...next, { role: 'parrot', text: reply.text, behaviour: reply.behaviour }]);
         window.setTimeout(() => setState('IDLE'), 2600);
         if (reply.closed) setDeckReady(true);
-      } catch {
+      } catch (cause) {
         setState('IDLE');
         onTurns(next);
+        onError?.(cause instanceof Error ? cause.message : 'The machine did not answer.');
       }
 
       // The deck control is only a presentation affordance; the backend
@@ -140,7 +143,9 @@ export default function Stage04Parrot({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, color: state === 'GLITCHING' || state === 'UNSTABLE' ? '#A63A2B' : '#8F8672' }}
         >
-          {emerged ? state : 'CAGED'}
+          {emerged
+            ? `${state}${turns.some((turn) => turn.role === 'parrot') ? ` · ${turns.filter((turn) => turn.role === 'parrot').at(-1)?.behaviour?.replace(/-/g, ' ').toUpperCase()}` : ''}`
+            : 'CAGED'}
         </motion.div>
       </div>
 
@@ -199,7 +204,7 @@ export default function Stage04Parrot({
                 <button
                   className="brass-button px-5 md:px-7 py-3 min-h-[44px] disabled:opacity-40"
                   onClick={send}
-                  disabled={!input.trim() || !emerged}
+                  disabled={!input.trim() || !emerged || state === 'THINKING'}
                 >
                   OFFER
                 </button>

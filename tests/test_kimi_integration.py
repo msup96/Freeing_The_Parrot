@@ -68,7 +68,17 @@ def test_kimi_api_sequence_uses_authoritative_ftp_lifecycle(monkeypatch, tmp_pat
         json={"session_id": session_id, "message": "Now speak."},
     ).get_json()
     assert chat["response"]
+    assert isinstance(chat["parrot_behavior"], str) and chat["parrot_behavior"]
     assert "parrot_context" not in chat
+    for hidden in (
+        "directive",
+        "directive_basis",
+        "selection_mode",
+        "engagement_state",
+        "behavioural_eligibility",
+        "director_state",
+    ):
+        assert hidden not in chat
 
     closed = client.post(
         "/api/end-conversation",
