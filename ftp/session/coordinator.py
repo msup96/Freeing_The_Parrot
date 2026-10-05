@@ -74,6 +74,8 @@ _PARROT_FORBIDDEN_KEYS: tuple[str, ...] = (
     "alternatives",
     "contradictions",
     "confidence",
+    "interpretation",
+    "deep_reader",
 )
 
 
@@ -459,6 +461,22 @@ class SessionCoordinator:
         from ftp.silent_reader.inference import evaluate_bundle
 
         return evaluate_bundle(self.build_evidence_bundle())
+
+    def read_session(self, adapter=None) -> dict:
+        """Apply the Phase 4B gloss layer after lock. Result stays in memory."""
+        if not self._machine.is_locked():
+            raise ValueError(
+                "Session reading may only run after the session is locked."
+            )
+        from ftp.silent_reader.inference import evaluate_bundle
+        from ftp.silent_reader.deep_reader.adapter import GeminiReaderAdapter
+        from ftp.silent_reader.deep_reader.read import read_session_interpretations
+
+        bundle = self.build_evidence_bundle()
+        evaluation = evaluate_bundle(bundle)
+        if adapter is None:
+            adapter = GeminiReaderAdapter()
+        return read_session_interpretations(bundle, evaluation, adapter)
 
     def generate_post_session_interpretation(self) -> dict:
         """Create the hidden post-session deck without exposing it to the Parrot."""

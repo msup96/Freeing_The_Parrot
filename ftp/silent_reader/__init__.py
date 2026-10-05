@@ -1,5 +1,6 @@
 from ftp.silent_reader.engagement import EngagementSynthesizer
 from ftp.silent_reader.evidence import EvidenceBundleBuilder
+from ftp.silent_reader.deep_reader import read_session_interpretations
 from ftp.silent_reader.inference import evaluate_bundle
 from ftp.silent_reader.linguistic import LinguisticTrajectorySynthesizer
 from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
@@ -17,4 +18,5 @@ __all__ = (
     "EngagementSynthesizer",
     "EvidenceBundleBuilder",
     "evaluate_bundle",
+    "read_session_interpretations",
 )
