@@ -209,3 +209,26 @@ class EngagementSynthesizer:
             "source_event_ids": source_ids,
             "signals": signals,
         }
+
+
+def build_live_engagement_snapshot(coordinator: SessionCoordinator) -> dict[str, Any]:
+    """Coordinator-private engagement view during ``LIVE_CONVERSATION``.
+
+    Uses the same synthesis path as post-lock ``synthesize_engagement()``,
+    without writing to the event store or exposing data to the Parrot.
+    """
+    from ftp.session.states import SessionState
+
+    if coordinator.machine.is_locked():
+        raise ValueError(
+            "Live engagement snapshot is only available before session lock."
+        )
+    if coordinator.state != SessionState.LIVE_CONVERSATION:
+        raise ValueError(
+            "Live engagement snapshot is only available during LIVE_CONVERSATION."
+        )
+    payload = EngagementSynthesizer(coordinator).synthesize()
+    return {
+        **payload,
+        "observation_kind": "live_engagement_snapshot",
+    }

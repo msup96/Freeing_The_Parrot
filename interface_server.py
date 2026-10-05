@@ -1,4 +1,6 @@
 from ftp.parrot.engine import choose_behaviour
+from ftp.parrot.director import BehaviourDirector, sync_legacy_session_behaviour_counters
+from ftp.parrot.realizer import LanguageRealizer, build_realizer_request
 from ftp.parrot.gates import detect_gate_state as detect_gate_state_module
 # ============================================================
 # FREEING THE PARROT INTERFACE SERVER
@@ -2816,6 +2818,11 @@ def process_chat_message(session, text):
             response,
         )
 
+        coordinator = get_ftp2_coordinator(session["id"])
+        if coordinator is not None and coordinator.state == SessionState.LIVE_CONVERSATION:
+            BehaviourDirector.record_implicit_understanding(coordinator)
+            sync_legacy_session_behaviour_counters(session, coordinator)
+
         return {
             "session_id": session["id"],
             "turn": session["turn"],
@@ -2848,17 +2855,48 @@ def process_chat_message(session, text):
         session
     )
 
-    behaviour = choose_behaviour(
-        session
-    )
-
-    behaviour_text = apply_behaviour(
-        behaviour,
-        session,
-        roast,
-        text=text,
-        analysis=analysis
-    )
+    coordinator = get_ftp2_coordinator(session["id"])
+    if coordinator is not None and coordinator.state == SessionState.LIVE_CONVERSATION:
+        behaviour_instruction = BehaviourDirector.decide(
+            coordinator,
+            turn_index=session["turn"],
+            turn_text=text,
+            navarasa_result={
+                "primary_rasa": analysis.get("primary_rasa"),
+                "rasa_scores": analysis.get("rasa_scores") or {},
+                "sentiment": analysis.get("sentiment") or {},
+            },
+        )
+        behaviour = behaviour_instruction["behaviour"]
+        sync_legacy_session_behaviour_counters(session, coordinator)
+        realizer_request = build_realizer_request(
+            coordinator,
+            behaviour_instruction,
+            turn_text=text,
+            turn_index=session["turn"],
+            navarasa_result={
+                "primary_rasa": analysis.get("primary_rasa"),
+                "rasa_scores": analysis.get("rasa_scores") or {},
+                "sentiment": analysis.get("sentiment") or {},
+            },
+        )
+        behaviour_text = LanguageRealizer.realize(
+            realizer_request,
+            session=session,
+            roast=roast,
+            analysis=analysis,
+        )
+    else:
+        behaviour = choose_behaviour(
+            session
+        )
+        behaviour_text = apply_behaviour(
+            behaviour,
+            session,
+            roast,
+            text=text,
+            analysis=analysis
+        )
 
     parts = []
 

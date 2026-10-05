@@ -124,18 +124,30 @@ class TestParrotContextStructure:
             "Parrot received a SessionIdentity object instead of a bare string."
         )
 
-    def test_understanding_turns_matches_turn_index_for_early_turns(self):
+    def test_fresh_session_director_understanding_turns_zero(self):
         c = make_live_coordinator()
+        assert c.director_state.understanding_turns == 0
         for i in range(1, 4):
             ctx = c.build_parrot_context("text", i, _CLEAN_NAVARASA)
             ps = ctx["parrot_session"]
             assert ps["understanding_turns"] == i
 
-    def test_understanding_turns_capped_at_3(self):
+    def test_understanding_turns_persist_after_engine_sync(self):
         c = make_live_coordinator()
+        ctx = c.build_parrot_context("text", 1, _CLEAN_NAVARASA)
+        choose_behaviour(ctx["parrot_session"])
+        c.apply_parrot_session_state(ctx["parrot_session"])
+        ctx_again = c.build_parrot_context("text", 2, _CLEAN_NAVARASA)
+        assert ctx_again["parrot_session"]["understanding_turns"] == 2
+
+    def test_understanding_turns_capped_after_trust_window(self):
+        c = make_live_coordinator()
+        for turn_index in (1, 2, 3):
+            ctx = c.build_parrot_context("text", turn_index, _CLEAN_NAVARASA)
+            choose_behaviour(ctx["parrot_session"])
+            c.apply_parrot_session_state(ctx["parrot_session"])
         ctx = c.build_parrot_context("text", 10, _CLEAN_NAVARASA)
-        ps = ctx["parrot_session"]
-        assert ps["understanding_turns"] == 3
+        assert ctx["parrot_session"]["understanding_turns"] == 3
 
 
 # ─────────────────────────────────────────────────────────────────────────────

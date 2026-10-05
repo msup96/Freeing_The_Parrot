@@ -213,7 +213,20 @@ def test_chat_api_reports_selected_parrot_behavior(monkeypatch, tmp_path):
     assert second_turn["parrot_behavior"] == "understanding"
     assert third_turn["parrot_behavior"] == "understanding"
 
-    monkeypatch.setattr(server, "choose_behaviour", lambda _session: "mirroring")
+    monkeypatch.setattr(
+        server.BehaviourDirector,
+        "decide",
+        classmethod(
+            lambda cls, coordinator, **kwargs: {
+                "behaviour": "mirroring",
+                "behaviour_family": "mirroring",
+                "behaviour_intensity": "steady",
+                "directive": None,
+                "directive_basis": [],
+                "selection_mode": "unstable",
+            }
+        ),
+    )
     next_turn = client.post(
         "/api/chat",
         json={"session_id": session_id, "message": "I keep thinking about it."},

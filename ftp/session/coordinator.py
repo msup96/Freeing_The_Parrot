@@ -39,6 +39,7 @@ from ftp.events.store import EventStore, StrictBoundaryViolationError
 from ftp.session.identity import SessionIdentity
 from ftp.session.machine import IllegalTransitionError, SessionStateMachine
 from ftp.session.states import SessionState
+from ftp.parrot.director_state import DirectorState
 from ftp.silent_reader.observer import (
     SilentReaderObserver,
     build_telemetry_payload,
@@ -79,6 +80,7 @@ _PARROT_FORBIDDEN_KEYS: tuple[str, ...] = (
     "reading_profile",
     "hidden_provenance",
     "qualitative_reading",
+    "director_state",
 )
 
 
@@ -121,6 +123,7 @@ class SessionCoordinator:
         self._turn_count: int = 0
         self._analysis_ready: bool = False
         self._silent_reader = SilentReaderObserver(self)
+        self._director_state = DirectorState()
 
     # ------------------------------------------------------------------
     # Properties
@@ -157,6 +160,19 @@ class SessionCoordinator:
     def silent_reader(self) -> SilentReaderObserver:
         """Passive telemetry observer for this session."""
         return self._silent_reader
+
+    @property
+    def director_state(self) -> DirectorState:
+        """Session-local Parrot behaviour state (not for Parrot context export)."""
+        return self._director_state
+
+    def reset_director_state(self) -> None:
+        """Clear behaviour counters/history for this session."""
+        self._director_state.clear()
+
+    def apply_parrot_session_state(self, parrot_session: dict) -> None:
+        """Persist legacy engine mutations after ``choose_behaviour()``."""
+        self._director_state.absorb_parrot_session(parrot_session)
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -235,6 +251,18 @@ class SessionCoordinator:
         )
         self._analysis_ready = True
         return event
+
+    def mark_raw_offering_ready(self) -> None:
+        """Mark intake complete after a raw media offering is stored.
+
+        The current architecture records the file and its metadata only.
+        This does not invent OCR, ASR, or a Navarasa classification.
+        """
+        if self._machine.state != SessionState.INPUT_INGESTION:
+            raise ValueError(
+                "Raw offering readiness may only complete during INPUT_INGESTION."
+            )
+        self._analysis_ready = True
 
     def record_silent_reader_observation(self, payload: dict) -> InteractionEvent:
         """Record a Silent Reader OBSERVED payload (never visible to Parrot)."""
@@ -357,20 +385,14 @@ class SessionCoordinator:
         _check_forbidden_keys(navarasa_result, "navarasa_result")
 
         # Build the minimal parrot_session dict the existing choose_behaviour()
-        # expects.  Critically, we derive understanding_turns and
-        # substantive_turns ONLY from the turn_index, not from any
-        # accumulated profile.
-        understanding_turns = min(turn_index, 3)
-        substantive_turns = turn_index
-
-        parrot_session: dict = {
-            "session_id": self._identity.session_id,   # bare string only
-            "understanding_turns": understanding_turns,
-            "substantive_turns": substantive_turns,
-            "chaos_count": 0,
-            "last_behaviour": None,
-            "behaviour_history": [],
-        }
+        # expects.  substantive_turns tracks the live turn index; behaviour
+        # counters/history come from session-local DirectorState (not reset
+        # each call).
+        parrot_session = self._director_state.parrot_session_view(
+            session_id=self._identity.session_id,
+            substantive_turns=turn_index,
+        )
+        _check_forbidden_keys(parrot_session, "parrot_session")
 
         return {
             "turn_text": turn_text,
@@ -444,6 +466,16 @@ class SessionCoordinator:
         from ftp.silent_reader.engagement import EngagementSynthesizer
 
         return EngagementSynthesizer(self).synthesize()
+
+    def live_engagement_snapshot(self) -> dict:
+        """Build live engagement evidence/state for the Behaviour Director.
+
+        Available only during ``LIVE_CONVERSATION`` before lock. Never flows
+        into ``build_parrot_context()`` or the event store.
+        """
+        from ftp.silent_reader.engagement import build_live_engagement_snapshot
+
+        return build_live_engagement_snapshot(self)
 
     def build_evidence_bundle(self) -> dict:
         """Curate Phase 3 outputs into an evidence bundle after lock."""
@@ -535,6 +567,9 @@ class SessionCoordinator:
         self, previous: SessionState, current: SessionState
     ) -> None:
         """Emit a SESSION_STATE_CHANGED event each time the SM transitions."""
+        if current == SessionState.PURGE_AND_RESET:
+            self.reset_director_state()
+
         # Avoid recording state changes before the store is initialised
         # (shouldn't happen in normal usage, but defensive).
         try:
