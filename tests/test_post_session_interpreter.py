@@ -34,7 +34,7 @@ class TestPostSessionInterpreter:
         deck = PostSessionInterpreter(coordinator).generate_deck()
         forbidden = ["you said", "system matched", "Navarasa", "OCR detected", "sentiment score"]
         for card in deck["cards"]:
-            text = (card["qualitative_reading"] + " " + card["card_title"]).lower()
+            text = (card["qualitative_reading"] + " " + card["title"]).lower()
             for token in forbidden:
                 assert token not in text
 
@@ -51,5 +51,5 @@ class TestPostSessionInterpreter:
 
         events = coordinator.store.events_of_type(EventType.CARDS_GENERATED)
         assert len(events) == 1
-        assert events[0].provenance_level == ProvenanceLevel.INTERPRETED
+        assert events[0].provenance_level == ProvenanceLevel.INFERRED
         assert events[0].payload["card_count"] == 27

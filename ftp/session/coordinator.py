@@ -76,6 +76,9 @@ _PARROT_FORBIDDEN_KEYS: tuple[str, ...] = (
     "confidence",
     "interpretation",
     "deep_reader",
+    "reading_profile",
+    "hidden_provenance",
+    "qualitative_reading",
 )
 
 
@@ -478,28 +481,51 @@ class SessionCoordinator:
             adapter = GeminiReaderAdapter()
         return read_session_interpretations(bundle, evaluation, adapter)
 
-    def generate_post_session_interpretation(self) -> dict:
-        """Create the hidden post-session deck without exposing it to the Parrot."""
+    def compose_post_session_reading(self, adapter=None) -> dict:
+        """Build and validate the 27-card deck from Phase 4B output."""
         if self._machine.state != SessionState.POST_SESSION_INTERPRETATION:
             raise ValueError(
-                "Post-session interpretation may only be generated during "
+                "Post-session reading may only be composed during "
                 "POST_SESSION_INTERPRETATION."
             )
+        from ftp.silent_reader.reading.compose import compose_reading_deck
 
-        from ftp.silent_reader.post_session import PostSessionInterpreter
+        return compose_reading_deck(self, adapter=adapter)
 
-        deck = PostSessionInterpreter(self).generate_deck()
+    def generate_post_session_interpretation(self) -> dict:
+        """Create the hidden post-session deck without exposing it to the Parrot."""
+        deck = self.compose_post_session_reading()
         self.record(
             event_type=EventType.CARDS_GENERATED,
-            provenance_level=ProvenanceLevel.INTERPRETED,
+            provenance_level=ProvenanceLevel.INFERRED,
             payload={
                 "session_id": self._identity.session_id,
                 "card_count": deck["total_cards"],
-                "source": "deterministic_post_session_interpreter",
+                "source": deck.get("source", "phase_4c_reading_composer"),
                 "cards": deck["cards"],
             },
         )
         return deck
+
+    def mark_card_resonance(self, *, card_id: str, card_index: int) -> InteractionEvent:
+        """Record participant RESONATES. This does not make the reading true."""
+        if self._machine.state != SessionState.CARD_SELECTION:
+            raise ValueError("Card resonance may only be marked during CARD_SELECTION.")
+        events = self._store.events_of_type(EventType.CARDS_GENERATED)
+        if not events:
+            raise ValueError("No generated deck is available for this session.")
+        deck = {
+            "cards": events[-1].payload["cards"],
+            "total_cards": events[-1].payload.get("card_count", 27),
+        }
+        from ftp.silent_reader.reading.validate import validate_card_resonance
+
+        payload = validate_card_resonance(deck, card_id=card_id, card_index=card_index)
+        return self.record(
+            EventType.CARD_RESONANCE_MARKED,
+            ProvenanceLevel.VALIDATED,
+            payload,
+        )
 
     # ------------------------------------------------------------------
     # Internal callbacks
