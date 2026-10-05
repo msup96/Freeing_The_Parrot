@@ -67,6 +67,13 @@ _PARROT_FORBIDDEN_KEYS: tuple[str, ...] = (
     "engagement_score",
     "behavioural_eligibility",
     "fracture_eligibility",
+    "evidence_bundle",
+    "evidence_items",
+    "candidate_inference",
+    "inferred_claim",
+    "alternatives",
+    "contradictions",
+    "confidence",
 )
 
 
@@ -432,6 +439,26 @@ class SessionCoordinator:
         from ftp.silent_reader.engagement import EngagementSynthesizer
 
         return EngagementSynthesizer(self).synthesize()
+
+    def build_evidence_bundle(self) -> dict:
+        """Curate Phase 3 outputs into an evidence bundle after lock."""
+        if not self._machine.is_locked():
+            raise ValueError(
+                "Evidence bundles may only be built after the session is locked."
+            )
+        from ftp.silent_reader.evidence import EvidenceBundleBuilder
+
+        return EvidenceBundleBuilder(self).build()
+
+    def evaluate_session_inferences(self) -> dict:
+        """Apply the evidence contract to session candidates after lock."""
+        if not self._machine.is_locked():
+            raise ValueError(
+                "Inferences may only be evaluated after the session is locked."
+            )
+        from ftp.silent_reader.inference import evaluate_bundle
+
+        return evaluate_bundle(self.build_evidence_bundle())
 
     def generate_post_session_interpretation(self) -> dict:
         """Create the hidden post-session deck without exposing it to the Parrot."""
