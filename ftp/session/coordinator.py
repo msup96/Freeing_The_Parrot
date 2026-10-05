@@ -62,6 +62,11 @@ _PARROT_FORBIDDEN_KEYS: tuple[str, ...] = (
     "long_term_history",
     "accumulated_rasa_history",
     "cross_session_data",
+    "engagement_evidence",
+    "engagement_state",
+    "engagement_score",
+    "behavioural_eligibility",
+    "fracture_eligibility",
 )
 
 
@@ -414,6 +419,19 @@ class SessionCoordinator:
         from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
 
         return NavarasaTrajectorySynthesizer(self).synthesize()
+
+    def synthesize_engagement(self) -> dict:
+        """Build post-lock engagement evidence and interaction state.
+
+        The result stays in memory and out of ``build_parrot_context()``.
+        """
+        if not self._machine.is_locked():
+            raise ValueError(
+                "Engagement synthesis may only run after the session is locked."
+            )
+        from ftp.silent_reader.engagement import EngagementSynthesizer
+
+        return EngagementSynthesizer(self).synthesize()
 
     def generate_post_session_interpretation(self) -> dict:
         """Create the hidden post-session deck without exposing it to the Parrot."""

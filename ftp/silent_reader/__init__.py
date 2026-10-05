@@ -1,3 +1,4 @@
+from ftp.silent_reader.engagement import EngagementSynthesizer
 from ftp.silent_reader.linguistic import LinguisticTrajectorySynthesizer
 from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
 from ftp.silent_reader.observer import SilentReaderObserver, build_telemetry_payload
@@ -11,4 +12,5 @@ __all__ = (
     "TemporalTrajectorySynthesizer",
     "LinguisticTrajectorySynthesizer",
     "NavarasaTrajectorySynthesizer",
+    "EngagementSynthesizer",
 )

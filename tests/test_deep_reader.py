@@ -318,6 +318,12 @@ class TestLinguisticTrajectory:
         ):
             assert forbidden not in blob
 
+    def test_whitespace_only_turn_has_no_tokens_or_ttr(self):
+        coordinator = _locked_with_turns("   \t  ")
+        row = coordinator.synthesize_linguistic_trajectories()["turn_sequence"][0]
+        assert row["token_count"] == 0
+        assert row["type_token_ratio"] is None
+
     def test_refuses_synthesis_before_lock(self):
         coordinator = _live()
         coordinator.record_parrot_turn("live", "ok")
@@ -343,14 +349,16 @@ class TestNavarasaTrajectory:
         )
         nav = coordinator.synthesize_navarasa_trajectories()
         assert nav["rasa_sequence"] == ["Hasya", "Raudra", "Hasya"]
-        assert nav["transition_count"] == 2
+        assert nav["detected_sequence"] == ["Hasya", "Raudra", "Hasya"]
+        assert nav["transition_count"]["value"] == 2
         assert nav["dominant_rasa"]["label"] == "Hasya"
         assert nav["dominant_rasa"]["count"] == 2
         assert nav["persistence"]["run_length"] == 1
         assert nav["switching_rate"]["value"] == 1.0
-        assert nav["beginning_rasa"] == "Hasya"
-        assert nav["ending_rasa"] == "Hasya"
-        assert nav["beginning_end_changed"] is False
+        assert nav["beginning_rasa"]["label"] == "Hasya"
+        assert nav["ending_rasa"]["label"] == "Hasya"
+        assert nav["beginning_end_changed"]["value"] is False
+        assert "initial_offering" not in nav
 
     def test_defaulted_shanta_on_neutral_text(self):
         coordinator = _locked_with_turns("hello there")
@@ -358,11 +366,18 @@ class TestNavarasaTrajectory:
         assert row["primary_rasa"] == "Shanta"
         assert row["defaulted_primary"] is True
         assert row["analysis_quality"] == "no_emotion_detected"
+        nav = coordinator.synthesize_navarasa_trajectories()
+        assert nav["rasa_sequence"] == ["Shanta"]
+        assert nav["detected_sequence"] == []
+        assert nav["dominant_rasa"]["status"] == "insufficient"
+        assert nav["rasa_distribution"]["status"] == "insufficient"
+        assert "Shanta" not in nav["rasa_distribution"]["counts"]
+        assert nav["beginning_rasa"]["status"] == "insufficient"
 
-    def test_initial_offering_separate_from_turn_sequence(self):
+    def test_stored_classification_is_not_an_initial_offering(self):
         coordinator = SessionCoordinator()
         coordinator.start()
-        offering = coordinator.mark_analysis_ready(
+        coordinator.mark_analysis_ready(
             {
                 "primary_rasa": "Karuna",
                 "rasa_scores": {"Karuna": 1.0},
@@ -373,15 +388,55 @@ class TestNavarasaTrajectory:
         coordinator.advance(SessionState.LIVE_CONVERSATION)
         coordinator.record_parrot_turn("I am angry and furious.", "Reply.")
         coordinator.lock()
+        before = len(coordinator.store.events_of_type(EventType.NAVARASA_CLASSIFIED))
         nav = coordinator.synthesize_navarasa_trajectories()
-        assert nav["turn_sequence"][0]["primary_rasa"] == "Raudra"
-        assert nav["initial_offering"]["event_id"] == offering.event_id
-        assert nav["initial_offering"]["primary_rasa"] == "Karuna"
+        after = len(coordinator.store.events_of_type(EventType.NAVARASA_CLASSIFIED))
+        assert "initial_offering" not in nav
         assert nav["rasa_sequence"] == ["Raudra"]
+        assert nav["detected_sequence"] == ["Raudra"]
+        assert after == before
 
-    def test_no_initial_offering_when_absent(self):
-        coordinator = _locked_with_turns("plain text")
-        assert coordinator.synthesize_navarasa_trajectories()["initial_offering"] is None
+    def test_defaulted_turns_do_not_enter_detected_aggregates(self):
+        coordinator = _locked_with_turns(
+            "I feel calm.",
+            "hello there",
+            "   ",
+            "I am angry and furious.",
+        )
+        nav = coordinator.synthesize_navarasa_trajectories()
+        assert nav["turn_sequence"][0]["defaulted_primary"] is False
+        assert nav["turn_sequence"][1]["defaulted_primary"] is True
+        assert nav["turn_sequence"][2]["defaulted_primary"] is True
+        assert nav["rasa_sequence"][1] == "Shanta"
+        assert nav["detected_sequence"] == ["Shanta", "Raudra"]
+        assert nav["rasa_distribution"]["counts"] == {"Shanta": 1, "Raudra": 1}
+        assert nav["dominant_rasa"]["tie"] is True
+        assert nav["dominant_rasa"]["label"] == "Shanta"
+        assert nav["transition_count"]["value"] == 1
+        assert nav["persistence"]["run_length"] == 1
+        assert nav["beginning_rasa"]["label"] == "Shanta"
+        assert nav["ending_rasa"]["label"] == "Raudra"
+
+    def test_all_defaulted_session_is_insufficient(self):
+        coordinator = _locked_with_turns("hello", "there", "friend")
+        nav = coordinator.synthesize_navarasa_trajectories()
+        assert all(row["defaulted_primary"] for row in nav["turn_sequence"])
+        assert nav["detected_sequence"] == []
+        assert nav["dominant_rasa"]["status"] == "insufficient"
+        assert nav["persistence"]["status"] == "insufficient"
+        assert nav["transition_count"]["status"] == "insufficient"
+        assert nav["switching_rate"]["status"] == "insufficient"
+        assert nav["beginning_end_changed"]["status"] == "insufficient"
+
+    def test_dominant_tie_uses_earliest_detected_turn(self):
+        coordinator = _locked_with_turns(
+            "hello",
+            "I am angry and furious.",
+            "I feel happy and joyful.",
+        )
+        nav = coordinator.synthesize_navarasa_trajectories()
+        assert nav["dominant_rasa"]["tie"] is True
+        assert nav["dominant_rasa"]["label"] == "Raudra"
 
     def test_sessions_do_not_cross_read(self):
         a = _locked_with_turns("I am angry and furious.")
@@ -412,6 +467,12 @@ class TestPhase3ParrotIsolation:
         "question_rate",
         "token_count",
         "type_token_ratio",
+        "engagement_trajectory",
+        "engagement_state",
+        "engagement_evidence",
+        "engagement_score",
+        "behavioural_eligibility",
+        "fracture_eligibility",
     )
 
     def test_build_parrot_context_unchanged_after_phase3_synthesis(self):
@@ -420,6 +481,7 @@ class TestPhase3ParrotIsolation:
         coordinator.lock()
         coordinator.synthesize_linguistic_trajectories()
         coordinator.synthesize_navarasa_trajectories()
+        coordinator.synthesize_engagement()
 
         ctx = coordinator.build_parrot_context(
             turn_text="blocked",
@@ -436,7 +498,92 @@ class TestPhase3ParrotIsolation:
             assert payload.get("observation_kind") not in (
                 "linguistic_trajectory",
                 "navarasa_trajectory",
+                "engagement_trajectory",
             )
             assert "rasa_sequence" not in payload
             for forbidden in self._FORBIDDEN_CONTEXT_KEYS:
                 assert forbidden not in blob
+
+
+class TestEngagementAlignment:
+    def test_evidence_is_observed_and_state_is_not_a_score(self):
+        from ftp.events.model import ProvenanceLevel
+
+        coordinator = _locked_with_turns("a", "bbbbbbbbbbbb", "a")
+        result = coordinator.synthesize_engagement()
+        assert result["evidence"]["provenance_level"] == ProvenanceLevel.OBSERVED.value
+        assert "engagement_score" not in result
+        assert "engagement_score" not in result["evidence"]
+        state = result["engagement_state"]
+        assert state["provenance_level"] == ProvenanceLevel.INTERPRETED.value
+        assert state["state"] == "fluctuating"
+        assert "participant" in state["disclaimer"]
+        assert "psychological" in state["disclaimer"]
+
+    def test_one_turn_is_insufficient_and_ineligible(self):
+        coordinator = _locked_with_turns("hello")
+        result = coordinator.synthesize_engagement()
+        assert result["engagement_state"]["state"] == "insufficient"
+        eligibility = result["behavioural_eligibility"]
+        assert eligibility["fracture_eligibility"] == "ineligible"
+        assert eligibility["recovery_eligibility"] == "ineligible"
+        assert set(eligibility) >= {
+            "fracture_eligibility",
+            "fracture_intensity_band",
+            "recovery_eligibility",
+        }
+        assert "evidence" not in eligibility
+
+    def test_eligibility_is_separate_from_evidence(self):
+        from ftp.silent_reader.engagement import (
+            derive_behavioural_eligibility,
+            selected_behaviour_instruction,
+        )
+
+        eligibility = derive_behavioural_eligibility("sustained")
+        instruction = selected_behaviour_instruction(
+            behaviour="MIRRORING",
+            behaviour_family="understanding",
+            behaviour_intensity="steady",
+        )
+        assert eligibility["recovery_eligibility"] == "eligible"
+        assert instruction == {
+            "behaviour": "MIRRORING",
+            "behaviour_family": "understanding",
+            "behaviour_intensity": "steady",
+        }
+        for key in (
+            "engagement_state",
+            "engagement_score",
+            "question_rate",
+            "source_event_ids",
+        ):
+            assert key not in instruction
+
+    def test_engagement_does_not_write_events_or_cross_sessions(self):
+        from ftp.events.model import EventType
+
+        first = _locked_with_turns("only one session line")
+        second = _locked_with_turns("aa", "bbbbbbbbbbbb", "aa")
+        before = len(first.store.all_events())
+        a = first.synthesize_engagement()
+        b = second.synthesize_engagement()
+        assert len(first.store.all_events()) == before
+        assert a["session_id"] != b["session_id"]
+        assert a["engagement_state"]["state"] == "insufficient"
+        assert b["engagement_state"]["state"] == "fluctuating"
+        assert not first.store.events_of_type(EventType.NAVARASA_CLASSIFIED)
+
+    def test_parrot_context_rejects_engagement_keys(self):
+        from ftp.events.store import StrictBoundaryViolationError
+
+        coordinator = _live()
+        with pytest.raises(StrictBoundaryViolationError):
+            coordinator.build_parrot_context(
+                turn_text="hello",
+                turn_index=1,
+                navarasa_result={
+                    "primary_rasa": "Shanta",
+                    "engagement_state": "high",
+                },
+            )
