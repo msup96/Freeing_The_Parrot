@@ -57,7 +57,7 @@ export default function App() {
     if (!sessionId) return;
     setError(null);
     try {
-      const result = offering.channel === 'write' && offering.text
+      const result = offering.text
         ? await submitInitialText(sessionId, offering.text)
         : offering.media
           ? await submitInitialMedia(
