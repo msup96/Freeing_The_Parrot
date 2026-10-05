@@ -71,9 +71,16 @@ export default function Stage04Parrot({
   const [state, setState] = useState<ParrotState>('IDLE');
   const [input, setInput] = useState('');
   const [emerged, setEmerged] = useState(false);
-  const [deckReady, setDeckReady] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const participantTurns = turns.filter((t) => t.role === 'participant').length;
+
+  const handleDone = () => {
+    if (isEnding) return;
+    setIsEnding(true);
+    setState('IDLE');
+    onDeck();
+  };
 
   // Emergence is presentation only; backend readiness is established before this stage.
   useEffect(() => {
@@ -81,9 +88,18 @@ export default function Stage04Parrot({
     const t2 = window.setTimeout(() => {
       setEmerged(true);
       setState('RESPONDING');
+      if (turns.length === 0) {
+        onTurns([
+          {
+            role: 'parrot',
+            text: 'I read what you left. Go on.',
+            behaviour: 'understanding',
+          },
+        ]);
+      }
     }, 2200);
-      const t3 = window.setTimeout(() => setState('IDLE'), 3200);
-      return () => [t1, t2, t3].forEach(clearTimeout);
+    const t3 = window.setTimeout(() => setState('IDLE'), 3200);
+    return () => [t1, t2, t3].forEach(clearTimeout);
   }, []);
 
   useEffect(() => {
@@ -103,16 +119,14 @@ export default function Stage04Parrot({
         setState(stateForBehaviour(reply.behaviour));
         onTurns([...next, { role: 'parrot', text: reply.text, behaviour: reply.behaviour }]);
         window.setTimeout(() => setState('IDLE'), 2600);
-        if (reply.closed) setDeckReady(true);
+        if (reply.closed) {
+          handleDone();
+        }
       } catch (cause) {
         setState('IDLE');
         onTurns(next);
         onError?.(cause instanceof Error ? cause.message : 'The machine did not answer.');
       }
-
-      // The deck control is only a presentation affordance; the backend
-      // authorizes the actual transition when it is pressed.
-      if (participantTurns + 1 >= 5) setDeckReady(true);
   };
 
   return (
@@ -177,26 +191,21 @@ export default function Stage04Parrot({
         </div>
 
         {/* input — or the deck invitation */}
+        {/* input and conversation controls */}
         <div className="pt-4 pb-16 md:pb-8">
           <AnimatePresence mode="wait">
-            {deckReady ? (
-              <motion.div key="deck" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={transition('REVEAL')} className="flex justify-center">
-                <button className="brass-button px-8 py-4 min-h-[44px]" onClick={onDeck}>
-                  TAKE THE DECK
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div key="input" exit={{ opacity: 0 }} className="flex gap-3 items-end">
+            <motion.div key="input" exit={{ opacity: 0 }} className="flex flex-col gap-3">
+              <div className="flex gap-3 items-end">
                 <div className="flex-1 border-b border-brass/50 focus-within:border-gold transition-colors duration-500">
                   <input
                     value={input}
                     onChange={(e) => {
                       setInput(e.target.value);
-                      if (emerged && state === 'IDLE') setState('LISTENING');
+                      if (emerged && state === 'IDLE' && !isEnding) setState('LISTENING');
                     }}
-                    onKeyDown={(e) => e.key === 'Enter' && send()}
-                    placeholder={emerged ? 'Say something true…' : '…'}
-                    disabled={!emerged}
+                    onKeyDown={(e) => e.key === 'Enter' && !isEnding && send()}
+                    placeholder={isEnding ? 'Conversation concluded.' : emerged ? 'Say something true…' : '…'}
+                    disabled={!emerged || isEnding || state === 'THINKING'}
                     className="w-full bg-transparent font-serif italic text-base md:text-lg text-parchment placeholder:text-parchment-faint/60 focus:outline-none py-3 min-h-[44px]"
                     style={{ caretColor: '#C9A227' }}
                   />
@@ -204,12 +213,22 @@ export default function Stage04Parrot({
                 <button
                   className="brass-button px-5 md:px-7 py-3 min-h-[44px] disabled:opacity-40"
                   onClick={send}
-                  disabled={!input.trim() || !emerged || state === 'THINKING'}
+                  disabled={!input.trim() || !emerged || state === 'THINKING' || isEnding}
                 >
                   OFFER
                 </button>
-              </motion.div>
-            )}
+                {participantTurns >= 1 && (
+                  <button
+                    className="brass-button px-4 md:px-6 py-3 min-h-[44px] disabled:opacity-40 text-xs tracking-[0.2em] font-mono cursor-pointer"
+                    onClick={handleDone}
+                    disabled={isEnding || state === 'THINKING'}
+                    title="Conclude conversation and take the 27 cards"
+                  >
+                    {isEnding ? 'CLOSING…' : 'I AM DONE'}
+                  </button>
+                )}
+              </div>
+            </motion.div>
           </AnimatePresence>
         </div>
       </div>
