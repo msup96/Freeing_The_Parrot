@@ -21,6 +21,7 @@ ALLOWED_REQUEST_KEYS = frozenset({
     "behaviour_intensity",
     "directive",
     "directive_basis",
+    "initial_context",
 })
 
 FORBIDDEN_REQUEST_KEYS = frozenset({
@@ -162,6 +163,7 @@ def build_realizer_request(
     turn_text: str,
     turn_index: int,
     navarasa_result: Mapping[str, Any],
+    initial_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the bounded realizer input for one live turn."""
     turns = dialogue_turns_from_coordinator(coordinator)
@@ -171,7 +173,7 @@ def build_realizer_request(
         "rasa_scores": navarasa_result.get("rasa_scores") or {},
         "sentiment": navarasa_result.get("sentiment") or {},
     }
-    return {
+    req = {
         "turn_text": turn_text,
         "turn_index": turn_index,
         "navarasa_result": nav,
@@ -182,6 +184,9 @@ def build_realizer_request(
         "directive": instruction.get("directive"),
         "directive_basis": list(instruction.get("directive_basis") or []),
     }
+    if initial_context:
+        req["initial_context"] = dict(initial_context)
+    return req
 
 
 def validate_realizer_output(
