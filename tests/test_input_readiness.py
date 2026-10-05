@@ -2,6 +2,8 @@
 
 import io
 
+import pytest
+
 import interface_server as server
 from ftp.events.model import EventType
 from ftp.session.states import SessionState
@@ -61,26 +63,58 @@ def test_chat_is_rejected_before_readiness():
     assert response.get_json()["analysis_ready"] is False
 
 
-def test_image_input_stays_unready_and_cannot_start_parrot(monkeypatch, tmp_path):
-    monkeypatch.setattr(server, "INGEST_MEDIA_DIR", tmp_path / "media")
-    client = server.app.test_client()
-    session_id = start_session(client)
-    response = client.post(
+def _ingest(client, session_id, modality, filename, payload):
+    return client.post(
         "/api/input/ingest",
         data={
             "session_id": session_id,
-            "modality": "IMAGE",
-            "file": (io.BytesIO(b"not-an-image"), "offering.jpg"),
+            "modality": modality,
+            "file": (io.BytesIO(payload), filename),
         },
         content_type="multipart/form-data",
     )
 
+
+@pytest.mark.parametrize(
+    ("modality", "filename", "payload"),
+    [
+        ("AUDIO", "offering.webm", b"not-audio"),
+        ("IMAGE", "offering.jpg", b"not-an-image"),
+        ("CAMERA", "offering.jpg", b"not-a-camera-frame"),
+    ],
+)
+def test_multimodal_offering_is_ready_without_invented_analysis(
+    monkeypatch,
+    tmp_path,
+    modality,
+    filename,
+    payload,
+):
+    monkeypatch.setattr(server, "INGEST_MEDIA_DIR", tmp_path / "media")
+    client = server.app.test_client()
+    session_id = start_session(client)
+    response = _ingest(client, session_id, modality, filename, payload)
+    body = response.get_json()
+    coordinator = server.get_ftp2_coordinator(session_id)
+
     assert response.status_code == 200
-    assert response.get_json()["analysis_ready"] is False
+    assert body["analysis_ready"] is True
+    assert body["state"] == "INPUT_INGESTION"
+    assert "primary_rasa" not in body
+    assert coordinator.store.events_of_type(EventType.INPUT_RAW_INGESTED)
+    assert not coordinator.store.events_of_type(EventType.NAVARASA_CLASSIFIED)
+    assert not coordinator.store.events_of_type(EventType.OCR_TEXT_EXTRACTED)
+    assert not coordinator.store.events_of_type(EventType.AUDIO_ASR_TRANSCRIBED)
     assert client.post(
         "/api/chat",
-        json={"session_id": session_id, "message": "Still not ready."},
+        json={"session_id": session_id, "message": "Still gated by lifecycle."},
     ).status_code == 409
+    complete = client.post(
+        "/api/session-lifecycle",
+        json={"session_id": session_id, "action": "input_complete"},
+    )
+    assert complete.status_code == 200
+    assert complete.get_json()["lifecycle_state"] == "LIVE_CONVERSATION"
 
 
 def test_input_complete_requires_readiness_and_is_safe_to_repeat():

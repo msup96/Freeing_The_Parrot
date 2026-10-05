@@ -15,9 +15,13 @@ export type ChatTurn = {
   behaviour?: string;
 };
 
+import type { DeckCard } from './deck';
+
 export type Session = {
   offering: Offering | null;
   turns: ChatTurn[];
+  cards: DeckCard[];
+  selectedCard: DeckCard | null;
   cardId: number | null;
   consent: 'private' | 'wall' | null;
 };
@@ -25,6 +29,8 @@ export type Session = {
 export const emptySession: Session = {
   offering: null,
   turns: [],
+  cards: [],
+  selectedCard: null,
   cardId: null,
   consent: null,
 };

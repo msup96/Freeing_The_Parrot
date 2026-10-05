@@ -70,18 +70,31 @@ def test_kimi_api_sequence_uses_authoritative_ftp_lifecycle(monkeypatch, tmp_pat
     assert chat["response"]
     assert "parrot_context" not in chat
 
-    assert client.post(
+    closed = client.post(
         "/api/end-conversation",
         json={"session_id": session_id},
-    ).get_json()["lifecycle_state"] == "CARD_SELECTION"
-    assert client.post(
+    ).get_json()
+    assert closed["lifecycle_state"] == "CARD_SELECTION"
+    assert len(closed["cards"]) == 27
+    assert "hidden_provenance" not in closed["cards"][0]
+    assert "evidence_ids" not in closed["cards"][0]
+    chosen = closed["cards"][0]
+    selected = client.post(
         "/api/session-lifecycle",
         json={
             "session_id": session_id,
             "action": "card_selection",
-            "card_index": 1,
+            "card_index": chosen["card_index"],
+            "card_id": chosen["card_id"],
         },
-    ).get_json()["lifecycle_state"] == "PROFILE_REVEAL"
+    )
+    assert selected.get_json()["lifecycle_state"] == "PROFILE_REVEAL"
+    from ftp.events.model import EventType, ProvenanceLevel
+    coordinator = server.get_ftp2_coordinator(session_id)
+    marked = coordinator.store.events_of_type(EventType.CARD_RESONANCE_MARKED)[-1]
+    assert marked.provenance_level == ProvenanceLevel.VALIDATED
+    assert marked.payload["meaning"] == "participant_reported_resonance_not_truth"
+    assert marked.payload["card_id"] == chosen["card_id"]
     assert client.post(
         "/api/session-lifecycle",
         json={"session_id": session_id, "action": "reveal"},

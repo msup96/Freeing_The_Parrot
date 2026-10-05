@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Apparatus } from './Stage01Apparatus';
 import { transition } from '../lib/motion';
-import { DECK } from '../lib/deck';
 import type { Session } from '../lib/session';
 
 /** Stage 09 — EXIT. An afterimage, not a congratulations screen. */
 export default function Stage09Exit({ session, onRestart }: { session: Session; onRestart: () => void }) {
   const [phase, setPhase] = useState(0);
   const priv = session.consent === 'private';
-  const card = session.cardId ? DECK.find((c) => c.id === session.cardId) : null;
+  const card = session.selectedCard;
 
   useEffect(() => {
     const t = [2200, 4600, 7000, 9200, 11400].map((d, i) => window.setTimeout(() => setPhase(i + 1), d));

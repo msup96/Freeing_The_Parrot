@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DECK, type DeckCard } from '../lib/deck';
+import type { DeckCard } from '../lib/deck';
 
 /**
  * Stage 07 — THE BREAK.
  * Not a hacker glitch: the backstage infrastructure suddenly becomes visible.
  * Hard cuts, typographic replacement, spatial snapping, material collapse.
  */
-export default function Stage07Break({ cardId, onComplete }: { cardId: number; onComplete: () => void }) {
+export default function Stage07Break({ card, onComplete }: { card: DeckCard; onComplete: () => void }) {
   const [step, setStep] = useState(0);
-  const card: DeckCard = DECK.find((c) => c.id === cardId) ?? DECK[26];
 
   useEffect(() => {
     // 1 card visible · 2 typo · 3 label changes · 4 texture dies · 5 serif→mono

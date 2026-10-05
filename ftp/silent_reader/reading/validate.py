@@ -79,13 +79,45 @@ def _validate_card(
         raise DeckValidationError("participant-facing card text exposes internal identifiers")
 
 
+_WHOLE_WORD_SPOILERS = frozenset({
+    "navarasa",
+    "ocr",
+    "sentiment",
+    "evidence_id",
+    "inference_id",
+    "event_id",
+    "telemetry",
+    "shanta",
+    "raudra",
+    "hasya",
+    "karuna",
+    "bibhatsa",
+    "adbhuta",
+    "bhayanaka",
+    "veera",
+    "confidence",
+    "gemini",
+})
+
+
 def contains_spoiler(text: str) -> bool:
     hay = text.lower()
-    for token in FORBIDDEN_SPOILERS:
-        if token in {"shanta", "raudra", "hasya", "karuna", "bibhatsa", "adbhuta", "bhayanaka", "veera"}:
-            if re.search(rf"\b{re.escape(token)}\b", hay):
-                return True
-        elif token in hay:
+    phrase_tokens = (
+        "you said",
+        "system matched",
+        "system detected",
+        "sentiment score",
+        "ocr detected",
+        "parrot turn",
+    )
+    for token in phrase_tokens:
+        if token in hay:
+            return True
+    for token in _WHOLE_WORD_SPOILERS:
+        if re.search(rf"\b{re.escape(token)}\b", hay):
+            return True
+    for token in ("evidence_id", "inference_id", "event_id"):
+        if token in hay:
             return True
     return False
 

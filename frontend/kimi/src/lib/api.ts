@@ -62,12 +62,33 @@ export async function sendChat(sessionId: string, message: string): Promise<{
   };
 }
 
-export async function endConversation(sessionId: string): Promise<void> {
-  await readJson(await fetch('/api/end-conversation', {
+export async function endConversation(sessionId: string): Promise<{
+  cards: Array<{
+    card_id: string;
+    card_index: number;
+    title: string;
+    archetype?: string;
+    qualitative_reading: string;
+  }>;
+}> {
+  const data = await readJson(await fetch('/api/end-conversation', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId }),
   }));
+  const cards = Array.isArray(data.cards) ? data.cards : [];
+  return {
+    cards: cards.map((card) => {
+      const row = card as Record<string, unknown>;
+      return {
+        card_id: String(row.card_id),
+        card_index: Number(row.card_index),
+        title: String(row.title ?? ''),
+        archetype: typeof row.archetype === 'string' ? row.archetype : undefined,
+        qualitative_reading: String(row.qualitative_reading ?? ''),
+      };
+    }),
+  };
 }
 
 export async function advanceLifecycle(

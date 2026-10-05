@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { transition } from '../lib/motion';
-import { DECK } from '../lib/deck';
 import type { Session } from '../lib/session';
 
 function EvidenceRow({ label, children, delay = 0 }: { label: string; children: React.ReactNode; delay?: number }) {
@@ -33,7 +32,7 @@ function Connector() {
 
 /** A pinned archival specimen tile */
 function WallTile({ index, session, self }: { index: number; session: Session; self?: boolean }) {
-  const card = session.cardId ? DECK.find((c) => c.id === session.cardId) : null;
+  const card = session.selectedCard;
   return (
     <motion.div
       initial={{ opacity: 0, y: 18, rotate: self ? 0 : (index % 3) - 1 }}
@@ -65,7 +64,7 @@ function WallTile({ index, session, self }: { index: number; session: Session; s
 /** Stage 08 — DATA JOURNEY · WALL OF FAME · CONSENT */
 export default function Stage08DataJourney({ session, onConsent }: { session: Session; onConsent: (c: 'private' | 'wall') => void }) {
   const [phase, setPhase] = useState(0); // 0 journey, 1 wall, 2 consent
-  const card = session.cardId ? DECK.find((c) => c.id === session.cardId)! : null;
+  const card = session.selectedCard;
   const firstWords = useMemo(() => {
     const t = session.turns.find((t) => t.role === 'participant');
     return t ? `“${t.text.slice(0, 80)}${t.text.length > 80 ? '…' : ''}”` : '—';

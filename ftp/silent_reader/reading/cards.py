@@ -63,7 +63,7 @@ TITLE_FRAGMENTS = (
     "The Map Beneath the Surface",
     "The Mirror of Delayed Recognition",
     "The Lantern Between Two Silences",
-    "The Orchard of Quiet Confidence",
+    "The Orchard of Quiet Composure",
     "The River That Returns the Same Question",
     "The Shape of a Careful Pause",
     "The Hearth of Less Certain Certainty",

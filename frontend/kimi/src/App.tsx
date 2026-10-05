@@ -20,6 +20,7 @@ import {
   submitInitialMedia,
   submitInitialText,
 } from './lib/api';
+import { cardsFromServer } from './lib/deck';
 import { emptySession, type ChatTurn, type Offering, type Session } from './lib/session';
 
 function presentationBehaviour(value: string | undefined): string {
@@ -97,18 +98,30 @@ export default function App() {
   const handleDeck = useCallback(async () => {
     if (!sessionId) return;
     try {
-      await endConversation(sessionId);
+      const closed = await endConversation(sessionId);
+      const cards = cardsFromServer(closed.cards);
+      if (cards.length !== 27) {
+        throw new Error('This session did not return a 27-card reading.');
+      }
+      setSession((current) => ({ ...current, cards }));
       goTo(6);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The conversation could not close.');
     }
   }, [goTo, sessionId]);
 
-  const handleCard = useCallback(async (card: { id: number }) => {
+  const handleCard = useCallback(async (card: { id: number; cardId: string }) => {
     if (!sessionId) return;
-    await advanceLifecycle(sessionId, 'card_selection', { card_index: card.id });
-    setSession((current) => ({ ...current, cardId: card.id }));
-    goTo(7);
+    try {
+      await advanceLifecycle(sessionId, 'card_selection', {
+        card_index: card.id,
+        card_id: card.cardId,
+      });
+      setSession((current) => ({ ...current, cardId: card.id, selectedCard: card as Session['selectedCard'] }));
+      goTo(7);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'That card could not be marked.');
+    }
   }, [goTo, sessionId]);
 
   const handleReveal = useCallback(async () => {
@@ -165,8 +178,8 @@ export default function App() {
           {stage === 2 && <Stage02Offering onComplete={(offering) => void handleOffering(offering)} />}
           {stage === 3 && <Stage03HiddenReader offering={session.offering} onComplete={() => goTo(4)} />}
           {stage === 4 && <Stage04Parrot turns={session.turns} onTurns={handleTurns} onChat={handleChat} onDeck={() => void handleDeck()} />}
-          {stage === 6 && <Stage06Deck onComplete={(card) => void handleCard(card)} />}
-          {stage === 7 && <Stage07Break cardId={session.cardId ?? 27} onComplete={() => void handleReveal()} />}
+          {stage === 6 && <Stage06Deck cards={session.cards} onComplete={(card) => void handleCard(card)} />}
+          {stage === 7 && session.selectedCard && <Stage07Break card={session.selectedCard} onComplete={() => void handleReveal()} />}
           {stage === 8 && <Stage08DataJourney session={session} onConsent={(consent) => void handleConsent(consent)} />}
           {stage === 9 && <Stage09Exit session={session} onRestart={() => void restart()} />}
         </motion.main>

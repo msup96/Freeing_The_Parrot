@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { transition, MECHANICAL } from '../lib/motion';
-import { DECK, type DeckCard } from '../lib/deck';
+import type { DeckCard } from '../lib/deck';
 
 function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
   return (
@@ -42,7 +42,13 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
 }
 
 /** Stage 06 — THE 27-CARD DECK. "Turn the one that sounds like you." */
-export default function Stage06Deck({ onComplete }: { onComplete: (card: DeckCard) => void }) {
+export default function Stage06Deck({
+  cards,
+  onComplete,
+}: {
+  cards: DeckCard[];
+  onComplete: (card: DeckCard) => void;
+}) {
   const [dealt, setDealt] = useState(0); // 1 → 3 → 9 → 27
   const [hovered, setHovered] = useState<number | null>(null);
   const [selected, setSelected] = useState<DeckCard | null>(null);
@@ -66,6 +72,14 @@ export default function Stage06Deck({ onComplete }: { onComplete: (card: DeckCar
     window.setTimeout(() => onComplete(card), 3600);
   };
 
+  if (cards.length === 0) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center px-6 font-mono text-xs tracking-[0.2em] text-crimson">
+        THE DECK DID NOT ARRIVE FROM THIS SESSION.
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-24 overflow-hidden">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={transition('REVEAL')} className="text-center mb-8 md:mb-12">
@@ -75,7 +89,7 @@ export default function Stage06Deck({ onComplete }: { onComplete: (card: DeckCar
 
       {/* the deck */}
       <div className={`grid grid-cols-3 md:grid-cols-9 gap-2 md:gap-3 w-full max-w-5xl transition-opacity duration-1000 ${selected ? 'opacity-25' : 'opacity-100'}`}>
-        {DECK.slice(0, dealt).map((card, i) => (
+        {cards.slice(0, dealt).map((card, i) => (
           <motion.button
             key={card.id}
             className="relative aspect-[2/3] min-h-[44px] cursor-pointer"

@@ -2037,6 +2037,45 @@ def get_ftp2_coordinator(session_id: str) -> SessionCoordinator | None:
     return FTP2_COORDINATORS.get(session_id)
 
 
+def participant_facing_cards(coordinator: SessionCoordinator) -> list[dict]:
+    """Titles and readings only. Hidden provenance stays on the server."""
+    events = coordinator.store.events_of_type(EventType.CARDS_GENERATED)
+    if not events:
+        return []
+    cards = []
+    for card in events[-1].payload.get("cards") or []:
+        cards.append({
+            "card_id": card["card_id"],
+            "card_index": card["card_index"],
+            "title": card.get("title") or card.get("card_title"),
+            "archetype": card.get("archetype"),
+            "qualitative_reading": card.get("qualitative_reading"),
+        })
+    return cards
+
+
+def resonance_payload(coordinator: SessionCoordinator, payload: dict) -> dict:
+    from ftp.silent_reader.reading.validate import validate_card_resonance
+
+    events = coordinator.store.events_of_type(EventType.CARDS_GENERATED)
+    if not events:
+        raise ValueError("No generated deck is available for this session.")
+    deck = {"cards": events[-1].payload.get("cards") or []}
+    card_index = payload.get("card_index")
+    card_id = payload.get("card_id")
+    if card_id is None and card_index is not None:
+        match = next((card for card in deck["cards"] if card["card_index"] == card_index), None)
+        if match is None:
+            raise ValueError(f"Unknown card_index {card_index!r}.")
+        card_id = match["card_id"]
+    validated = validate_card_resonance(
+        deck,
+        card_id=str(card_id),
+        card_index=int(card_index),
+    )
+    return validated
+
+
 def advance_participant_lifecycle(session_id, action, payload=None):
     """Advance one participant action through the canonical state machine."""
     coordinator = get_ftp2_coordinator(session_id)
@@ -2060,15 +2099,17 @@ def advance_participant_lifecycle(session_id, action, payload=None):
         coordinator.advance(SessionState.CARD_SELECTION)
         return coordinator
 
+    card_payload = (
+        resonance_payload(coordinator, payload)
+        if action == "card_selection"
+        else None
+    )
     actions = {
         "card_selection": (
             SessionState.PROFILE_REVEAL,
             EventType.CARD_RESONANCE_MARKED,
             ProvenanceLevel.VALIDATED,
-            {
-                "card_index": payload.get("card_index"),
-                "card_text": payload.get("card_text", ""),
-            },
+            card_payload,
         ),
         "reveal": (
             SessionState.DATA_WALL_CONSENT,
@@ -5034,7 +5075,9 @@ def input_ingest():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    if coordinator.state == SessionState.LIVE_CONVERSATION:
+    if coordinator.state == SessionState.INPUT_INGESTION:
+        coordinator.mark_raw_offering_ready()
+    elif coordinator.state == SessionState.LIVE_CONVERSATION:
         try:
             run_silent_reader_pass(coordinator)
         except Exception:
@@ -5127,6 +5170,7 @@ def end_conversation_route():
         coordinator.generate_post_session_interpretation()
         coordinator.advance(SessionState.CARD_SELECTION)
         result["lifecycle_state"] = coordinator.state.value
+        result["cards"] = participant_facing_cards(coordinator)
     return jsonify(result)
 
 
