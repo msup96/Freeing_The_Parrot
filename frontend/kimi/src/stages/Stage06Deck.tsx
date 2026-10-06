@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { transition, MECHANICAL } from '../lib/motion';
 import type { DeckCard } from '../lib/deck';
+import type { SelectedCard } from '../lib/session';
 
 function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
   return (
@@ -21,6 +22,9 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
         <div className={`${large ? 'text-3xl md:text-4xl' : 'text-lg md:text-2xl'} text-gold/90 mb-1`}>{card.glyph}</div>
         <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[9px] md:text-xs'} tracking-[0.14em] text-parchment leading-snug`}>
           {card.title}
+        </div>
+        <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[5px]'} tracking-[0.22em] text-gold/70 uppercase`}>
+          TERRITORY · {card.semanticAnchor}
         </div>
         {card.archetype && (
           <div className={`mt-1 font-mono ${large ? 'text-[10px]' : 'text-[6px]'} tracking-[0.25em] text-gold/60 uppercase`}>
@@ -55,13 +59,15 @@ export default function Stage06Deck({
   onRetry,
 }: {
   cards: DeckCard[];
-  onComplete: (card: DeckCard) => void;
+  onComplete: (cards: SelectedCard[]) => void;
   onRetry?: () => void;
 }) {
   const [phase, setPhase] = useState<'concluded' | 'silence' | 'deck'>('concluded');
   const [dealt, setDealt] = useState(0); // 1 → 3 → 9 → 27
   const [hovered, setHovered] = useState<number | null>(null);
-  const [selected, setSelected] = useState<DeckCard | null>(null);
+  const [selected, setSelected] = useState<DeckCard[]>([]);
+  const [flipped, setFlipped] = useState<Set<string>>(new Set());
+  const [shuffled, setShuffled] = useState(false);
   const [resonating, setResonating] = useState(false);
 
   // Transition ritual: CONVERSATION CONCLUDED → THE PARROT HAS NOTHING MORE TO SAY → 27 CARDS APPEAR
@@ -74,16 +80,22 @@ export default function Stage06Deck({
     return () => [t1, t2, t3, t4, t5].forEach(clearTimeout);
   }, []);
 
-  const handleSelect = (card: DeckCard) => {
+  const handleCardClick = (card: DeckCard) => {
     if (resonating) return;
-    setSelected(card);
+    if (!flipped.has(card.cardId)) {
+      setFlipped((current) => new Set(current).add(card.cardId));
+      return;
+    }
+    setSelected((current) => current.some((item) => item.cardId === card.cardId)
+      ? current.filter((item) => item.cardId !== card.cardId)
+      : [...current, card]);
   };
 
   const handleConfirmResonance = () => {
-    if (!selected || resonating) return;
+    if (selected.length === 0 || resonating) return;
     setResonating(true);
     window.setTimeout(() => {
-      onComplete(selected);
+      onComplete(selected.map((card, index) => ({ ...card, selectionOrder: index + 1 })));
     }, 1500);
   };
 
@@ -103,7 +115,13 @@ export default function Stage06Deck({
   }
 
   return (
-    <div className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-20 overflow-hidden">
+    <div 
+      className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-20 overflow-hidden"
+      style={{
+        fontFamily: 'inherit',
+        fontSize: '16'
+      }}
+    >
       {/* Prelude ritual sequence */}
       {phase !== 'deck' ? (
         <div className="min-h-[60vh] flex items-center justify-center text-center px-6">
@@ -143,56 +161,63 @@ export default function Stage06Deck({
             className="text-center mb-6 md:mb-10"
           >
             <div className="meta-label mb-2">TWENTY-SEVEN CARDS</div>
-            <h2 className="font-display text-xl md:text-3xl tracking-[0.14em] text-balance text-parchment">
-              ONE OF THESE MAY FEEL FAMILIAR.
+              <h2 className="font-display text-xl md:text-3xl tracking-[0.14em] text-balance text-parchment">
+              READINGS, NOT REWARDS.
             </h2>
             <p className="mt-1 font-serif italic text-xs md:text-sm text-parchment-dim">
-              Turn the one that sounds like you
+              Flip the readings, shuffle them, then choose any number that resonates.
             </p>
+            <button type="button" className="mt-4 text-[10px] font-mono tracking-[0.25em] text-gold" onClick={() => setShuffled((value) => !value)}>
+              {shuffled ? 'SHUFFLE COMPLETE' : 'SHUFFLE THE READINGS'}
+            </button>
           </motion.div>
 
           {/* the 27-card grid */}
           <div
             className={`grid grid-cols-3 sm:grid-cols-6 md:grid-cols-9 gap-2 md:gap-3 w-full max-w-5xl transition-opacity duration-700 ${
-              selected ? 'opacity-20 pointer-events-none' : 'opacity-100'
+              'opacity-100'
             }`}
           >
-            {cards.slice(0, dealt).map((card, i) => (
+            {(shuffled ? [...cards].reverse() : cards).slice(0, dealt).map((card, i) => (
               <motion.button
                 key={card.cardId}
-                className="relative aspect-[2/3] min-h-[44px] cursor-pointer"
+                className={`relative aspect-[2/3] min-h-[44px] cursor-pointer ${selected.some((item) => item.cardId === card.cardId) ? 'ring-2 ring-gold ring-offset-2 ring-offset-[#0a0a09]' : ''}`}
                 initial={{ opacity: 0, y: 30, rotate: i % 2 ? 2 : -2 }}
                 animate={{ opacity: 1, y: 0, rotate: 0 }}
                 transition={{ duration: 0.5, delay: (i % 9) * 0.04, ease: MECHANICAL }}
                 whileHover={{ y: -8 }}
                 onHoverStart={() => setHovered(card.id)}
                 onHoverEnd={() => setHovered(null)}
-                onClick={() => handleSelect(card)}
-                disabled={!!selected}
+                onClick={() => handleCardClick(card)}
+                aria-pressed={selected.some((item) => item.cardId === card.cardId)}
+                aria-label={`${flipped.has(card.cardId) ? 'Select' : 'Flip'} card № ${card.id}: ${card.title}`}
                 style={{ transformStyle: 'preserve-3d' }}
-                aria-label={`Card № ${card.id}: ${card.title}`}
               >
                 <motion.div
                   className="w-full h-full"
-                  animate={hovered === card.id && !selected ? { scale: 1.04 } : { scale: 1 }}
+                  animate={hovered === card.id ? { scale: 1.04 } : { scale: 1 }}
                   transition={transition('SETTLE')}
                   style={{
                     filter:
-                      hovered === card.id && !selected
+                      hovered === card.id
                         ? 'drop-shadow(0 16px 20px rgba(0,0,0,0.65))'
                         : 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))',
                   }}
                 >
-                  <img
-                    src="/assets/card-back.png"
-                    alt=""
-                    className="w-full h-full object-cover rounded-[3px]"
-                    draggable={false}
-                  />
+                  {flipped.has(card.cardId) ? (
+                    <CardFace card={card} />
+                  ) : (
+                    <img
+                      src="/assets/card-back.png"
+                      alt=""
+                      className="w-full h-full object-cover rounded-[3px]"
+                      draggable={false}
+                    />
+                  )}
                 </motion.div>
                 {/* index hint on hover */}
                 <AnimatePresence>
-                  {hovered === card.id && !selected && (
+                  {hovered === card.id && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -210,88 +235,22 @@ export default function Stage06Deck({
         </>
       )}
 
-      {/* Selected Card Modal — Prominently centered with mechanical archival presence */}
-      <AnimatePresence>
-        {selected && (
-          <motion.div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 md:p-6 bg-[#070b08]/85 backdrop-blur-md"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            {/* Atmospheric brass focal glow behind the elevated card */}
-            <motion.div
-              className="absolute pointer-events-none rounded-full"
-              style={{
-                width: 'min(90vw, 520px)',
-                height: 'min(90vw, 520px)',
-                background: 'radial-gradient(circle, rgba(196,160,53,0.18) 0%, rgba(23,31,21,0.5) 45%, transparent 70%)',
-              }}
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            />
-
-            {/* Centered elevated physical card */}
-            <motion.div
-              className="relative z-10 w-[min(82vw,290px)] md:w-[330px] aspect-[2/3] max-h-[66vh]"
-              initial={{ y: 80, scale: 0.82, opacity: 0, rotateX: 10 }}
-              animate={
-                resonating
-                  ? { y: 0, scale: [1, 1.02, 1], opacity: 1, rotateX: 0, filter: ['brightness(1)', 'brightness(1.12)', 'brightness(1)'] }
-                  : { y: 0, scale: 1, opacity: 1, rotateX: 0, filter: 'brightness(1)' }
-              }
-              exit={{ y: 50, scale: 0.9, opacity: 0 }}
-              transition={
-                resonating
-                  ? { duration: 0.8, ease: 'easeInOut' }
-                  : { duration: 0.7, ease: [0.16, 1, 0.3, 1] }
-              }
-            >
-              <CardFace card={selected} large />
-            </motion.div>
-
-            {/* Selection actions: RESONATES vs CHOOSE ANOTHER */}
-            <div className="relative z-10 mt-6 md:mt-8 flex flex-col items-center gap-3">
-              {!resonating ? (
-                <>
-                  <motion.button
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.4 }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="brass-button px-9 py-3.5 min-h-[44px] text-xs md:text-sm tracking-[0.3em] font-mono cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
-                    onClick={handleConfirmResonance}
-                  >
-                    RESONATES
-                  </motion.button>
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.42, duration: 0.4 }}
-                    className="text-parchment-faint hover:text-parchment text-[11px] font-mono tracking-[0.2em] transition-colors py-1.5 cursor-pointer"
-                    onClick={() => setSelected(null)}
-                  >
-                    CHOOSE ANOTHER
-                  </motion.button>
-                </>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, letterSpacing: '0.2em', y: 6 }}
-                  animate={{ opacity: 1, letterSpacing: '0.45em', y: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="font-mono text-xs md:text-sm text-gold py-2"
-                >
-                  RESONANCE RECORDED.
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="mt-8 flex flex-col items-center gap-3" aria-live="polite">
+        <div className="font-mono text-[10px] tracking-[0.24em] text-parchment-dim uppercase">
+          Selected: {selected.length} card{selected.length === 1 ? '' : 's'}
+        </div>
+        <button
+          type="button"
+          disabled={selected.length === 0 || resonating}
+          onClick={handleConfirmResonance}
+          className="brass-button px-9 py-3.5 min-h-[44px] text-xs md:text-sm tracking-[0.3em] font-mono disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          {resonating ? 'RESONANCE RECORDED.' : 'RESONATE'}
+        </button>
+        <div className="font-serif italic text-xs text-parchment-faint">
+          Flip to inspect. Select or deselect. Resonance confirms the complete set.
+        </div>
+      </div>
     </div>
   );
 }

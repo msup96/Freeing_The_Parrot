@@ -1,7 +1,14 @@
 import type { SessionReveal } from './session';
 
 type Json = Record<string, unknown>;
-const API_BASE_URL = (import.meta.env.VITE_FTP_API_URL ?? '').replace(/\/$/, '');
+const configuredApiBase = String(import.meta.env.VITE_FTP_API_URL ?? '').trim();
+// Accept either an origin (recommended) or an origin that already includes `/api`.
+// Every client path below owns the `/api` prefix; keeping it out of the base
+// prevents production requests such as `/api/api/session/start` (404).
+const API_BASE_URL = configuredApiBase
+  .replace(/\/$/, '')
+  .replace(/\/api$/, '');
+
 
 function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
@@ -36,11 +43,20 @@ export async function submitInitialMedia(
   media: Blob,
   filename: string,
 ): Promise<{ analysis_ready: boolean }> {
-  const body = new FormData();
-  body.append('session_id', sessionId);
-  body.append('modality', modality);
-  body.append('file', media, filename);
-  const data = await readJson(await fetch(apiUrl('/api/input/ingest'), { method: 'POST', body }));
+  // The authoritative backend accepts a normalized JSON ingest contract. The
+  // raw media bytes are intentionally not sent to the analytical pipeline;
+  // modality and filename are recorded as the participant's input event.
+  const data = await readJson(await fetch(apiUrl('/api/input/ingest'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: sessionId,
+      modality,
+      filename,
+      content_type: media.type || undefined,
+      size_bytes: media.size,
+    }),
+  }));
   return { analysis_ready: Boolean(data.analysis_ready ?? data.ok) };
 }
 
@@ -74,6 +90,8 @@ export async function endConversation(sessionId: string): Promise<{
     card_id: string;
     card_index: number;
     title: string;
+    semantic_anchor?: string;
+    semantic_motif?: string;
     archetype?: string;
     qualitative_reading: string;
   }>;
@@ -91,11 +109,20 @@ export async function endConversation(sessionId: string): Promise<{
         card_id: String(row.card_id),
         card_index: Number(row.card_index),
         title: String(row.title ?? ''),
+        semantic_anchor: typeof row.semantic_anchor === 'string' ? row.semantic_anchor : undefined,
+        semantic_motif: typeof row.semantic_motif === 'string' ? row.semantic_motif : undefined,
         archetype: typeof row.archetype === 'string' ? row.archetype : undefined,
         qualitative_reading: String(row.qualitative_reading ?? ''),
       };
     }),
   };
+}
+
+export async function submitCardResonance(
+  sessionId: string,
+  cards: Array<{ card_index: number; card_id: string }>,
+): Promise<void> {
+  await advanceLifecycle(sessionId, 'card_selection', { cards });
 }
 
 export async function advanceLifecycle(

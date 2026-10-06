@@ -123,14 +123,14 @@ export default function App() {
     }
   }, [goTo, sessionId]);
 
-  const handleCard = useCallback(async (card: { id: number; cardId: string }) => {
-    if (!sessionId) return;
+  const handleCard = useCallback(async (cards: Array<{ id: number; cardId: string }>) => {
+    if (!sessionId || cards.length === 0) return;
     try {
       await advanceLifecycle(sessionId, 'card_selection', {
-        card_index: card.id,
-        card_id: card.cardId,
+        cards: cards.map((card) => ({ card_index: card.id, card_id: card.cardId })),
       });
-      setSession((current: Session) => ({ ...current, cardId: card.id, selectedCard: card as Session['selectedCard'] }));
+      const primary = cards[0];
+      setSession((current: Session) => ({ ...current, cardId: primary.id, selectedCard: primary as Session['selectedCard'], selectedCards: cards as Session['selectedCards'] }));
       goTo(7);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'That card could not be marked.');
@@ -201,8 +201,16 @@ export default function App() {
               onDeck={() => void handleDeck()}
             />
           )}
-          {stage === 6 && <Stage06Deck cards={session.cards} onComplete={(card) => void handleCard(card)} />}
-          {stage === 7 && session.selectedCard && <Stage07Break card={session.selectedCard} onComplete={() => void handleReveal()} />}
+          {stage === 6 && <Stage06Deck cards={session.cards} onComplete={(cards) => void handleCard(cards)} />}
+          {stage === 7 && session.selectedCard && (
+            <Stage07Break
+              card={session.selectedCard}
+              selectionCount={session.selectedCards.length || 1}
+              turnCount={session.turns.filter((t: ChatTurn) => t.role === 'participant').length}
+              readingCount={session.cards.length}
+              onComplete={() => void handleReveal()}
+            />
+          )}
           {stage === 8 && <Stage08DataJourney session={session} onConsent={(consent) => void handleConsent(consent)} />}
           {stage === 9 && <Stage09Exit session={session} onRestart={() => void restart()} />}
         </motion.main>

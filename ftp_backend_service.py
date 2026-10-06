@@ -107,6 +107,49 @@ def get_or_create_coordinator(session_id: str | None) -> SessionCoordinator:
     return require_session(session_id)
 
 
+# Plain-language wording for limitation codes already emitted by the evidence/inference layers.
+# Unknown codes are skipped, never guessed at.
+_LIMITATION_TEXT: dict[str, str] = {
+    "fewer_than_two_turns": "Whether anything changed across the conversation: there were fewer than two turns to compare.",
+    "message_length_change_unavailable": "Whether your messages grew or shrank: this session gave no measurable change.",
+    "question_rate_unavailable": "How often you asked questions: this could not be measured for this session.",
+    "self_reference_unavailable": "How you referred to yourself: this could not be measured for this session.",
+    "detected_rasa_unavailable": "Any stable emotional label: no turn contained lexicon evidence for one.",
+    "defaulted_shanta_not_detected_evidence": "Turns labelled Shanta by default carry no evidence. A default is not a detection.",
+    "engagement_state_insufficient": "How the interaction was going: there was not enough evidence to label it.",
+    "response_latency_unavailable": "How quickly you replied: this session did not record a usable response time.",
+    "no_eligible_inference": "Any claim about you: no claim met the evidence threshold in this session.",
+    "bundle_insufficient": "A fuller reading: the session was too short to support one.",
+    "interaction_state_not_a_person_claim": "Anything about you as a person from the interaction-state label: it describes this exchange only.",
+    "contradiction_blocks_claim": "A claim that the session's own evidence contradicted.",
+}
+
+
+def _limitation_notes(codes: Any) -> list[str]:
+    """Plain-language notes for the limitation codes attached to one evidence or inference record."""
+    return [_LIMITATION_TEXT[c] for c in (codes or []) if c in _LIMITATION_TEXT]
+
+
+def _participant_limitations(bundle: dict[str, Any], evaluation: dict[str, Any]) -> list[str]:
+    """Epistemic limits the backend itself reports, in plain language, plus the evidence contract's prohibitions."""
+    from ftp.silent_reader.inference import PROHIBITED_INFERENCE_CATEGORIES
+
+    codes: list[str] = list(bundle.get("limitations") or [])
+    for item in bundle.get("evidence_items") or []:
+        codes.extend(item.get("limitations") or [])
+    codes.extend(evaluation.get("limitations") or [])
+    for record in evaluation.get("records") or []:
+        codes.extend(record.get("limitations") or [])
+    out: list[str] = []
+    for code in codes:
+        text = _LIMITATION_TEXT.get(code)
+        if text and text not in out:
+            out.append(text)
+    categories = ", ".join(sorted(c.replace("_", " ") for c in PROHIBITED_INFERENCE_CATEGORIES))
+    out.append(f"The evidence contract does not permit the system to infer: {categories}.")
+    return out
+
+
 def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | None, selected: dict[str, Any] | None) -> dict[str, Any]:
     """Assemble the dedicated participant-facing reveal payload preserving provenance."""
     sid = coord.session_id
@@ -116,7 +159,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
     # 1. WHAT YOU GAVE: actual participant inputs
     dialogue_events = [e for e in events if e.event_type == EventType.PARROT_TURN_GENERATED]
     turn_texts = [str(e.payload.get("user_text") or "") for e in dialogue_events]
-    offering_text = offering.get("text") or (turn_texts[0] if turn_texts else "A quiet opening statement.")
+    offering_text = offering.get("text") or (turn_texts[0] if turn_texts else "")
 
     # 2. WHAT WAS RECORDED: actual approved observed session material
     turn_count = len(dialogue_events)
@@ -129,32 +172,48 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         f"{question_count} of your statements were formulated as questions."
     )
     what_recorded_sub = (
-        f"Session trace № {sid[-7:]} verified: input sequence, dialogue timestamps, "
-        "and conversational rhythm preserved in archival memory."
+        f"Session trace № {sid[-7:]}: counts and measurements taken from your text. Observed, not interpreted."
     )
 
     # 3. WHAT WAS INTERPRETED: expose the actual evidence-backed interpretation.
     # This is deliberately computed at reveal time from the locked session rather
     # than reconstructed from generic copy.
+    trajectory: dict[str, Any] = {
+        "detected_sequence": [],
+        "dominant_rasa": {"label": None, "status": "insufficient_evidence"},
+        "quality_limitations": {"status": "insufficient_evidence"},
+    }
     try:
-        from ftp.silent_reader.inference import evaluate_bundle
+        from ftp.silent_reader.engagement import EngagementSynthesizer
+        from ftp.silent_reader.inference import build_deep_reader_packet, evaluate_bundle
+        from ftp.silent_reader.linguistic import LinguisticTrajectorySynthesizer
         from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
+        from ftp.silent_reader.trajectories import TemporalTrajectorySynthesizer
 
         bundle = coord.build_evidence_bundle()
         evaluation = evaluate_bundle(bundle)
+        deep_reader_packet = build_deep_reader_packet(bundle, evaluation)
+        linguistic = LinguisticTrajectorySynthesizer(coord).synthesize()
+        temporal = TemporalTrajectorySynthesizer(coord).synthesize()
+        engagement = EngagementSynthesizer(coord).synthesize()
         trajectory = NavarasaTrajectorySynthesizer(coord).synthesize()
         detected_seq = trajectory.get("detected_sequence", [])
         dominant = trajectory.get("dominant_rasa", {}).get("label")
         eligible = [
-            item for item in evaluation.get("candidates", [])
+            item for item in evaluation.get("records", [])
             if item.get("eligibility") == "eligible"
         ]
         interpretations = [str(item.get("claim")) for item in eligible if item.get("claim")]
-        evidence_count = len(bundle.get("evidence_items", []))
+        evidence_items = bundle.get("evidence_items", [])
+        evidence_count = len(evidence_items)
     except Exception as exc:
         logger.warning(f"Reveal analysis notice: {exc}")
         bundle = {}
         evaluation = {}
+        deep_reader_packet = {}
+        linguistic = {}
+        temporal = {}
+        engagement = {}
         detected_seq = []
         dominant = None
         interpretations = []
@@ -184,11 +243,25 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "Cards are INFERRED reflection hypotheses. Their hidden provenance retains the inference and evidence IDs; they are not diagnoses."
     )
 
-    # 5. WHAT YOU CHOSE: selected card + resonance validation
-    if selected:
-        card_title = selected.get("title", "The Chosen Card")
-        card_idx = selected.get("card_index") or selected.get("id") or 1
-        card_reading = selected.get("qualitative_reading") or selected.get("statement") or ""
+    # 5. WHAT YOU CHOSE: preserve the participant's complete selection pattern.
+    selected_cards = selected if isinstance(selected, list) else ([selected] if selected else [])
+    first_selected = selected_cards[0] if selected_cards else None
+    selection_pattern = {
+        "selected_count": len(selected_cards),
+        "selected_card_ids": [str(card.get("card_id", "")) for card in selected_cards],
+        "selected_card_indices": [int(card.get("card_index", 0)) for card in selected_cards],
+        "selection_order": [str(card.get("card_id", "")) for card in selected_cards],
+        "semantic_anchors": [str(card.get("semantic_anchor")) for card in selected_cards if card.get("semantic_anchor")],
+        "semantic_motifs": [str(card.get("semantic_motif")) for card in selected_cards if card.get("semantic_motif")],
+        "archetypes": [str(card.get("archetype")) for card in selected_cards if card.get("archetype")],
+        "categories": [str(card.get("category")) for card in selected_cards if card.get("category")],
+        "reading_groups": [str(card.get("reading_group")) for card in selected_cards if card.get("reading_group")],
+        "resonance_recorded": bool(selected_cards),
+    }
+    if first_selected:
+        card_title = first_selected.get("title", "The Chosen Card")
+        card_idx = first_selected.get("card_index") or first_selected.get("id") or 1
+        card_reading = first_selected.get("qualitative_reading") or first_selected.get("statement") or ""
         what_chose = {
             "card_index": card_idx,
             "title": card_title,
@@ -197,10 +270,10 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         }
     else:
         what_chose = {
-            "card_index": 1,
-            "title": "The First Specimen",
-            "statement": "An inquiry opened and acknowledged.",
-            "validation": "Session completed without card resonance selection.",
+            "card_index": None,
+            "title": None,
+            "statement": None,
+            "validation": "No card resonance was recorded for this session.",
         }
 
     # 6. Wall Specimens: Real cards from THIS session's deck for the Wall of Fame
@@ -213,19 +286,104 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
             "qualitative_reading": c["qualitative_reading"],
         })
 
-    limitations = list(bundle.get("limitations") or [])
-    limitations.extend(evaluation.get("limitations") or [])
-    if not limitations:
-        limitations = [
-            "This session does not establish a stable fact about the participant.",
-            "Resonance is participant-reported and is not objective psychological validation.",
-            "The Parrot did not receive the Silent Reader's analysis or card selection.",
-        ]
+    limitations = _participant_limitations(bundle, evaluation)
+
+    observed_signals = [
+        {
+            "evidence_id": item.get("evidence_id"),
+            "signal_type": item.get("signal_type"),
+            "value": item.get("value"),
+            "observation": item.get("observation"),
+            "source_event_ids": item.get("source_event_ids", []),
+            "provenance_level": item.get("provenance_level"),
+            "scope": item.get("scope"),
+            "limitations": item.get("limitations", []),
+            "limitation_notes": _limitation_notes(item.get("limitations")),
+            "eligibility": item.get("eligibility", "observed"),
+        }
+        for item in evidence_items
+    ]
+    inference_records = [
+        {**record, "limitation_notes": _limitation_notes(record.get("limitations"))}
+        for record in (evaluation.get("records") or [])
+    ]
+    card_provenance = [
+        {
+            "card_id": card.get("card_id"),
+            "card_index": card.get("card_index"),
+            "title": card.get("title"),
+            "semantic_anchor": card.get("semantic_anchor"),
+            "semantic_motif": card.get("semantic_motif"),
+            "archetype": card.get("archetype"),
+            "qualitative_reading": card.get("qualitative_reading"),
+            "provenance_level": card.get("provenance_level"),
+            "provenance": card.get("hidden_provenance") or {},
+            "selection_state": "selected" if card.get("card_id") in selection_pattern["selected_card_ids"] else "not_selected",
+        }
+        for card in deck_cards
+    ]
+    selection_pattern.update({
+        "total_cards_presented": len(deck_cards),
+        "cards_inspected": None,
+        "selection_status": "participant_reported" if selected_cards else "no_selection_recorded",
+        "group_distribution": {
+            group: selection_pattern["reading_groups"].count(group)
+            for group in dict.fromkeys(selection_pattern["reading_groups"])
+        },
+    })
+    navarasa_sufficient = bool(detected_seq)
+    def _traj(source: dict[str, Any], key: str) -> dict[str, Any]:
+        value = source.get(key) if isinstance(source, dict) else None
+        return value if isinstance(value, dict) else {}
+
+    latency = _traj(temporal, "response_latency_trajectory")
+    gap = _traj(temporal, "inter_turn_gap_trajectory")
+    variation = _traj(_traj(temporal, "volatility"), "message_length")
+    interaction_profile = {
+        "input_modality": offering.get("modality"),
+        "turn_count": turn_count,
+        "question_count": question_count,
+        "character_count": total_chars,
+        "question_density": _traj(linguistic, "question_rate").get("value"),
+        "self_reference_mean": _traj(linguistic, "self_reference_trajectory").get("mean"),
+        "repetition_count": _traj(temporal, "repetition").get("repetition_count"),
+        "message_length_variation": variation.get("normalized_variation"),
+        "response_latency_mean_seconds": latency.get("mean") if latency.get("status") == "ok" else None,
+        "inter_turn_gap_mean_seconds": gap.get("mean") if gap.get("status") == "ok" else None,
+        "interaction_state": _traj(engagement, "engagement_state").get("state"),
+        "navarasa_status": "ok" if navarasa_sufficient else "insufficient_evidence",
+        "evidence_count": evidence_count,
+        "eligible_inference_count": len(eligible),
+        "readings_constructed": len(deck_cards),
+        "card_selection_count": len(selected_cards) if isinstance(selected, list) else int(bool(selected)),
+        "resonance": "participant-reported" if selected_cards else "none recorded",
+        "card_selection_pattern": "participant-reported selection pattern; not psychological validation",
+    }
 
     return {
         "session_id": sid,
         "what_you_gave": offering_text,
         "what_you_gave_channel": offering.get("modality"),
+        "machine_transformation": {
+            "raw_text": {"character_count": total_chars, "turn_count": turn_count},
+            "turn_sequence": [int(e.payload.get("turn_index", i)) for i, e in enumerate(dialogue_events)],
+            "evidence_ids": [item["evidence_id"] for item in evidence_items],
+            "inference_ids": [item.get("inference_id") for item in eligible],
+        },
+        "observed_signals": observed_signals,
+        "analytical_artifacts": {
+            "linguistic": linguistic,
+            "temporal": temporal,
+            "engagement": engagement,
+            "navarasa": trajectory,
+            "evidence_bundle": bundle,
+            "inference_evaluation": evaluation,
+            "deep_reader_packet": deep_reader_packet,
+        },
+        "inference_records": inference_records,
+        "card_provenance": card_provenance,
+        "navarasa_trajectory": trajectory,
+        "interaction_profile": interaction_profile,
         "turn_texts": turn_texts,
         "what_was_recorded": what_recorded_body,
         "what_the_system_observed": what_recorded_body,
@@ -237,6 +395,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "what_the_system_inferred": what_constructed_body,
         "what_was_constructed_sub": what_constructed_sub,
         "what_you_chose": what_chose,
+        "selection_pattern": selection_pattern,
         "what_we_cannot_know": list(dict.fromkeys(limitations)),
         "wall_specimens": wall_specimens,
     }
@@ -251,6 +410,9 @@ def build_session_receipt(coord: SessionCoordinator) -> str:
     dialogue_events = [e for e in events if e.event_type == EventType.PARROT_TURN_GENERATED]
     offering = SESSION_OFFERINGS.get(sid, {})
     selected = SESSION_SELECTED.get(sid)
+    # Card selection stores the participant's ordered selections as a list;
+    # the receipt represents the first selected card without assuming a dict.
+    selected_card = selected[0] if isinstance(selected, list) and selected else selected
 
     user_chars = 0
     machine_chars = 0
@@ -304,8 +466,8 @@ def build_session_receipt(coord: SessionCoordinator) -> str:
         *conv_lines,
         "--------------------------------",
         "[KILI JOSIYAM - SELECTED CARD]",
-        f"CARD: {selected.get('title', 'None Selected') if selected else 'None Selected'}",
-        f"READING: {selected.get('qualitative_reading', '') if selected else ''}",
+        f"CARD: {selected_card.get('title', 'None Selected') if isinstance(selected_card, dict) else 'None Selected'}",
+        f"READING: {selected_card.get('qualitative_reading', '') if isinstance(selected_card, dict) else ''}",
         "",
         "--------------------------------",
         "",
@@ -533,32 +695,41 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                     coord.advance(SessionState.LIVE_CONVERSATION)
 
             elif action == "card_selection":
-                card_index = int(body.get("card_index", 1))
-                card_id = str(body.get("card_id", "card_01"))
+                raw_cards = body.get("cards") or [{"card_index": body.get("card_index", 1), "card_id": body.get("card_id", "card_01")}]
+                if not isinstance(raw_cards, list) or not raw_cards:
+                    raise ValueError("At least one resonant card is required")
                 deck = SESSION_DECKS.get(sid) or {}
+                selected_cards = []
                 
-                # Validate card resonance against generated deck if available
-                if deck.get("cards"):
-                    try:
-                        validated_card = validate_card_resonance(deck, card_id=card_id, card_index=card_index)
-                    except Exception as exc:
-                        logger.warning(f"Card resonance validation fallback: {exc}")
-                        validated_card = next((c for c in deck["cards"] if c["card_index"] == card_index), deck["cards"][0])
-                else:
-                    validated_card = {"card_id": card_id, "card_index": card_index, "title": "The Resonant Card", "qualitative_reading": "A card chosen by reflection."}
+                # Validate every resonant card against this session's generated deck.
+                for order, item in enumerate(raw_cards, start=1):
+                    card_index = int(item.get("card_index", 1))
+                    card_id = str(item.get("card_id", f"card_{card_index:02d}"))
+                    if deck.get("cards"):
+                        try:
+                            validated_card = validate_card_resonance(deck, card_id=card_id, card_index=card_index)
+                        except Exception as exc:
+                            logger.warning(f"Card resonance validation fallback: {exc}")
+                            validated_card = next((c for c in deck["cards"] if c["card_index"] == card_index), deck["cards"][0])
+                    else:
+                        validated_card = {"card_id": card_id, "card_index": card_index, "title": "The Resonant Card", "qualitative_reading": "A card chosen by reflection."}
+                    selected_cards.append({**validated_card, "selection_order": order})
 
-                SESSION_SELECTED[sid] = validated_card
+                # One participant-level confirmation represents the complete set.
+                # Card identity/order remain in the payload; resonance is not emitted per card.
                 coord.record(
                     event_type=EventType.CARD_RESONANCE_MARKED,
                     provenance_level=ProvenanceLevel.VALIDATED,
                     payload={
-                        "card_id": card_id,
-                        "card_index": card_index,
-                        "title": validated_card.get("title"),
-                        "qualitative_reading": validated_card.get("qualitative_reading"),
+                        "selected_cards": [
+                            {"card_id": card.get("card_id"), "card_index": card.get("card_index"), "selection_order": card.get("selection_order")}
+                            for card in selected_cards
+                        ],
+                        "selected_count": len(selected_cards),
                         "meaning": "participant_reported_resonance_not_truth",
                     },
                 )
+                SESSION_SELECTED[sid] = selected_cards
                 if coord.machine.state == SessionState.CARD_SELECTION:
                     coord.advance(SessionState.PROFILE_REVEAL)
 
