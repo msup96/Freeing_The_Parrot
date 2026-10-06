@@ -36,11 +36,20 @@ export async function submitInitialMedia(
   media: Blob,
   filename: string,
 ): Promise<{ analysis_ready: boolean }> {
-  const body = new FormData();
-  body.append('session_id', sessionId);
-  body.append('modality', modality);
-  body.append('file', media, filename);
-  const data = await readJson(await fetch(apiUrl('/api/input/ingest'), { method: 'POST', body }));
+  // The authoritative backend accepts a normalized JSON ingest contract. The
+  // raw media bytes are intentionally not sent to the analytical pipeline;
+  // modality and filename are recorded as the participant's input event.
+  const data = await readJson(await fetch(apiUrl('/api/input/ingest'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: sessionId,
+      modality,
+      filename,
+      content_type: media.type || undefined,
+      size_bytes: media.size,
+    }),
+  }));
   return { analysis_ready: Boolean(data.analysis_ready ?? data.ok) };
 }
 

@@ -77,3 +77,17 @@ def test_unknown_session_ids_are_not_created():
     with pytest.raises(KeyError):
         backend.require_session("ftp2_unknown")
     assert "ftp2_unknown" not in backend.SESSIONS
+
+
+def test_same_session_survives_normalized_multimodal_input():
+    session = backend.create_session()
+    sid = session.session_id
+
+    session.record_raw_input({"modality": "IMAGE", "filename": "offering.png"})
+    session.mark_raw_offering_ready()
+    backend.SESSION_MULTIMODAL_CONTEXT[sid] = {"modality": "photo", "confidence": 0.84}
+    backend.SESSION_OFFERINGS[sid] = {"channel": "show", "modality": "IMAGE"}
+
+    assert backend.require_session(sid) is session
+    assert backend.SESSION_MULTIMODAL_CONTEXT[sid]["modality"] == "photo"
+    assert backend.SESSION_OFFERINGS[sid]["modality"] == "IMAGE"
