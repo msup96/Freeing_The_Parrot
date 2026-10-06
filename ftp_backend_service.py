@@ -116,7 +116,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
     # 1. WHAT YOU GAVE: actual participant inputs
     dialogue_events = [e for e in events if e.event_type == EventType.PARROT_TURN_GENERATED]
     turn_texts = [str(e.payload.get("user_text") or "") for e in dialogue_events]
-    offering_text = offering.get("text") or (turn_texts[0] if turn_texts else "A quiet opening statement.")
+    offering_text = offering.get("text") or (turn_texts[0] if turn_texts else "")
 
     # 2. WHAT WAS RECORDED: actual approved observed session material
     turn_count = len(dialogue_events)
@@ -136,6 +136,11 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
     # 3. WHAT WAS INTERPRETED: expose the actual evidence-backed interpretation.
     # This is deliberately computed at reveal time from the locked session rather
     # than reconstructed from generic copy.
+    trajectory: dict[str, Any] = {
+        "detected_sequence": [],
+        "dominant_rasa": {"label": None, "status": "insufficient_evidence"},
+        "quality_limitations": {"status": "insufficient_evidence"},
+    }
     try:
         from ftp.silent_reader.inference import evaluate_bundle
         from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer

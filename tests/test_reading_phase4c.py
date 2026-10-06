@@ -227,3 +227,46 @@ class TestReadingComposer:
 
         deck = coordinator.compose_post_session_reading(adapter=ExplodingAdapter())
         assert deck["total_cards"] == 27
+
+    def test_same_analytical_material_is_independent_of_session_id(self):
+        profile = {
+            "session_id": "session-a",
+            "reader_status": "accepted",
+            "evaluation_status": "sufficient",
+            "limitations": [],
+            "evidence_catalog": {"ev_1": {"signal_type": "length", "observation": "messages lengthened"}},
+            "anchors": [{
+                "inference_id": "inf_1",
+                "category": "temporal_pattern",
+                "evidence_refs": ["ev_1"],
+                "reading_seed": "The exchange lengthened as the participant stayed with the question.",
+            }],
+        }
+        equivalent = {**profile, "session_id": "session-b"}
+
+        assert compose_deck(profile)["cards"] == compose_deck(equivalent)["cards"]
+
+    def test_different_analytical_material_changes_qualitative_readings(self):
+        profile_a = {
+            "session_id": "a",
+            "reader_status": "accepted",
+            "evaluation_status": "sufficient",
+            "limitations": [],
+            "evidence_catalog": {"ev_1": {"signal_type": "length", "observation": "messages lengthened"}},
+            "anchors": [{
+                "inference_id": "inf_1",
+                "category": "temporal_pattern",
+                "evidence_refs": ["ev_1"],
+                "reading_seed": "The exchange lengthened as the participant stayed with the question.",
+            }],
+        }
+        profile_b = {**profile_a}
+        profile_b["anchors"] = [{
+            **profile_a["anchors"][0],
+            "reading_seed": "The exchange shortened when the participant approached a boundary.",
+        }]
+
+        readings_a = {card["qualitative_reading"] for card in compose_deck(profile_a)["cards"]}
+        readings_b = {card["qualitative_reading"] for card in compose_deck(profile_b)["cards"]}
+        assert readings_a != readings_b
+        assert len(readings_a & readings_b) < 27
