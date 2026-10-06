@@ -49,12 +49,18 @@ export type SessionReveal = {
     evidence_ids?: string[];
     inference_ids?: Array<string | null>;
   };
-  observed_signals?: Array<{
-    evidence_id?: string;
-    signal_type?: string;
-    observation?: string;
-    source_event_ids?: string[];
-  }>;
+  observed_signals?: Array<Record<string, unknown>>;
+  analytical_artifacts?: {
+    linguistic?: Record<string, unknown>;
+    temporal?: Record<string, unknown>;
+    engagement?: Record<string, unknown>;
+    navarasa?: Record<string, unknown>;
+    evidence_bundle?: Record<string, unknown>;
+    inference_evaluation?: Record<string, unknown>;
+    deep_reader_packet?: Record<string, unknown>;
+  };
+  inference_records?: Array<Record<string, unknown>>;
+  card_provenance?: Array<Record<string, unknown>>;
   navarasa_trajectory?: {
     detected_sequence?: string[];
     dominant_rasa?: { label?: string | null; status?: string };
