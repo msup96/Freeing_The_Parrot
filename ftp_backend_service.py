@@ -60,16 +60,51 @@ SESSION_MULTIMODAL_CONTEXT: dict[str, dict[str, Any]] = {}
 SESSION_DECKS: dict[str, dict[str, Any]] = {}
 SESSION_SELECTED: dict[str, dict[str, Any]] = {}
 SESSION_REVEALS: dict[str, dict[str, Any]] = {}
+SESSION_CREATED_AT: dict[str, float] = {}
+SESSION_TTL_SECONDS = max(60, int(os.environ.get("FTP_SESSION_TTL_SECONDS", "3600")))
+
+
+def purge_expired_sessions(now: float | None = None) -> list[str]:
+    """Remove all expired in-memory state and return the purged session IDs."""
+    current = now if now is not None else time.time()
+    expired = [sid for sid, created_at in SESSION_CREATED_AT.items()
+               if current - created_at >= SESSION_TTL_SECONDS]
+    for sid in expired:
+        for store in (SESSIONS, SESSION_OFFERINGS, SESSION_MULTIMODAL_CONTEXT,
+                      SESSION_DECKS, SESSION_SELECTED, SESSION_REVEALS, SESSION_CREATED_AT):
+            store.pop(sid, None)
+        logger.info("Purged expired FTP session: %s", sid)
+    return expired
+
+
+def create_session() -> SessionCoordinator:
+    purge_expired_sessions()
+    sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(8).hex()}"
+    coord = SessionCoordinator(sid)
+    coord.start()
+    SESSIONS[sid] = coord
+    SESSION_CREATED_AT[sid] = time.time()
+    logger.info("Created new session coordinator: %s", sid)
+    return coord
+
+
+def get_session(session_id: str | None) -> SessionCoordinator | None:
+    purge_expired_sessions()
+    if not session_id:
+        return None
+    return SESSIONS.get(str(session_id))
+
+
+def require_session(session_id: str | None) -> SessionCoordinator:
+    coord = get_session(session_id)
+    if coord is None:
+        raise KeyError("Session not found or expired")
+    return coord
 
 
 def get_or_create_coordinator(session_id: str | None) -> SessionCoordinator:
-    sid = session_id or f"ftp2_{int(time.time()*1000)}_{os.urandom(4).hex()}"
-    if sid not in SESSIONS:
-        coord = SessionCoordinator(sid)
-        coord.start()
-        SESSIONS[sid] = coord
-        logger.info(f"Created new session coordinator: {sid}")
-    return SESSIONS[sid]
+    """Backward-compatible name; unknown IDs are never silently created."""
+    return require_session(session_id)
 
 
 def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | None, selected: dict[str, Any] | None) -> dict[str, Any]:
@@ -323,6 +358,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
+        purge_expired_sessions()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -333,9 +369,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/session-reveal":
             sid = query.get("session_id", [""])[0]
-            coord = SESSIONS.get(sid)
+            coord = get_session(sid)
             if not coord:
-                self._send_json({"error": "Session not found"}, 404)
+                self._send_json({"error": "Session not found or expired"}, 404)
                 return
             deck = SESSION_DECKS.get(sid)
             selected = SESSION_SELECTED.get(sid)
@@ -349,6 +385,8 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             self._handle_post()
+        except KeyError:
+            self._send_json({"error": "Session not found or expired"}, 404)
         except Exception as exc:
             logger.exception(f"Unhandled error in do_POST: {exc}")
             self._send_json({"error": f"Internal FTP error: {str(exc)}"}, 500)
@@ -366,10 +404,8 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
         # 1. POST /api/session/start
         if path == "/api/session/start":
-            sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(4).hex()}"
-            coord = SessionCoordinator(sid)
-            coord.start()
-            SESSIONS[sid] = coord
+            coord = create_session()
+            sid = coord.session_id
             self._send_json({
                 "ok": True,
                 "session_id": sid,
@@ -687,18 +723,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
         # 8. POST /api/session-output-reset
         if path == "/api/session-output-reset":
             sid = body.get("session_id")
-            if sid in SESSIONS:
-                del SESSIONS[sid]
-            if sid in SESSION_OFFERINGS:
-                del SESSION_OFFERINGS[sid]
-            if sid in SESSION_MULTIMODAL_CONTEXT:
-                del SESSION_MULTIMODAL_CONTEXT[sid]
-            if sid in SESSION_DECKS:
-                del SESSION_DECKS[sid]
-            if sid in SESSION_SELECTED:
-                del SESSION_SELECTED[sid]
-            if sid in SESSION_REVEALS:
-                del SESSION_REVEALS[sid]
+            for store in (SESSIONS, SESSION_OFFERINGS, SESSION_MULTIMODAL_CONTEXT,
+                          SESSION_DECKS, SESSION_SELECTED, SESSION_REVEALS, SESSION_CREATED_AT):
+                store.pop(sid, None)
             self._send_json({
                 "ok": True,
                 "lifecycle_state": "IDLE_STANDBY",
@@ -708,13 +735,15 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
         self._send_json({"error": "Unknown POST route"}, 404)
 
 
-def run_server(port: int = 5001) -> None:
+def run_server(port: int | None = None) -> None:
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", port), FtpApiHandler) as httpd:
-        logger.info(f"FTP 2.0 Authoritative Python Backend running on http://127.0.0.1:{port}")
+    bind_host = os.environ.get("FTP_BIND_HOST", "127.0.0.1")
+    bind_port = port if port is not None else int(os.environ.get("PORT", "5001"))
+    with socketserver.ThreadingTCPServer((bind_host, bind_port), FtpApiHandler) as httpd:
+        logger.info("FTP 2.0 backend running on http://%s:%s", bind_host, bind_port)
         httpd.serve_forever()
 
 
 if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5001
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else None
     run_server(port)
