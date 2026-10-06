@@ -410,6 +410,9 @@ def build_session_receipt(coord: SessionCoordinator) -> str:
     dialogue_events = [e for e in events if e.event_type == EventType.PARROT_TURN_GENERATED]
     offering = SESSION_OFFERINGS.get(sid, {})
     selected = SESSION_SELECTED.get(sid)
+    # Card selection stores the participant's ordered selections as a list;
+    # the receipt represents the first selected card without assuming a dict.
+    selected_card = selected[0] if isinstance(selected, list) and selected else selected
 
     user_chars = 0
     machine_chars = 0
@@ -463,8 +466,8 @@ def build_session_receipt(coord: SessionCoordinator) -> str:
         *conv_lines,
         "--------------------------------",
         "[KILI JOSIYAM - SELECTED CARD]",
-        f"CARD: {selected.get('title', 'None Selected') if selected else 'None Selected'}",
-        f"READING: {selected.get('qualitative_reading', '') if selected else ''}",
+        f"CARD: {selected_card.get('title', 'None Selected') if isinstance(selected_card, dict) else 'None Selected'}",
+        f"READING: {selected_card.get('qualitative_reading', '') if isinstance(selected_card, dict) else ''}",
         "",
         "--------------------------------",
         "",
