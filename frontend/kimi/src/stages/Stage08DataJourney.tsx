@@ -43,6 +43,28 @@ function Connector() {
   );
 }
 
+function MachineTable({ rows }: { rows: Array<[string, unknown]> }) {
+  return (
+    <div className="grid gap-2 border border-parchment/10 p-3 text-[10px]">
+      {rows.map(([label, value]) => (
+        <div key={label} className="grid grid-cols-[minmax(110px,0.4fr)_1fr] gap-3 border-b border-parchment/5 pb-2 last:border-0 last:pb-0">
+          <span className="text-crimson/80 uppercase">{label.replaceAll('_', ' ')}</span>
+          <span className="break-words text-parchment-dim">{value === null || value === undefined ? 'NOT COMPUTED' : typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ArtifactList({ title, items }: { title: string; items: unknown[] }) {
+  return (
+    <div className="mt-4">
+      <div className="mb-2 text-[9px] uppercase tracking-[0.22em] text-crimson/80">{title}</div>
+      {items.length ? <div className="space-y-2">{items.map((item, index) => <MachineTable key={index} rows={Object.entries(item as Record<string, unknown>)} />)}</div> : <div className="text-parchment-faint">NOT AVAILABLE IN THIS SESSION</div>}
+    </div>
+  );
+}
+
 /** A pinned archival specimen tile on the Wall of Fame */
 function WallTile({
   index,
@@ -182,6 +204,30 @@ export default function Stage08DataJourney({
           </motion.section>
         )}
 
+        {/* ——— ACTUAL ANALYTICAL ARTIFACTS ——— */}
+        {reveal?.analytical_artifacts && (
+          <EvidenceRow label="WHAT THE MACHINE ACTUALLY MEASURED" sub="Authoritative server artifacts; values are session measurements, not psychological truths.">
+            <ArtifactList title="LINGUISTIC TURN MEASUREMENTS" items={(reveal.analytical_artifacts.linguistic?.turn_sequence as unknown[]) ?? []} />
+            <ArtifactList title="TEMPORAL / BEHAVIOURAL TURN MEASUREMENTS" items={(reveal.analytical_artifacts.temporal?.turn_sequence as unknown[]) ?? []} />
+            <MachineTable rows={Object.entries(reveal.analytical_artifacts.linguistic ?? {}).filter(([key]) => key !== 'turn_sequence')} />
+            <MachineTable rows={Object.entries(reveal.analytical_artifacts.temporal ?? {}).filter(([key]) => key !== 'turn_sequence')} />
+          </EvidenceRow>
+        )}
+
+        {reveal?.observed_signals && (
+          <EvidenceRow label="EVIDENCE → INFERENCE" sub="Each record preserves its value, source events, provenance, scope, and limitations.">
+            <ArtifactList title="EVIDENCE RECORDS" items={reveal.observed_signals} />
+            <ArtifactList title="INFERENCE RECORDS" items={reveal.inference_records ?? []} />
+            <MachineTable rows={Object.entries(reveal.analytical_artifacts?.deep_reader_packet ?? {})} />
+          </EvidenceRow>
+        )}
+
+        {reveal?.card_provenance && (
+          <EvidenceRow label="HOW THE 27 READINGS WERE CONSTRUCTED" sub="Card provenance is exposed without revealing internal prompt text.">
+            <ArtifactList title={`${reveal.card_provenance.length} CARD PROVENANCE RECORDS`} items={reveal.card_provenance} />
+          </EvidenceRow>
+        )}
+
         {/* ——— NAVARASA TRAJECTORY ——— */}
         {reveal && (
           <EvidenceRow
@@ -193,6 +239,8 @@ export default function Stage08DataJourney({
             {reveal.navarasa_trajectory?.detected_sequence?.length
               ? reveal.navarasa_trajectory.detected_sequence.join(' → ')
               : 'INSUFFICIENT EVIDENCE FOR A STABLE RASA TRAJECTORY.'}
+            <ArtifactList title="TURN-LEVEL NAVARASA OUTPUT" items={(reveal.analytical_artifacts?.navarasa?.turn_sequence as unknown[]) ?? []} />
+            <MachineTable rows={Object.entries(reveal.analytical_artifacts?.navarasa ?? {}).filter(([key]) => key !== 'turn_sequence')} />
           </EvidenceRow>
         )}
 
@@ -314,8 +362,8 @@ export default function Stage08DataJourney({
         </EvidenceRow>
 
         {reveal?.selection_pattern && (
-          <EvidenceRow label="HOW YOUR SELECTIONS FORMED A PATTERN" sub="Recorded selection behavior only; it is not psychological validation.">
-            {reveal.selection_pattern.selected_count ?? 0} selected · {(reveal.selection_pattern.selected_card_ids ?? []).join(' · ') || 'none'}
+          <EvidenceRow label="HOW YOUR SELECTIONS FORMED A PATTERN" sub="Recorded selection behavior only; RESONATES is participant-reported and is not validation.">
+            <MachineTable rows={Object.entries(reveal.selection_pattern)} />
           </EvidenceRow>
         )}
 

@@ -142,11 +142,18 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "quality_limitations": {"status": "insufficient_evidence"},
     }
     try:
-        from ftp.silent_reader.inference import evaluate_bundle
+        from ftp.silent_reader.engagement import EngagementSynthesizer
+        from ftp.silent_reader.inference import build_deep_reader_packet, evaluate_bundle
+        from ftp.silent_reader.linguistic import LinguisticTrajectorySynthesizer
         from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
+        from ftp.silent_reader.trajectories import TemporalTrajectorySynthesizer
 
         bundle = coord.build_evidence_bundle()
         evaluation = evaluate_bundle(bundle)
+        deep_reader_packet = build_deep_reader_packet(bundle, evaluation)
+        linguistic = LinguisticTrajectorySynthesizer(coord).synthesize()
+        temporal = TemporalTrajectorySynthesizer(coord).synthesize()
+        engagement = EngagementSynthesizer(coord).synthesize()
         trajectory = NavarasaTrajectorySynthesizer(coord).synthesize()
         detected_seq = trajectory.get("detected_sequence", [])
         dominant = trajectory.get("dominant_rasa", {}).get("label")
@@ -161,6 +168,10 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         logger.warning(f"Reveal analysis notice: {exc}")
         bundle = {}
         evaluation = {}
+        deep_reader_packet = {}
+        linguistic = {}
+        temporal = {}
+        engagement = {}
         detected_seq = []
         dominant = None
         interpretations = []
@@ -244,11 +255,39 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         {
             "evidence_id": item.get("evidence_id"),
             "signal_type": item.get("signal_type"),
+            "value": item.get("value"),
             "observation": item.get("observation"),
             "source_event_ids": item.get("source_event_ids", []),
+            "provenance_level": item.get("provenance_level"),
+            "scope": item.get("scope"),
+            "limitations": item.get("limitations", []),
+            "eligibility": item.get("eligibility", "observed"),
         }
         for item in evidence_items
     ]
+    inference_records = list(evaluation.get("records") or [])
+    card_provenance = [
+        {
+            "card_id": card.get("card_id"),
+            "card_index": card.get("card_index"),
+            "title": card.get("title"),
+            "archetype": card.get("archetype"),
+            "qualitative_reading": card.get("qualitative_reading"),
+            "provenance_level": card.get("provenance_level"),
+            "provenance": card.get("hidden_provenance") or {},
+            "selection_state": "selected" if card.get("card_id") in selection_pattern["selected_card_ids"] else "not_selected",
+        }
+        for card in deck_cards
+    ]
+    selection_pattern.update({
+        "total_cards_presented": len(deck_cards),
+        "cards_inspected": None,
+        "selection_status": "participant_reported" if selected_cards else "no_selection_recorded",
+        "group_distribution": {
+            group: selection_pattern["reading_groups"].count(group)
+            for group in dict.fromkeys(selection_pattern["reading_groups"])
+        },
+    })
     navarasa_sufficient = bool(detected_seq)
     interaction_profile = {
         "turn_count": turn_count,
@@ -272,6 +311,17 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
             "inference_ids": [item.get("inference_id") for item in eligible],
         },
         "observed_signals": observed_signals,
+        "analytical_artifacts": {
+            "linguistic": linguistic,
+            "temporal": temporal,
+            "engagement": engagement,
+            "navarasa": trajectory,
+            "evidence_bundle": bundle,
+            "inference_evaluation": evaluation,
+            "deep_reader_packet": deep_reader_packet,
+        },
+        "inference_records": inference_records,
+        "card_provenance": card_provenance,
         "navarasa_trajectory": trajectory,
         "interaction_profile": interaction_profile,
         "turn_texts": turn_texts,
