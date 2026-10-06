@@ -119,7 +119,7 @@ export default function Stage06Deck({
       className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-20 overflow-hidden"
       style={{
         fontFamily: 'inherit',
-        fontSize: '16px'
+        fontSize: '16'
       }}
     >
       {/* Prelude ritual sequence */}
