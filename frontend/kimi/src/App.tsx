@@ -202,7 +202,15 @@ export default function App() {
             />
           )}
           {stage === 6 && <Stage06Deck cards={session.cards} onComplete={(cards) => void handleCard(cards)} />}
-          {stage === 7 && session.selectedCard && <Stage07Break card={session.selectedCard} selectionCount={session.selectedCards.length || 1} onComplete={() => void handleReveal()} />}
+          {stage === 7 && session.selectedCard && (
+            <Stage07Break
+              card={session.selectedCard}
+              selectionCount={session.selectedCards.length || 1}
+              turnCount={session.turns.filter((t: ChatTurn) => t.role === 'participant').length}
+              readingCount={session.cards.length}
+              onComplete={() => void handleReveal()}
+            />
+          )}
           {stage === 8 && <Stage08DataJourney session={session} onConsent={(consent) => void handleConsent(consent)} />}
           {stage === 9 && <Stage09Exit session={session} onRestart={() => void restart()} />}
         </motion.main>

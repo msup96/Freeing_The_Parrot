@@ -99,6 +99,20 @@
       inset 0 0 60px rgba(138, 116, 74, 0.18);
   }
 
+  /* Scanlines for machine fragments only (the Stage 07 record card). Never applied to the whole page. */
+  .crt-scan {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.3) 3px,
+      rgba(0, 0, 0, 0) 4px
+    );
+  }
+
   .lens-glow {
     background: radial-gradient(circle, rgba(232, 163, 61, 0.9) 0%, rgba(232, 163, 61, 0.25) 35%, transparent 70%);
     mix-blend-mode: screen;

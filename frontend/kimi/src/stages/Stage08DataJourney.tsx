@@ -1,7 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { transition } from '../lib/motion';
-import type { ChatTurn, Session } from '../lib/session';
+import type { Session } from '../lib/session';
+
+type Row = Record<string, unknown>;
+const NA = 'NOT AVAILABLE';
+const obj = (v: unknown): Row => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Row) : {});
+const rows = (v: unknown): Row[] => (Array.isArray(v) ? (v as Row[]) : []);
+const pad = (n: number | string) => String(n).padStart(2, '0');
+
+function fmt(v: unknown, digits = 2): string {
+  if (v === null || v === undefined || v === '') return NA;
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(digits);
+  if (typeof v === 'boolean') return v ? 'YES' : 'NO';
+  return String(v).replaceAll('_', ' ');
+}
+
+/** Short `key: value` rendering of one evidence value. Never a JSON dump. */
+function flat(v: unknown): string {
+  if (v === null || v === undefined) return NA;
+  if (Array.isArray(v)) return v.map((x) => fmt(x)).join(' → ');
+  if (typeof v === 'object') {
+    return Object.entries(v as Row)
+      .map(([k, val]) => `${k.replaceAll('_', ' ')}: ${Array.isArray(val) ? val.map((x) => fmt(x)).join(' → ') : fmt(val)}`)
+      .join(' · ');
+  }
+  return fmt(v);
+}
+
+/** `first → final (mean m unit)` for a trajectory the backend marked ok. */
+function stat(t: Row): string {
+  if (t.status !== 'ok') return NA;
+  return `${fmt(t.first)} → ${fmt(t.final)}  (mean ${fmt(t.mean)}${t.unit ? ` ${String(t.unit)}` : ''})`;
+}
 
 function EvidenceRow({
   label,
@@ -43,24 +74,54 @@ function Connector() {
   );
 }
 
-function MachineTable({ rows }: { rows: Array<[string, unknown]> }) {
+function Kv({ rows: items }: { rows: Array<[string, React.ReactNode]> }) {
   return (
-    <div className="grid gap-2 border border-parchment/10 p-3 text-[10px]">
-      {rows.map(([label, value]) => (
-        <div key={label} className="grid grid-cols-[minmax(110px,0.4fr)_1fr] gap-3 border-b border-parchment/5 pb-2 last:border-0 last:pb-0">
-          <span className="text-crimson/80 uppercase">{label.replaceAll('_', ' ')}</span>
-          <span className="break-words text-parchment-dim">{value === null || value === undefined ? 'NOT COMPUTED' : typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+    <div className="grid grid-cols-[minmax(110px,0.45fr)_1fr] gap-x-4 gap-y-1.5 text-[11px]">
+      {items.map(([label, value]) => (
+        <div key={label} className="contents">
+          <div className="pt-0.5 text-[9px] uppercase tracking-[0.2em] text-crimson/80">{label}</div>
+          <div className="break-words text-parchment-dim">{value}</div>
         </div>
       ))}
     </div>
   );
 }
 
-function ArtifactList({ title, items }: { title: string; items: unknown[] }) {
+function Tag({ children }: { children: React.ReactNode }) {
+  return <div className="mb-2 mt-5 text-[9px] uppercase tracking-[0.25em] text-crimson/80 first:mt-0">{children}</div>;
+}
+
+/** One evidence or inference record: an id, then labelled fields. */
+function RecordBlock({ id, fields }: { id: string; fields: Array<[string, React.ReactNode]> }) {
   return (
-    <div className="mt-4">
-      <div className="mb-2 text-[9px] uppercase tracking-[0.22em] text-crimson/80">{title}</div>
-      {items.length ? <div className="space-y-2">{items.map((item, index) => <MachineTable key={index} rows={Object.entries(item as Record<string, unknown>)} />)}</div> : <div className="text-parchment-faint">NOT AVAILABLE IN THIS SESSION</div>}
+    <div className="mb-3 border border-parchment/10 bg-black/20 p-3">
+      <div className="mb-2 text-[10px] tracking-[0.3em] text-gold">{id}</div>
+      <Kv rows={fields} />
+    </div>
+  );
+}
+
+function Table({ head, body }: { head: string[]; body: React.ReactNode[][] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[480px] text-left text-[11px]">
+        <thead>
+          <tr className="text-[9px] uppercase tracking-[0.18em] text-crimson/80">
+            {head.map((h) => (
+              <th key={h} className="pb-2 pr-4 font-normal">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="text-parchment-dim">
+          {body.map((cells, i) => (
+            <tr key={i} className="border-t border-parchment/5">
+              {cells.map((cell, j) => (
+                <td key={j} className="py-1.5 pr-4 align-top">{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -118,7 +179,7 @@ function WallTile({
 
       <div className="flex items-center justify-between border-t border-parchment/10 pt-1.5">
         <div className={`font-mono text-[8px] tracking-[0.2em] ${self ? 'text-gold' : 'text-parchment-faint/60'}`}>
-          {self ? 'YOUR TRACE' : 'ARCHIVED'}
+          {self ? 'YOUR TRACE' : 'CONSTRUCTED'}
         </div>
         <div className={`w-1.5 h-1.5 rounded-full ${self ? 'bg-gold animate-pulse' : 'bg-crimson/60'}`} />
       </div>
@@ -126,7 +187,30 @@ function WallTile({
   );
 }
 
-/** Stage 08 — DATA JOURNEY · WALL OF FAME · CONSENT */
+const PROFILE_FIELDS: Array<[string, string, string]> = [
+  ['INPUT', 'input_modality', ''],
+  ['TURNS', 'turn_count', ''],
+  ['TEXT VOLUME', 'character_count', ' characters'],
+  ['QUESTION DENSITY', 'question_density', ''],
+  ['SELF-REFERENCE (MEAN)', 'self_reference_mean', ''],
+  ['REPETITION', 'repetition_count', ''],
+  ['MESSAGE VARIANCE', 'message_length_variation', ''],
+  ['RESPONSE LATENCY (MEAN)', 'response_latency_mean_seconds', ' s'],
+  ['INTER-TURN GAP (MEAN)', 'inter_turn_gap_mean_seconds', ' s'],
+  ['INTERACTION STATE', 'interaction_state', ''],
+  ['NAVARASA', 'navarasa_status', ''],
+  ['EVIDENCE', 'evidence_count', ''],
+  ['INFERENCES', 'eligible_inference_count', ''],
+  ['READINGS', 'readings_constructed', ''],
+  ['SELECTED', 'card_selection_count', ''],
+  ['RESONANCE', 'resonance', ''],
+];
+
+/**
+ * Stage 08 — THE MACHINE REVEAL.
+ * Renders the backend's serialized reveal in the canonical order. It computes nothing:
+ * every value is read from `session.reveal`; anything missing is shown as NOT AVAILABLE.
+ */
 export default function Stage08DataJourney({
   session,
   onConsent,
@@ -134,7 +218,7 @@ export default function Stage08DataJourney({
   session: Session;
   onConsent: (c: 'private' | 'wall') => void;
 }) {
-  const [phase, setPhase] = useState(0); // 0 layers, 1 wall, 2 consent
+  const [phase, setPhase] = useState(0); // 0 sections, 1 wall, 2 consent
   const card = session.selectedCard;
   const reveal = session.reveal;
 
@@ -147,10 +231,47 @@ export default function Stage08DataJourney({
     };
   }, []);
 
-  // Only backend-provided specimens are eligible for the wall. The participant's
-  // deck is session material, not a collection of other participants.
   const wallSpecimens = reveal?.wall_specimens ?? [];
   const sessionIdShort = session.sessionId ? session.sessionId.slice(-8) : '—';
+
+  const art = obj(reveal?.analytical_artifacts);
+  const linguistic = obj(art.linguistic);
+  const temporal = obj(art.temporal);
+  const navarasa = obj(art.navarasa);
+  const packet = obj(art.deep_reader_packet);
+  const signals = useMemo(() => reveal?.observed_signals ?? [], [reveal?.observed_signals]);
+  const inferences = useMemo(() => reveal?.inference_records ?? [], [reveal?.inference_records]);
+  const cardRecords = useMemo(() => reveal?.card_provenance ?? [], [reveal?.card_provenance]);
+  const pattern = reveal?.selection_pattern;
+  const profile = reveal?.interaction_profile;
+
+  // Labels only: E-01.. / I-01.. number the records the backend returned, in order.
+  const evidenceLabel = useMemo(() => new Map(signals.map((s, i) => [s.evidence_id, `E-${pad(i + 1)}`])), [signals]);
+  const inferenceLabel = useMemo(() => new Map(inferences.map((r, i) => [r.inference_id, `I-${pad(i + 1)}`])), [inferences]);
+
+  const lingRows = rows(linguistic.turn_sequence);
+  const tempRows = rows(temporal.turn_sequence);
+  const tempByTurn = new Map(tempRows.map((r) => [Number(r.turn_index), r]));
+  const turnByEvent = new Map<string, number>();
+  for (const r of [...lingRows, ...tempRows]) turnByEvent.set(String(r.event_id), Number(r.turn_index));
+  const turnsOf = (ids: string[] = []): string => {
+    const turns = [...new Set(ids.map((id) => turnByEvent.get(id)).filter((t): t is number => t !== undefined))].sort((a, b) => a - b);
+    if (turns.length === 0) return NA;
+    return turns.length > 4 ? `T${pad(turns[0])} – T${pad(turns[turns.length - 1])}` : turns.map((t) => `T${pad(t)}`).join(' · ');
+  };
+
+  const participantTurns = session.turns.filter((t) => t.role === 'participant').length;
+  const rawText = obj(reveal?.machine_transformation?.raw_text);
+  const offeringText = session.offering?.text;
+
+  const selectedRecords = (pattern?.selected_card_ids ?? [])
+    .map((id) => cardRecords.find((c) => c.card_id === id))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const interpreted = signals.filter((s) => s.provenance_level === 'INTERPRETED');
+  const nav = (key: string) => obj(navarasa[key]);
+  const detected = (navarasa.detected_sequence as string[] | undefined) ?? [];
+  const defaultedTurns = Number(navarasa.defaulted_shanta_turns ?? 0);
+  const readings = cardRecords.length;
 
   return (
     <div className="relative min-h-[100dvh] bg-[#0a0a09] px-6 md:px-0 py-24 text-parchment selection:bg-crimson selection:text-parchment">
@@ -160,9 +281,7 @@ export default function Stage08DataJourney({
           <div className="font-mono text-[10px] tracking-[0.45em] text-crimson mb-3">
             SESSION № {sessionIdShort.toUpperCase()} — DECONSTRUCTION
           </div>
-          <h2 className="font-mono text-2xl md:text-4xl tracking-[0.16em] text-parchment">
-            WHAT ACTUALLY HAPPENED
-          </h2>
+          <h2 className="font-mono text-2xl md:text-4xl tracking-[0.16em] text-parchment">THE MACHINE REVEAL</h2>
           <p className="mt-3 font-serif italic text-xs md:text-sm text-parchment-dim">
             The Parrot was the performer. The Silent Reader was the observer.
           </p>
@@ -177,218 +296,324 @@ export default function Stage08DataJourney({
               </span>
             ))}
           </div>
-          <div className="mt-3 text-[9px] text-parchment-faint/70">ONE SESSION · {session.turns.length} TURN{session.turns.length === 1 ? '' : 'S'} · SERVER REVEAL DATA ONLY</div>
+          <div className="mt-3 text-[9px] text-parchment-faint/70">ONE SESSION · SERVER REVEAL DATA ONLY</div>
         </div>
 
-        {/* ——— MACHINE TRANSFORMATION ——— */}
-        {reveal && (
-          <motion.section
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={transition('REVEAL', 0.25)}
-            className="mb-10 border border-crimson/30 bg-[#080b0a] p-4 md:p-6 font-mono text-[10px] tracking-[0.12em]"
-            aria-label="Machine transformation"
-          >
-            <div className="flex items-center justify-between border-b border-crimson/20 pb-3 text-crimson">
-              <span>MAGIC → MECHANISM</span>
-              <span className="text-parchment-faint/60">SESSION-LOCAL / READ-ONLY</span>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3 text-parchment-dim">
-              <div><span className="text-crimson/80">RAW TEXT</span><br />{reveal.machine_transformation?.raw_text?.character_count ?? 0} chars / {reveal.machine_transformation?.raw_text?.turn_count ?? session.turns.length} turns</div>
-              <div><span className="text-crimson/80">OBSERVED</span><br />{reveal.observed_signals?.length ?? 0} evidence signals</div>
-              <div><span className="text-crimson/80">INFERRED</span><br />{reveal.machine_transformation?.inference_ids?.length ?? 0} bounded hypotheses</div>
-            </div>
-            <div className="mt-4 border-t border-crimson/10 pt-3 text-parchment-faint/80">
-              {reveal.machine_transformation?.evidence_ids?.join(' · ') || 'No evidence identifiers returned'}
-            </div>
-          </motion.section>
-        )}
+        {/* ——— 01 WHAT YOU GAVE ——— */}
+        <EvidenceRow label="01 — WHAT YOU GAVE" sub="Your own input, as it entered the system.">
+          <Kv
+            rows={[
+              ['INPUT MODALITY', (session.offering?.channel ?? reveal?.what_you_gave_channel ?? NA).toString().toUpperCase()],
+              [
+                'TEXT RECEIVED',
+                offeringText ? (
+                  <span className="font-serif italic">“{offeringText}”</span>
+                ) : session.offering?.imageDataUrl ? (
+                  'IMAGE OFFERING (NO TEXT)'
+                ) : reveal?.what_you_gave ? (
+                  <span className="font-serif italic">“{reveal.what_you_gave}”</span>
+                ) : (
+                  NA
+                ),
+              ],
+              ['CONVERSATIONAL TURNS', fmt(rawText.turn_count ?? (participantTurns || null))],
+              ['CHARACTERS RECEIVED', fmt(rawText.character_count)],
+            ]}
+          />
+          {session.offering?.imageDataUrl && (
+            <img src={session.offering.imageDataUrl} alt="offering specimen" className="mt-3 w-32 md:w-44 border border-parchment/20" />
+          )}
+        </EvidenceRow>
 
-        {/* ——— ACTUAL ANALYTICAL ARTIFACTS ——— */}
-        {reveal?.analytical_artifacts && (
-          <EvidenceRow label="WHAT THE MACHINE ACTUALLY MEASURED" sub="Authoritative server artifacts; values are session measurements, not psychological truths.">
-            <ArtifactList title="LINGUISTIC TURN MEASUREMENTS" items={(reveal.analytical_artifacts.linguistic?.turn_sequence as unknown[]) ?? []} />
-            <ArtifactList title="TEMPORAL / BEHAVIOURAL TURN MEASUREMENTS" items={(reveal.analytical_artifacts.temporal?.turn_sequence as unknown[]) ?? []} />
-            <MachineTable rows={Object.entries(reveal.analytical_artifacts.linguistic ?? {}).filter(([key]) => key !== 'turn_sequence')} />
-            <MachineTable rows={Object.entries(reveal.analytical_artifacts.temporal ?? {}).filter(([key]) => key !== 'turn_sequence')} />
-          </EvidenceRow>
-        )}
+        <Connector />
 
-        {reveal?.observed_signals && (
-          <EvidenceRow label="EVIDENCE → INFERENCE" sub="Each record preserves its value, source events, provenance, scope, and limitations.">
-            <ArtifactList title="EVIDENCE RECORDS" items={reveal.observed_signals} />
-            <ArtifactList title="INFERENCE RECORDS" items={reveal.inference_records ?? []} />
-            <MachineTable rows={Object.entries(reveal.analytical_artifacts?.deep_reader_packet ?? {})} />
-          </EvidenceRow>
-        )}
+        {/* ——— 02 WHAT THE SYSTEM OBSERVED ——— */}
+        <EvidenceRow label="02 — WHAT THE SYSTEM OBSERVED" sub="Turn by turn. Measured from your text and timing; not interpreted.">
+          {lingRows.length === 0 ? (
+            'NO TURNS WERE RECORDED FOR THIS SESSION.'
+          ) : (
+            <Table
+              head={['TURN', 'LENGTH', 'TOKENS', 'QUESTION', 'SELF-REF', 'LATENCY s', 'GAP s', 'REPEAT']}
+              body={lingRows.map((r) => {
+                const t = obj(tempByTurn.get(Number(r.turn_index)));
+                return [
+                  `T${pad(Number(r.turn_index))}`,
+                  fmt(r.message_length),
+                  fmt(r.token_count),
+                  fmt(r.utterance_is_question),
+                  fmt(r.self_reference_count),
+                  fmt(t.response_latency),
+                  fmt(t.inter_turn_gap),
+                  fmt(t.repeated_message),
+                ];
+              })}
+            />
+          )}
+        </EvidenceRow>
 
-        {reveal?.card_provenance && (
-          <EvidenceRow label="HOW THE 27 READINGS WERE CONSTRUCTED" sub="Card provenance is exposed without revealing internal prompt text.">
-            <ArtifactList title={`${reveal.card_provenance.length} CARD PROVENANCE RECORDS`} items={reveal.card_provenance} />
-          </EvidenceRow>
-        )}
+        <Connector />
 
-        {/* ——— NAVARASA TRAJECTORY ——— */}
-        {reveal && (
-          <EvidenceRow
-            label="NAVARASA TRAJECTORY"
-            sub={reveal.navarasa_trajectory?.dominant_rasa?.label
-              ? `Dominant detected label: ${reveal.navarasa_trajectory.dominant_rasa.label}. This is an interaction signal, not a trait.`
-              : 'No stable Rasa trajectory was supported by this session.'}
-          >
-            {reveal.navarasa_trajectory?.detected_sequence?.length
-              ? reveal.navarasa_trajectory.detected_sequence.join(' → ')
-              : 'INSUFFICIENT EVIDENCE FOR A STABLE RASA TRAJECTORY.'}
-            <ArtifactList title="TURN-LEVEL NAVARASA OUTPUT" items={(reveal.analytical_artifacts?.navarasa?.turn_sequence as unknown[]) ?? []} />
-            <MachineTable rows={Object.entries(reveal.analytical_artifacts?.navarasa ?? {}).filter(([key]) => key !== 'turn_sequence')} />
-          </EvidenceRow>
-        )}
+        {/* ——— 03 WHAT THE SYSTEM MEASURED ——— */}
+        <EvidenceRow label="03 — WHAT THE SYSTEM MEASURED" sub="Session-wide signals. A measurement describes the interaction, not you.">
+          <Tag>LINGUISTIC</Tag>
+          <Kv
+            rows={[
+              [
+                'QUESTION RATE',
+                obj(linguistic.question_rate).status === 'ok'
+                  ? `${fmt(obj(linguistic.question_rate).value)}  (${fmt(obj(linguistic.question_rate).question_turns)} of ${fmt(obj(linguistic.question_rate).turn_count)} turns)`
+                  : NA,
+              ],
+              ['SELF-REFERENCE', stat(obj(linguistic.self_reference_trajectory))],
+              ['TYPE-TOKEN RATIO', stat(obj(linguistic.type_token_ratio_trajectory))],
+              ['TOKEN COUNT', stat(obj(linguistic.token_count_trajectory))],
+              ['MESSAGE LENGTH', stat(obj(linguistic.message_length_trajectory))],
+              ['REPETITION', fmt(obj(temporal.repetition).repetition_count)],
+              ['MESSAGE VARIANCE', fmt(obj(obj(temporal.volatility).message_length).normalized_variation)],
+            ]}
+          />
+          <Tag>TEMPORAL</Tag>
+          <Kv
+            rows={[
+              ['RESPONSE LATENCY', stat(obj(temporal.response_latency_trajectory))],
+              ['INTER-TURN GAP', stat(obj(temporal.inter_turn_gap_trajectory))],
+              [
+                'VOLATILITY',
+                obj(obj(temporal.volatility).message_length).status === 'ok'
+                  ? `${fmt(obj(obj(temporal.volatility).message_length).transition_count)} length changes · range ${fmt(obj(obj(temporal.volatility).message_length).range)}`
+                  : NA,
+              ],
+              [
+                'BEGINNING → END',
+                obj(temporal.beginning_vs_ending).status === 'ok'
+                  ? `length ${fmt(obj(obj(temporal.beginning_vs_ending).beginning).message_length)} → ${fmt(obj(obj(temporal.beginning_vs_ending).ending).message_length)}`
+                  : NA,
+              ],
+            ]}
+          />
+        </EvidenceRow>
 
-        {/* ——— INTERACTION PROFILE ——— */}
-        {reveal?.interaction_profile && (
-          <EvidenceRow
-            label="INTERACTION PROFILE"
-            sub="What this interaction made computationally legible; not a permanent or psychological profile."
-          >
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {Object.entries(reveal.interaction_profile).map(([key, value]) => (
-                <div key={key} className="border border-parchment/10 p-2">
-                  <div className="text-[9px] uppercase text-crimson/80">{key.replaceAll('_', ' ')}</div>
-                  <div className="mt-1 text-gold">{String(value)}</div>
-                </div>
-              ))}
-            </div>
-          </EvidenceRow>
-        )}
+        <Connector />
 
-        {/* ——— 1. WHAT YOU GAVE ——— */}
-        <EvidenceRow
-          label="WHAT YOU GAVE"
-          sub="Direct physical inputs received across intake and conversational turns."
-        >
-          {session.offering ? (
-            <div>
-              <div className="flex items-center gap-2 mb-2 font-mono text-xs">
-                <span>INTAKE MODALITY:</span>
-                <span className="text-gold font-bold">{session.offering.channel.toUpperCase()}</span>
-              </div>
-              {session.offering.text && (
-                <div className="border-l-2 border-gold/40 pl-3 py-1 my-2 font-serif italic text-parchment-dim">
-                  “{session.offering.text}”
-                </div>
-              )}
-              {session.offering.imageDataUrl && (
-                <img
-                  src={session.offering.imageDataUrl}
-                  alt="offering specimen"
-                  className="mt-3 w-32 md:w-44 border border-parchment/20"
+        {/* ——— 04 NAVARASA TRAJECTORY ——— */}
+        <EvidenceRow label="04 — NAVARASA TRAJECTORY" sub="Detected emotional vocabulary per turn. A default label is not a detection.">
+          {rows(navarasa.turn_sequence).length > 0 && (
+            <Table
+              head={['TURN', 'SIGNAL', 'WORDS']}
+              body={rows(navarasa.turn_sequence).map((r) => [
+                `T${pad(Number(r.turn_index))}`,
+                r.defaulted_primary === true ? 'NO RASA DETECTED' : fmt(r.primary_rasa),
+                Array.isArray(r.emotional_words) && r.emotional_words.length ? (r.emotional_words as string[]).join(', ') : '—',
+              ])}
+            />
+          )}
+          <div className="mt-4">
+            <Kv
+              rows={[
+                ['TRAJECTORY', detected.length ? detected.join(' → ') : 'INSUFFICIENT EVIDENCE FOR A STABLE RASA TRAJECTORY'],
+                ['TRANSITIONS', fmt(nav('transition_count').value)],
+                ['DOMINANT SIGNAL', fmt(nav('dominant_rasa').label)],
+                [
+                  'DEFAULTED TURNS',
+                  defaultedTurns > 0 ? `${defaultedTurns} turn(s) had no emotional vocabulary; their default label is not shown as evidence.` : '0',
+                ],
+              ]}
+            />
+          </div>
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 05 WHAT THE SYSTEM INTERPRETED ——— */}
+        <EvidenceRow label="05 — WHAT THE SYSTEM INTERPRETED" sub="Labels produced by rules applied to the measurements above. Interaction-scoped.">
+          {interpreted.length === 0
+            ? 'NOTHING WAS INTERPRETED. THE EVIDENCE DID NOT SUPPORT IT.'
+            : interpreted.map((s) => (
+                <RecordBlock
+                  key={s.evidence_id}
+                  id={evidenceLabel.get(s.evidence_id) ?? s.evidence_id}
+                  fields={[
+                    ['SIGNAL', s.signal_type.replaceAll('_', ' ').toUpperCase()],
+                    ['VALUE', flat(s.value)],
+                    ['PROVENANCE', s.provenance_level],
+                    ['LIMITATION', s.limitation_notes?.length ? s.limitation_notes.join(' ') : '—'],
+                  ]}
                 />
-              )}
-              {session.turns.length > 0 && (
-                <div className="mt-3 text-xs text-parchment-dim font-mono">
-                  {session.turns.filter((t: ChatTurn) => t.role === 'participant').length} statement(s) submitted to the Parrot.
-                </div>
-              )}
-            </div>
+              ))}
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 06 EVIDENCE ——— */}
+        <EvidenceRow label="06 — EVIDENCE" sub="OBSERVATION → EVIDENCE → INFERENCE. This is how the machine got there.">
+          {signals.length === 0
+            ? 'NO EVIDENCE RECORDS WERE RETURNED FOR THIS SESSION.'
+            : signals.map((s) => (
+                <RecordBlock
+                  key={s.evidence_id}
+                  id={evidenceLabel.get(s.evidence_id) ?? s.evidence_id}
+                  fields={[
+                    ['SIGNAL', s.signal_type.replaceAll('_', ' ').toUpperCase()],
+                    ['VALUE', flat(s.value)],
+                    ['OBSERVATION', s.observation],
+                    ['SOURCE', turnsOf(s.source_event_ids)],
+                    ['PROVENANCE', s.provenance_level],
+                    ['LIMITATION', s.limitation_notes?.length ? s.limitation_notes.join(' ') : 'NONE RECORDED'],
+                  ]}
+                />
+              ))}
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 07 INFERENCE ——— */}
+        <EvidenceRow label="07 — INFERENCE" sub="Bounded claims. Support is within this interaction, not the probability that a claim is true of you.">
+          {inferences.length === 0
+            ? 'NO INFERENCE RECORDS WERE RETURNED FOR THIS SESSION.'
+            : inferences.map((r) => (
+                <RecordBlock
+                  key={r.inference_id}
+                  id={inferenceLabel.get(r.inference_id) ?? r.inference_id}
+                  fields={[
+                    ['CLAIM', r.claim],
+                    ['SUPPORTED BY', r.evidence_refs.map((id) => evidenceLabel.get(id) ?? id).join(' · ') || NA],
+                    ['ALTERNATIVES', r.alternative_interpretations?.length ? r.alternative_interpretations.join(' / ') : 'NONE RECORDED'],
+                    ['CONTRADICTIONS', r.contradictions?.length ? r.contradictions.map((c) => c.description ?? '—').join(' / ') : 'NONE RECORDED'],
+                    ['ELIGIBILITY', fmt(r.eligibility).toUpperCase()],
+                    ['SUPPORT', r.confidence === null || r.confidence === undefined ? NA : `${fmt(r.confidence)} (within this interaction)`],
+                    ['LIMITATIONS', r.limitation_notes?.length ? r.limitation_notes.join(' ') : 'NONE RECORDED'],
+                  ]}
+                />
+              ))}
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 08 WHAT THE SYSTEM CONSTRUCTED ——— */}
+        <EvidenceRow label="08 — WHAT THE SYSTEM CONSTRUCTED" sub="From analysis to qualitative readings.">
+          {readings === 0 ? (
+            'NO READINGS WERE SERIALIZED FOR THIS SESSION.'
           ) : (
-            reveal?.what_you_gave || 'No participant input is available in this reveal.'
+            <>
+              <p className="mb-3 text-parchment">
+                THE SYSTEM DID NOT DISCOVER {readings} TRUTHS ABOUT YOU. IT CONSTRUCTED {readings} POSSIBLE READINGS FROM THE INTERACTION.
+              </p>
+              <Kv
+                rows={[
+                  ['READINGS CONSTRUCTED', String(readings)],
+                  ['EVIDENCE PASSED TO THE READER', fmt(rows(packet.evidence_items).length)],
+                  ['ELIGIBLE INFERENCES', fmt(rows(packet.eligible_inferences).length)],
+                  ['EVERY READING IS', 'INFERRED · TRACED TO AT LEAST ONE EVIDENCE ITEM AND ONE INFERENCE'],
+                ]}
+              />
+            </>
           )}
         </EvidenceRow>
 
         <Connector />
 
-        {/* ——— 2. WHAT THE SYSTEM OBSERVED ——— */}
-        <EvidenceRow
-          label="WHAT THE SYSTEM OBSERVED"
-          sub={reveal?.what_was_recorded_sub || 'Deterministic computational counts and timestamps preserved in the append-only event store.'}
-        >
-          {reveal?.what_the_system_observed || reveal?.what_was_recorded || 'The authoritative reveal did not provide an observation summary.'}
-        </EvidenceRow>
-
-        <Connector />
-
-        {/* ——— 3. WHAT THE SYSTEM INTERPRETED ——— */}
-        <EvidenceRow
-          label="WHAT THE SYSTEM INTERPRETED"
-          sub={reveal?.what_was_interpreted_sub || 'Derived solely from linguistic rhythm, vocabulary, and sentiment tone.'}
-        >
-          {reveal?.what_the_system_interpreted || reveal?.what_was_interpreted || 'No interpreted output was returned for this session.'}
-        </EvidenceRow>
-
-        <Connector />
-
-        {/* ——— 4. WHAT THE SYSTEM INFERRED ——— */}
-        <EvidenceRow
-          label="WHAT THE SYSTEM INFERRED"
-          sub={reveal?.what_was_constructed_sub || 'Hypotheses for reflection, combining archetype seeds with subjective completion.'}
-        >
-          {reveal?.what_the_system_inferred || reveal?.what_was_constructed || 'No inferred output was returned for this session.'}
-          <span className="block mt-3 text-[11px] text-parchment-dim/80 border-l border-crimson/40 pl-3 italic">
-            Notice: The apparatus did not diagnose you. It prepared mirrors designed to allow personal projection.
-          </span>
-        </EvidenceRow>
-
-        <Connector />
-
-        {/* ——— 5. WHAT YOU CHOSE ——— */}
-        <EvidenceRow
-          label="WHAT YOU CHOSE"
-          sub={reveal?.what_you_chose?.disclaimer || 'Subjective validation reported by the participant. Not an objective diagnosis.'}
-        >
-          {card ? (
-            <div>
-              <div className="font-mono text-xs tracking-wider text-gold font-bold uppercase">
-                CARD {String(card.id).padStart(2, '0')} — {card.title}
-              </div>
-              <div className="mt-1 font-serif italic text-parchment-dim">
-                “{card.statement}”
-              </div>
-              <div className="mt-3 font-mono text-[10px] tracking-widest text-crimson/90">
-                ▸ STATUS: RESONANCE MARKED BY PARTICIPANT
-              </div>
-            </div>
-          ) : reveal?.what_you_chose ? (
-            <div>
-              <div className="font-mono text-xs tracking-wider text-gold font-bold uppercase">
-                CARD {String(reveal.what_you_chose.card_index).padStart(2, '0')} — {reveal.what_you_chose.title}
-              </div>
-              <div className="mt-1 font-serif italic text-parchment-dim">
-                “{reveal.what_you_chose.statement}”
-              </div>
-            </div>
+        {/* ——— 09 THE 27 READINGS ——— */}
+        <EvidenceRow label={`09 — THE ${readings || 27} READINGS`} sub="Machine provenance of each card you were shown. Territory is the card's semantic category.">
+          {readings === 0 ? (
+            NA
           ) : (
-            '—'
+            <Table
+              head={['№', 'TERRITORY', 'TITLE', 'MOTIF', 'ARCHETYPE', 'EVIDENCE', 'INFERENCE', 'SELECTION']}
+              body={cardRecords.map((c) => {
+                const selectedAt = (pattern?.selected_card_ids ?? []).indexOf(c.card_id);
+                const gold = selectedAt >= 0 ? 'text-gold' : '';
+                return [
+                  <span className={gold}>{pad(c.card_index)}</span>,
+                  <span className={gold}>{fmt(c.semantic_anchor)}</span>,
+                  <span className={gold}>{c.title}</span>,
+                  fmt(c.semantic_motif),
+                  fmt(c.archetype),
+                  (c.provenance?.evidence_ids ?? []).map((id) => evidenceLabel.get(id) ?? id).join(' · ') || '—',
+                  (c.provenance?.inference_ids ?? []).map((id) => inferenceLabel.get(id) ?? id).join(' · ') || '—',
+                  <span className={gold}>{selectedAt >= 0 ? `SELECTED · ${pad(selectedAt + 1)}` : 'NOT SELECTED'}</span>,
+                ];
+              })}
+            />
           )}
         </EvidenceRow>
 
-        {reveal?.selection_pattern && (
-          <EvidenceRow label="HOW YOUR SELECTIONS FORMED A PATTERN" sub="Recorded selection behavior only; RESONATES is participant-reported and is not validation.">
-            <MachineTable rows={Object.entries(reveal.selection_pattern)} />
-            <div className="mt-3 text-[10px] uppercase tracking-[0.18em] text-gold/80">
-              Semantic territories: {(reveal.selection_pattern.semantic_anchors ?? []).join(' · ') || 'none recorded'}
-            </div>
-          </EvidenceRow>
-        )}
+        <Connector />
 
-        {/* ——— 6. WHAT WE CANNOT KNOW ——— */}
-        {reveal?.what_we_cannot_know && (
-          <>
-            <Connector />
-            <EvidenceRow
-              label="WHAT WE CANNOT KNOW"
-              sub="The sovereign boundary of machine observation."
-            >
-              <ul className="space-y-2 font-mono text-xs text-parchment-dim">
-                {reveal.what_we_cannot_know.map((lim: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-crimson">✕</span>
-                    <span>{lim}</span>
-                  </li>
-                ))}
-              </ul>
-            </EvidenceRow>
-          </>
-        )}
+        {/* ——— 10 WHAT YOU CHOSE ——— */}
+        <EvidenceRow label="10 — WHAT YOU CHOSE" sub={reveal?.what_you_chose?.disclaimer || 'Selected by you from the cards presented.'}>
+          <Kv
+            rows={[
+              ['CARDS PRESENTED', fmt(pattern?.total_cards_presented ?? (readings || null))],
+              ['CARDS SELECTED', fmt(pattern?.selected_count)],
+              ['YOUR SELECTED TERRITORIES', (pattern?.semantic_anchors ?? []).join(' · ') || NA],
+            ]}
+          />
+          {selectedRecords.length > 0 && (
+            <div className="mt-4">
+              <Table
+                head={['№', 'TERRITORY', 'TITLE']}
+                body={selectedRecords.map((c) => [pad(c.card_index), fmt(c.semantic_anchor), c.title])}
+              />
+            </div>
+          )}
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 11 YOUR SELECTION PATTERN ——— */}
+        <EvidenceRow label="11 — YOUR SELECTION PATTERN" sub="THE MACHINE RECORDED. A selection is an observation, not proof of who you are.">
+          <Kv
+            rows={[
+              ['SELECTION COUNT', fmt(pattern?.selected_count)],
+              ['SELECTION ORDER', (pattern?.selected_card_indices ?? []).map(pad).join(' → ') || NA],
+              ['SEMANTIC TERRITORIES', (pattern?.semantic_anchors ?? []).join(' · ') || NA],
+              ['READING GROUPS', (pattern?.reading_groups ?? []).length ? (pattern?.reading_groups ?? []).join(' · ') : NA],
+              ['INSPECTION DATA', pattern?.cards_inspected === null || pattern?.cards_inspected === undefined ? 'NOT AVAILABLE IN THIS SESSION' : fmt(pattern.cards_inspected)],
+              ['RESONANCE', 'PARTICIPANT-REPORTED · VALIDATED PROVENANCE · NOT PROOF'],
+            ]}
+          />
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 12 INTERACTION PROFILE ——— */}
+        <EvidenceRow label="12 — INTERACTION PROFILE" sub="NOT A PROFILE OF YOU. A profile of this interaction.">
+          {profile ? (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {PROFILE_FIELDS.map(([label, key, suffix]) => {
+                const value = profile[key];
+                return (
+                  <div key={key} className="border border-parchment/10 p-2">
+                    <div className="text-[9px] uppercase tracking-[0.12em] text-crimson/80">{label}</div>
+                    <div className="mt-1 break-words text-gold">
+                      {value === null || value === undefined ? NA : `${fmt(value)}${suffix}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            NA
+          )}
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 13 WHAT THE SYSTEM CANNOT KNOW ——— */}
+        <EvidenceRow label="13 — WHAT THE SYSTEM CANNOT KNOW" sub="THIS IS NOT WHO YOU ARE. THIS IS WHAT THIS INTERACTION MADE LEGIBLE.">
+          {reveal?.what_we_cannot_know && reveal.what_we_cannot_know.length > 0 ? (
+            <ul className="space-y-2 text-xs text-parchment-dim">
+              {reveal.what_we_cannot_know.map((lim: string, i: number) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-crimson">✕</span>
+                  <span>{lim}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            'THE SYSTEM DID NOT REPORT ITS LIMITS FOR THIS SESSION.'
+          )}
+        </EvidenceRow>
       </div>
 
       {/* ——— Wall of Fame ——— */}
@@ -400,22 +625,14 @@ export default function Stage08DataJourney({
             transition={transition('REVEAL')}
             className="max-w-4xl mx-auto mt-20 md:mt-28"
           >
-            <div className="font-mono text-[10px] tracking-[0.45em] text-crimson mb-2 uppercase">
-              THE WALL OF FAME
-            </div>
+            <div className="font-mono text-[10px] tracking-[0.45em] text-crimson mb-2 uppercase">THE WALL OF FAME</div>
             <p className="font-mono text-[11px] text-parchment-faint tracking-[0.15em] mb-8">
               Session materials available for consent. No cross-session specimens are loaded here.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
               {wallSpecimens.slice(0, 11).map((s: { title: string; qualitative_reading: string; archetype?: string }, i: number) => (
-                <WallTile
-                  key={i}
-                  index={i}
-                  title={s.title}
-                  text={s.qualitative_reading}
-                  archetype={s.archetype}
-                />
+                <WallTile key={i} index={i} title={s.title} text={s.qualitative_reading} archetype={s.archetype} />
               ))}
 
               {/* The participant's material, waiting for a decision */}
@@ -432,7 +649,7 @@ export default function Stage08DataJourney({
         )}
       </AnimatePresence>
 
-      {/* ——— Sovereign Consent Gate ——— */}
+      {/* ——— 14 CONSENT / PURGE ——— */}
       <AnimatePresence>
         {phase >= 2 && (
           <motion.div
@@ -441,7 +658,14 @@ export default function Stage08DataJourney({
             transition={{ duration: 1.2 }}
             className="max-w-3xl mx-auto mt-24 md:mt-32 mb-16 text-center border-t border-parchment/10 pt-16"
           >
-            <p className="font-mono text-sm md:text-lg tracking-[0.25em] text-parchment leading-relaxed text-balance">
+            <p className="font-mono text-xs md:text-sm tracking-[0.3em] text-crimson leading-loose text-balance">
+              THE CARD WAS THE EXPERIENCE.
+              <br />
+              THE SELECTION WAS DATA.
+              <br />
+              THE REVEAL IS THE MIRROR.
+            </p>
+            <p className="mt-16 font-mono text-sm md:text-lg tracking-[0.25em] text-parchment leading-relaxed text-balance">
               DO YOU CONSENT YOUR DATA
               <br />
               TO BE ADDED TO THE WALL OF FAME?
@@ -451,16 +675,10 @@ export default function Stage08DataJourney({
               If you keep it private, your session trace will be purged completely.
             </p>
             <div className="mt-10 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-              <button
-                className="brass-button px-8 py-4 min-h-[44px] min-w-[220px]"
-                onClick={() => onConsent('private')}
-              >
+              <button className="brass-button px-8 py-4 min-h-[44px] min-w-[220px]" onClick={() => onConsent('private')}>
                 KEEP PRIVATE
               </button>
-              <button
-                className="brass-button px-8 py-4 min-h-[44px] min-w-[220px]"
-                onClick={() => onConsent('wall')}
-              >
+              <button className="brass-button px-8 py-4 min-h-[44px] min-w-[220px]" onClick={() => onConsent('wall')}>
                 ADD TO WALL OF FAME
               </button>
             </div>

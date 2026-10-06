@@ -107,6 +107,49 @@ def get_or_create_coordinator(session_id: str | None) -> SessionCoordinator:
     return require_session(session_id)
 
 
+# Plain-language wording for limitation codes already emitted by the evidence/inference layers.
+# Unknown codes are skipped, never guessed at.
+_LIMITATION_TEXT: dict[str, str] = {
+    "fewer_than_two_turns": "Whether anything changed across the conversation: there were fewer than two turns to compare.",
+    "message_length_change_unavailable": "Whether your messages grew or shrank: this session gave no measurable change.",
+    "question_rate_unavailable": "How often you asked questions: this could not be measured for this session.",
+    "self_reference_unavailable": "How you referred to yourself: this could not be measured for this session.",
+    "detected_rasa_unavailable": "Any stable emotional label: no turn contained lexicon evidence for one.",
+    "defaulted_shanta_not_detected_evidence": "Turns labelled Shanta by default carry no evidence. A default is not a detection.",
+    "engagement_state_insufficient": "How the interaction was going: there was not enough evidence to label it.",
+    "response_latency_unavailable": "How quickly you replied: this session did not record a usable response time.",
+    "no_eligible_inference": "Any claim about you: no claim met the evidence threshold in this session.",
+    "bundle_insufficient": "A fuller reading: the session was too short to support one.",
+    "interaction_state_not_a_person_claim": "Anything about you as a person from the interaction-state label: it describes this exchange only.",
+    "contradiction_blocks_claim": "A claim that the session's own evidence contradicted.",
+}
+
+
+def _limitation_notes(codes: Any) -> list[str]:
+    """Plain-language notes for the limitation codes attached to one evidence or inference record."""
+    return [_LIMITATION_TEXT[c] for c in (codes or []) if c in _LIMITATION_TEXT]
+
+
+def _participant_limitations(bundle: dict[str, Any], evaluation: dict[str, Any]) -> list[str]:
+    """Epistemic limits the backend itself reports, in plain language, plus the evidence contract's prohibitions."""
+    from ftp.silent_reader.inference import PROHIBITED_INFERENCE_CATEGORIES
+
+    codes: list[str] = list(bundle.get("limitations") or [])
+    for item in bundle.get("evidence_items") or []:
+        codes.extend(item.get("limitations") or [])
+    codes.extend(evaluation.get("limitations") or [])
+    for record in evaluation.get("records") or []:
+        codes.extend(record.get("limitations") or [])
+    out: list[str] = []
+    for code in codes:
+        text = _LIMITATION_TEXT.get(code)
+        if text and text not in out:
+            out.append(text)
+    categories = ", ".join(sorted(c.replace("_", " ") for c in PROHIBITED_INFERENCE_CATEGORIES))
+    out.append(f"The evidence contract does not permit the system to infer: {categories}.")
+    return out
+
+
 def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | None, selected: dict[str, Any] | None) -> dict[str, Any]:
     """Assemble the dedicated participant-facing reveal payload preserving provenance."""
     sid = coord.session_id
@@ -129,8 +172,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         f"{question_count} of your statements were formulated as questions."
     )
     what_recorded_sub = (
-        f"Session trace № {sid[-7:]} verified: input sequence, dialogue timestamps, "
-        "and conversational rhythm preserved in archival memory."
+        f"Session trace № {sid[-7:]}: counts and measurements taken from your text. Observed, not interpreted."
     )
 
     # 3. WHAT WAS INTERPRETED: expose the actual evidence-backed interpretation.
@@ -244,14 +286,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
             "qualitative_reading": c["qualitative_reading"],
         })
 
-    limitations = list(bundle.get("limitations") or [])
-    limitations.extend(evaluation.get("limitations") or [])
-    if not limitations:
-        limitations = [
-            "This session does not establish a stable fact about the participant.",
-            "Resonance is participant-reported and is not objective psychological validation.",
-            "The Parrot did not receive the Silent Reader's analysis or card selection.",
-        ]
+    limitations = _participant_limitations(bundle, evaluation)
 
     observed_signals = [
         {
@@ -263,11 +298,15 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
             "provenance_level": item.get("provenance_level"),
             "scope": item.get("scope"),
             "limitations": item.get("limitations", []),
+            "limitation_notes": _limitation_notes(item.get("limitations")),
             "eligibility": item.get("eligibility", "observed"),
         }
         for item in evidence_items
     ]
-    inference_records = list(evaluation.get("records") or [])
+    inference_records = [
+        {**record, "limitation_notes": _limitation_notes(record.get("limitations"))}
+        for record in (evaluation.get("records") or [])
+    ]
     card_provenance = [
         {
             "card_id": card.get("card_id"),
@@ -293,14 +332,31 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         },
     })
     navarasa_sufficient = bool(detected_seq)
+    def _traj(source: dict[str, Any], key: str) -> dict[str, Any]:
+        value = source.get(key) if isinstance(source, dict) else None
+        return value if isinstance(value, dict) else {}
+
+    latency = _traj(temporal, "response_latency_trajectory")
+    gap = _traj(temporal, "inter_turn_gap_trajectory")
+    variation = _traj(_traj(temporal, "volatility"), "message_length")
     interaction_profile = {
+        "input_modality": offering.get("modality"),
         "turn_count": turn_count,
         "question_count": question_count,
         "character_count": total_chars,
+        "question_density": _traj(linguistic, "question_rate").get("value"),
+        "self_reference_mean": _traj(linguistic, "self_reference_trajectory").get("mean"),
+        "repetition_count": _traj(temporal, "repetition").get("repetition_count"),
+        "message_length_variation": variation.get("normalized_variation"),
+        "response_latency_mean_seconds": latency.get("mean") if latency.get("status") == "ok" else None,
+        "inter_turn_gap_mean_seconds": gap.get("mean") if gap.get("status") == "ok" else None,
+        "interaction_state": _traj(engagement, "engagement_state").get("state"),
+        "navarasa_status": "ok" if navarasa_sufficient else "insufficient_evidence",
         "evidence_count": evidence_count,
         "eligible_inference_count": len(eligible),
-        "navarasa_status": "ok" if navarasa_sufficient else "insufficient_evidence",
+        "readings_constructed": len(deck_cards),
         "card_selection_count": len(selected_cards) if isinstance(selected, list) else int(bool(selected)),
+        "resonance": "participant-reported" if selected_cards else "none recorded",
         "card_selection_pattern": "participant-reported selection pattern; not psychological validation",
     }
 
