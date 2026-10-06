@@ -58,14 +58,18 @@ def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
     anchors = profile["anchors"]
     cards: list[dict[str, Any]] = []
     used_readings: set[str] = set()
+    # Stable session material changes the deterministic composition without adding
+    # randomness. The profile remains the source of meaning; this only prevents
+    # every session from receiving the same title/archetype ordering.
+    session_seed = _session_seed(profile)
 
     for index in range(1, CARD_COUNT + 1):
-        anchor = anchors[(index * 5 + index // 3) % len(anchors)]
-        strategy = COMPOSITION_STRATEGIES[(index - 1) % len(COMPOSITION_STRATEGIES)]
-        technique = BARNUM_TECHNIQUES[(index - 1) % len(BARNUM_TECHNIQUES)]
-        title = _unique_title(index, used_readings)
-        archetype = ARCHETYPES[(index - 1) % len(ARCHETYPES)]
-        fragment = READING_FRAGMENTS[(index * 3 + len(anchor["reading_seed"])) % len(READING_FRAGMENTS)]
+        anchor = anchors[(index * 5 + index // 3 + session_seed) % len(anchors)]
+        strategy = COMPOSITION_STRATEGIES[(index - 1 + session_seed) % len(COMPOSITION_STRATEGIES)]
+        technique = BARNUM_TECHNIQUES[(index - 1 + session_seed) % len(BARNUM_TECHNIQUES)]
+        title = _unique_title(index, used_readings, session_seed)
+        archetype = ARCHETYPES[(index - 1 + session_seed) % len(ARCHETYPES)]
+        fragment = READING_FRAGMENTS[(index * 3 + len(anchor["reading_seed"]) + session_seed) % len(READING_FRAGMENTS)]
         qualitative = _compose_reading(
             title=title,
             archetype=archetype,
@@ -135,8 +139,16 @@ def _resolve_evidence_ids(anchor: dict[str, Any], profile: dict[str, Any]) -> li
     return ["reading_anchor_session_threshold"]
 
 
-def _unique_title(index: int, used: set[str]) -> str:
-    title = TITLE_FRAGMENTS[(index - 1) % len(TITLE_FRAGMENTS)]
+def _session_seed(profile: dict[str, Any]) -> int:
+    material = "|".join(
+        [str(profile.get("session_id") or "")]
+        + [str(anchor.get("reading_seed") or "") for anchor in profile.get("anchors", [])]
+    )
+    return int(hashlib.sha256(material.encode("utf-8")).hexdigest()[:8], 16)
+
+
+def _unique_title(index: int, used: set[str], session_seed: int) -> str:
+    title = TITLE_FRAGMENTS[(index - 1 + session_seed) % len(TITLE_FRAGMENTS)]
     if title not in used:
         used.add(title)
         return title
