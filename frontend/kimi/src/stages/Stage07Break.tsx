@@ -71,13 +71,14 @@ export default function Stage07Break({ card, onComplete }: { card: DeckCard; onC
           {step >= 3 && (
             <>
               {[
-                { text: 'SELECTION: VOLUNTARY', pos: '-left-2 top-6 -translate-x-full' },
-                { text: 'RESONANCE: VALIDATED', pos: '-right-2 top-16 translate-x-full' },
-                { text: 'OBSERVATION: ARCHIVED', pos: '-left-2 bottom-10 -translate-x-full' },
+                { text: 'SELECTION: VOLUNTARY', pos: 'left-1 top-6 md:-left-2 md:-translate-x-full' },
+                { text: 'RESPONSE: RECORDED', pos: 'right-1 top-16 md:-right-2 md:translate-x-full' },
+                { text: 'RESONANCE: SELF-REPORTED', pos: 'left-1 bottom-16 md:-left-2 md:-translate-x-full' },
+                { text: 'VALIDATION: PARTICIPANT-SUPPLIED', pos: 'right-1 bottom-10 md:-right-2 md:translate-x-full' },
               ].map((a, i) => (
                 <motion.div
                   key={i}
-                  className={`absolute ${a.pos} hidden md:block font-mono text-[9px] tracking-[0.25em] text-crimson/80 whitespace-nowrap`}
+                  className={`absolute ${a.pos} font-mono text-[8px] md:text-[9px] tracking-[0.12em] md:tracking-[0.25em] text-crimson/80 whitespace-nowrap max-w-[45vw] overflow-hidden text-ellipsis`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.15, delay: i * 0.15 }}
