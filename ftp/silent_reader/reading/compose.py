@@ -140,10 +140,26 @@ def _resolve_evidence_ids(anchor: dict[str, Any], profile: dict[str, Any]) -> li
 
 
 def _session_seed(profile: dict[str, Any]) -> int:
-    material = "|".join(
-        [str(profile.get("session_id") or "")]
-        + [str(anchor.get("reading_seed") or "") for anchor in profile.get("anchors", [])]
-    )
+    """Derive composition variation only from analytical material.
+
+    Session identity is deliberately excluded: identical evidence/inference
+    material must produce the same deck even when replayed under another ID.
+    """
+    analytical_material = []
+    for anchor in profile.get("anchors", []):
+        analytical_material.append({
+            "category": anchor.get("category"),
+            "evidence_refs": sorted(str(ref) for ref in (anchor.get("evidence_refs") or [])),
+            "inference_id": anchor.get("inference_id"),
+            "reading_seed": anchor.get("reading_seed"),
+        })
+    material = repr({
+        "anchors": analytical_material,
+        "evidence_catalog": profile.get("evidence_catalog") or {},
+        "limitations": profile.get("limitations") or [],
+        "reader_status": profile.get("reader_status"),
+        "evaluation_status": profile.get("evaluation_status"),
+    })
     return int(hashlib.sha256(material.encode("utf-8")).hexdigest()[:8], 16)
 
 
