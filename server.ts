@@ -582,7 +582,10 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, version: "2.0", apparatus: "online" });
 });
 
-const PYTHON_BACKEND = process.env.FTP_PYTHON_BACKEND || "https://ftp2-backend.onrender.com";
+const configuredPythonBackend = process.env.FTP_PYTHON_BACKEND?.trim();
+// Use the checked-out authoritative backend for local previews by default. The
+// remote service remains available through FTP_PYTHON_BACKEND for deployments.
+const PYTHON_BACKEND = configuredPythonBackend || "http://localhost:5002";
 const PYTHON_EXECUTABLE = fs.existsSync(path.join(__dirname, ".venv", "bin", "python"))
   ? path.join(__dirname, ".venv", "bin", "python")
   : process.platform === "win32"
@@ -592,11 +595,18 @@ const PYTHON_EXECUTABLE = fs.existsSync(path.join(__dirname, ".venv", "bin", "py
 // Ensure the authoritative Python FTP 2.0 service is running
 function ensurePythonService() {
   fetch(`${PYTHON_BACKEND}/health`)
-    .then((r) => r.json())
+    .then((r) => {
+      if (!r.ok) throw new Error(`health check returned ${r.status}`);
+      return r.json();
+    })
     .then((d) => console.log("[FTP Authoritative Backend] Connected to Python runtime:", d))
     .catch(() => {
-      console.log("[FTP Authoritative Backend] Spawning Python runtime on port 5002...");
-      const py = spawn("python3", ["ftp_backend_service.py", "5002"], {
+      if (configuredPythonBackend) {
+        console.error(`[FTP Authoritative Backend] Configured backend unavailable: ${PYTHON_BACKEND}`);
+        return;
+      }
+      console.log("[FTP Authoritative Backend] Spawning local Python runtime on port 5002...");
+      const py = spawn(PYTHON_EXECUTABLE, ["ftp_backend_service.py", "5002"], {
         cwd: __dirname,
         stdio: "inherit",
       });
