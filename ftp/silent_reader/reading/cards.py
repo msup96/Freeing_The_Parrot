@@ -134,4 +134,54 @@ FORBIDDEN_SPOILERS = (
     "parrot turn",
 )
 
+SEMANTIC_ANCHORS = (
+    "INQUIRY", "GUIDANCE", "RETURN", "SILENCE", "DELAY", "RECONSIDERATION",
+    "ABSENCE", "DOUBT", "OMISSION", "DEPTH", "RECOGNITION", "ATTENTION",
+    "CULTIVATION", "RECURRENCE", "PAUSE", "UNCERTAINTY", "THRESHOLD", "REVELATION",
+    "LANGUAGE", "AGENCY", "DIFFICULTY", "REFRAMING", "ADAPTATION", "DISCERNMENT",
+    "PATTERN", "INCOMPLETION", "BEGINNING",
+)
+
+SEMANTIC_MOTIFS = {
+    "INQUIRY": "open-star",
+    "GUIDANCE": "lantern-beam",
+    "RETURN": "returning-loop",
+    "SILENCE": "weather-veil",
+    "DELAY": "held-hourglass",
+    "RECONSIDERATION": "turning-crescent",
+    "ABSENCE": "bell-negative-space",
+    "DOUBT": "worn-forked-path",
+    "OMISSION": "broken-glyph",
+    "DEPTH": "layered-contour",
+    "RECOGNITION": "reflected-point",
+    "ATTENTION": "narrow-beam",
+    "CULTIVATION": "branching-tree",
+    "RECURRENCE": "circular-current",
+    "PAUSE": "held-breath",
+    "UNCERTAINTY": "unstable-flame",
+    "THRESHOLD": "door-frame",
+    "REVELATION": "occluded-flame",
+    "LANGUAGE": "syntax-fragment",
+    "AGENCY": "upright-ray",
+    "DIFFICULTY": "clouded-point",
+    "REFRAMING": "shifting-frame",
+    "ADAPTATION": "branching-path",
+    "DISCERNMENT": "measured-thread",
+    "PATTERN": "repeating-tessellation",
+    "INCOMPLETION": "open-circle",
+    "BEGINNING": "rising-line",
+}
+
+ANCHOR_TERMS = {
+    "INQUIRY": "question and openness", "GUIDANCE": "direction and attention", "RETURN": "movement back",
+    "SILENCE": "quiet and unspoken space", "DELAY": "deferred timing", "RECONSIDERATION": "thinking again",
+    "ABSENCE": "what is not present", "DOUBT": "questioned certainty", "OMISSION": "a missing element",
+    "DEPTH": "layers beneath the surface", "RECOGNITION": "something becoming seen", "ATTENTION": "noticing the interval",
+    "CULTIVATION": "something tended over time", "RECURRENCE": "the same question returning", "PAUSE": "a bounded interval",
+    "UNCERTAINTY": "unresolved status", "THRESHOLD": "boundary and entry", "REVELATION": "gradual disclosure",
+    "LANGUAGE": "the form of what is unsaid", "AGENCY": "capacity to act", "DIFFICULTY": "a demanding truth",
+    "REFRAMING": "a changed way of seeing", "ADAPTATION": "adjustment under change", "DISCERNMENT": "careful differentiation",
+    "PATTERN": "recurrence becoming structure", "INCOMPLETION": "an open unfinished form", "BEGINNING": "transition into a new phase",
+}
+
 CARD_COUNT = 27

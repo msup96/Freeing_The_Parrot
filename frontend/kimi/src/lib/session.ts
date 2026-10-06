@@ -32,6 +32,8 @@ export type SelectionPattern = {
   selected_card_ids?: string[];
   selected_card_indices?: number[];
   selection_order?: string[];
+  semantic_anchors?: string[];
+  semantic_motifs?: string[];
   archetypes?: string[];
   categories?: string[];
   reading_groups?: string[];
