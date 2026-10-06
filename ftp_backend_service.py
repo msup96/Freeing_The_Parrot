@@ -737,8 +737,10 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
 def run_server(port: int | None = None) -> None:
     socketserver.TCPServer.allow_reuse_address = True
-    bind_host = os.environ.get("FTP_BIND_HOST", "127.0.0.1")
-    bind_port = port if port is not None else int(os.environ.get("PORT", "5001"))
+    # Render and other managed services route traffic to the process over the
+    # container network, so the production default must not be loopback-only.
+    bind_host = os.environ.get("FTP_BIND_HOST", "0.0.0.0")
+    bind_port = port if port is not None else int(os.environ.get("PORT", "5000"))
     with socketserver.ThreadingTCPServer((bind_host, bind_port), FtpApiHandler) as httpd:
         logger.info("FTP 2.0 backend running on http://%s:%s", bind_host, bind_port)
         httpd.serve_forever()
