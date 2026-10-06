@@ -1,7 +1,7 @@
 import type { SessionReveal } from './session';
 
 type Json = Record<string, unknown>;
-const API_BASE_URL = (import.meta.env.VITE_FTP_API_URL ?? '').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_FTP_API_URL ?? 'https://ftp2-backend.onrender.com').replace(/\/$/, '');
 
 function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;

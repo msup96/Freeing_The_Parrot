@@ -158,6 +158,61 @@ export default function Stage08DataJourney({
           <div className="mt-3 text-[9px] text-parchment-faint/70">ONE SESSION · {session.turns.length} TURN{session.turns.length === 1 ? '' : 'S'} · SERVER REVEAL DATA ONLY</div>
         </div>
 
+        {/* ——— MACHINE TRANSFORMATION ——— */}
+        {reveal && (
+          <motion.section
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={transition('REVEAL', 0.25)}
+            className="mb-10 border border-crimson/30 bg-[#080b0a] p-4 md:p-6 font-mono text-[10px] tracking-[0.12em]"
+            aria-label="Machine transformation"
+          >
+            <div className="flex items-center justify-between border-b border-crimson/20 pb-3 text-crimson">
+              <span>MAGIC → MECHANISM</span>
+              <span className="text-parchment-faint/60">SESSION-LOCAL / READ-ONLY</span>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3 text-parchment-dim">
+              <div><span className="text-crimson/80">RAW TEXT</span><br />{reveal.machine_transformation?.raw_text?.character_count ?? 0} chars / {reveal.machine_transformation?.raw_text?.turn_count ?? session.turns.length} turns</div>
+              <div><span className="text-crimson/80">OBSERVED</span><br />{reveal.observed_signals?.length ?? 0} evidence signals</div>
+              <div><span className="text-crimson/80">INFERRED</span><br />{reveal.machine_transformation?.inference_ids?.length ?? 0} bounded hypotheses</div>
+            </div>
+            <div className="mt-4 border-t border-crimson/10 pt-3 text-parchment-faint/80">
+              {reveal.machine_transformation?.evidence_ids?.join(' · ') || 'No evidence identifiers returned'}
+            </div>
+          </motion.section>
+        )}
+
+        {/* ——— NAVARASA TRAJECTORY ——— */}
+        {reveal && (
+          <EvidenceRow
+            label="NAVARASA TRAJECTORY"
+            sub={reveal.navarasa_trajectory?.dominant_rasa?.label
+              ? `Dominant detected label: ${reveal.navarasa_trajectory.dominant_rasa.label}. This is an interaction signal, not a trait.`
+              : 'No stable Rasa trajectory was supported by this session.'}
+          >
+            {reveal.navarasa_trajectory?.detected_sequence?.length
+              ? reveal.navarasa_trajectory.detected_sequence.join(' → ')
+              : 'INSUFFICIENT EVIDENCE FOR A STABLE RASA TRAJECTORY.'}
+          </EvidenceRow>
+        )}
+
+        {/* ——— INTERACTION PROFILE ——— */}
+        {reveal?.interaction_profile && (
+          <EvidenceRow
+            label="INTERACTION PROFILE"
+            sub="What this interaction made computationally legible; not a permanent or psychological profile."
+          >
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {Object.entries(reveal.interaction_profile).map(([key, value]) => (
+                <div key={key} className="border border-parchment/10 p-2">
+                  <div className="text-[9px] uppercase text-crimson/80">{key.replaceAll('_', ' ')}</div>
+                  <div className="mt-1 text-gold">{String(value)}</div>
+                </div>
+              ))}
+            </div>
+          </EvidenceRow>
+        )}
+
         {/* ——— 1. WHAT YOU GAVE ——— */}
         <EvidenceRow
           label="WHAT YOU GAVE"
