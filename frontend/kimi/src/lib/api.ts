@@ -2,7 +2,13 @@ import type { SessionReveal } from './session';
 
 type Json = Record<string, unknown>;
 const configuredApiBase = String(import.meta.env.VITE_FTP_API_URL ?? '').trim();
-const API_BASE_URL = configuredApiBase.replace(/\/$/, '');
+// Accept either an origin (recommended) or an origin that already includes `/api`.
+// Every client path below owns the `/api` prefix; keeping it out of the base
+// prevents production requests such as `/api/api/session/start` (404).
+const API_BASE_URL = configuredApiBase
+  .replace(/\/$/, '')
+  .replace(/\/api$/, '');
+
 
 function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
