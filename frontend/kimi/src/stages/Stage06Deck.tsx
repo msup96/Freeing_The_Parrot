@@ -115,7 +115,13 @@ export default function Stage06Deck({
   }
 
   return (
-    <div className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-20 overflow-hidden">
+    <div 
+      className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-20 overflow-hidden"
+      style={{
+        fontFamily: 'inherit',
+        fontSize: '16'
+      }}
+    >
       {/* Prelude ritual sequence */}
       {phase !== 'deck' ? (
         <div className="min-h-[60vh] flex items-center justify-center text-center px-6">
@@ -229,88 +235,22 @@ export default function Stage06Deck({
         </>
       )}
 
-      {/* Selected Card Modal — Prominently centered with mechanical archival presence */}
-      <AnimatePresence>
-        {selected.length > 0 && (
-          <motion.div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 md:p-6 bg-[#070b08]/85 backdrop-blur-md"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            {/* Atmospheric brass focal glow behind the elevated card */}
-            <motion.div
-              className="absolute pointer-events-none rounded-full"
-              style={{
-                width: 'min(90vw, 520px)',
-                height: 'min(90vw, 520px)',
-                background: 'radial-gradient(circle, rgba(196,160,53,0.18) 0%, rgba(23,31,21,0.5) 45%, transparent 70%)',
-              }}
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            />
-
-            {/* Centered elevated physical card */}
-            <motion.div
-              className="relative z-10 w-[min(82vw,290px)] md:w-[330px] aspect-[2/3] max-h-[66vh]"
-              initial={{ y: 80, scale: 0.82, opacity: 0, rotateX: 10 }}
-              animate={
-                resonating
-                  ? { y: 0, scale: [1, 1.02, 1], opacity: 1, rotateX: 0, filter: ['brightness(1)', 'brightness(1.12)', 'brightness(1)'] }
-                  : { y: 0, scale: 1, opacity: 1, rotateX: 0, filter: 'brightness(1)' }
-              }
-              exit={{ y: 50, scale: 0.9, opacity: 0 }}
-              transition={
-                resonating
-                  ? { duration: 0.8, ease: 'easeInOut' }
-                  : { duration: 0.7, ease: [0.16, 1, 0.3, 1] }
-              }
-            >
-              <CardFace card={selected[0]} large />
-            </motion.div>
-
-            {/* Selection actions: RESONATES vs CHOOSE ANOTHER */}
-            <div className="relative z-10 mt-6 md:mt-8 flex flex-col items-center gap-3">
-              {!resonating ? (
-                <>
-                  <motion.button
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.4 }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="brass-button px-9 py-3.5 min-h-[44px] text-xs md:text-sm tracking-[0.3em] font-mono cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
-                    onClick={handleConfirmResonance}
-                  >
-                    RESONATES
-                  </motion.button>
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.42, duration: 0.4 }}
-                    className="text-parchment-faint hover:text-parchment text-[11px] font-mono tracking-[0.2em] transition-colors py-1.5 cursor-pointer"
-                    onClick={() => setSelected([])}
-                  >
-                    CHOOSE ANOTHER
-                  </motion.button>
-                </>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, letterSpacing: '0.2em', y: 6 }}
-                  animate={{ opacity: 1, letterSpacing: '0.45em', y: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="font-mono text-xs md:text-sm text-gold py-2"
-                >
-                  RESONANCE RECORDED.
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="mt-8 flex flex-col items-center gap-3" aria-live="polite">
+        <div className="font-mono text-[10px] tracking-[0.24em] text-parchment-dim uppercase">
+          Selected: {selected.length} card{selected.length === 1 ? '' : 's'}
+        </div>
+        <button
+          type="button"
+          disabled={selected.length === 0 || resonating}
+          onClick={handleConfirmResonance}
+          className="brass-button px-9 py-3.5 min-h-[44px] text-xs md:text-sm tracking-[0.3em] font-mono disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          {resonating ? 'RESONANCE RECORDED.' : 'RESONATE'}
+        </button>
+        <div className="font-serif italic text-xs text-parchment-faint">
+          Flip to inspect. Select or deselect. Resonance confirms the complete set.
+        </div>
+      </div>
     </div>
   );
 }

@@ -112,6 +112,13 @@ export async function endConversation(sessionId: string): Promise<{
   };
 }
 
+export async function submitCardResonance(
+  sessionId: string,
+  cards: Array<{ card_index: number; card_id: string }>,
+): Promise<void> {
+  await advanceLifecycle(sessionId, 'card_selection', { cards });
+}
+
 export async function advanceLifecycle(
   sessionId: string,
   action: string,

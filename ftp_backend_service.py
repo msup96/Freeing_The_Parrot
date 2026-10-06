@@ -654,20 +654,22 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                             validated_card = next((c for c in deck["cards"] if c["card_index"] == card_index), deck["cards"][0])
                     else:
                         validated_card = {"card_id": card_id, "card_index": card_index, "title": "The Resonant Card", "qualitative_reading": "A card chosen by reflection."}
-                    selected_cards.append(validated_card)
-                    coord.record(
-                        event_type=EventType.CARD_RESONANCE_MARKED,
-                        provenance_level=ProvenanceLevel.VALIDATED,
-                        payload={
-                            "card_id": card_id,
-                            "card_index": card_index,
-                            "selection_order": order,
-                            "title": validated_card.get("title"),
-                            "qualitative_reading": validated_card.get("qualitative_reading"),
-                            "meaning": "participant_reported_resonance_not_truth",
-                        },
-                    )
+                    selected_cards.append({**validated_card, "selection_order": order})
 
+                # One participant-level confirmation represents the complete set.
+                # Card identity/order remain in the payload; resonance is not emitted per card.
+                coord.record(
+                    event_type=EventType.CARD_RESONANCE_MARKED,
+                    provenance_level=ProvenanceLevel.VALIDATED,
+                    payload={
+                        "selected_cards": [
+                            {"card_id": card.get("card_id"), "card_index": card.get("card_index"), "selection_order": card.get("selection_order")}
+                            for card in selected_cards
+                        ],
+                        "selected_count": len(selected_cards),
+                        "meaning": "participant_reported_resonance_not_truth",
+                    },
+                )
                 SESSION_SELECTED[sid] = selected_cards
                 if coord.machine.state == SessionState.CARD_SELECTION:
                     coord.advance(SessionState.PROFILE_REVEAL)
