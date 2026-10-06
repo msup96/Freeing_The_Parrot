@@ -60,6 +60,15 @@ def test_interaction_profile_serializes_existing_artifacts_only():
     assert profile["navarasa_status"] == "insufficient_evidence"
 
 
+def test_conversation_inference_requires_consistent_detected_evidence():
+    reveal, _ = _reveal()
+    inference = reveal["navarasa_trajectory"]["conversation_inference"]
+
+    assert inference["status"] == "insufficient_evidence"
+    assert inference["label"] is None
+    assert inference["limitation"]
+
+
 def test_selection_pattern_keeps_order_and_marks_inspection_unavailable():
     reveal, cards = _reveal()
     pattern = reveal["selection_pattern"]

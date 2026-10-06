@@ -42,6 +42,9 @@ class NavarasaTrajectorySynthesizer:
             for row in turn_rows
         ]
         detected = [label for label in detected_slots if label is not None]
+        dominant = self._dominant_rasa(detected_slots)
+        distribution = self._distribution(detected)
+        inference = self._conversation_inference(detected_slots, dominant, distribution)
 
         return {
             "session_id": self._coordinator.session_id,
@@ -51,8 +54,9 @@ class NavarasaTrajectorySynthesizer:
             "turn_sequence": turn_rows,
             "rasa_sequence": raw_primaries,
             "detected_sequence": detected,
-            "dominant_rasa": self._dominant_rasa(detected_slots),
-            "rasa_distribution": self._distribution(detected),
+            "dominant_rasa": dominant,
+            "rasa_distribution": distribution,
+            "conversation_inference": inference,
             "persistence": self._persistence(detected_slots),
             "transition_count": self._transition_count(detected),
             "switching_rate": self._switching_rate(detected),
@@ -119,6 +123,33 @@ class NavarasaTrajectorySynthesizer:
             "count": max_count,
             "tie": len(leaders) > 1,
             "status": "ok",
+        }
+
+    @staticmethod
+    def _conversation_inference(
+        slots: list[str | None], dominant: dict[str, Any], distribution: dict[str, Any]
+    ) -> dict[str, Any]:
+        detected = [label for label in slots if label is not None]
+        label = dominant.get("label")
+        counts = distribution.get("counts", {})
+        count = int(counts.get(label, 0)) if label else 0
+        total = len(detected)
+        share = round(count / total, 3) if total else 0.0
+        alternatives = [
+            {"label": rasa, "count": value, "share": round(value / total, 3)}
+            for rasa, value in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+            if rasa != label
+        ][:2]
+        sufficient = bool(label and total >= 2 and not dominant.get("tie") and share >= 0.5)
+        return {
+            "label": label if sufficient else None,
+            "status": "supported" if sufficient else "insufficient_evidence",
+            "confidence": round(min(0.95, 0.45 + (0.35 * share) + (0.05 * min(total, 3))), 3) if sufficient else 0.0,
+            "evidence_turn_count": total,
+            "support_share": share,
+            "alternative_readings": alternatives,
+            "source": "detected_per_turn_rasa_aggregation",
+            "limitation": "This is an interaction-scoped pattern, not a psychological or diagnostic claim.",
         }
 
     @staticmethod
