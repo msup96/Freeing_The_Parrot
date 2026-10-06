@@ -34,6 +34,7 @@ export type SelectionPattern = {
   selection_order?: string[];
   archetypes?: string[];
   categories?: string[];
+  reading_groups?: string[];
   resonance_recorded?: boolean;
 };
 

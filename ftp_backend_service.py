@@ -199,6 +199,8 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "selected_card_indices": [int(card.get("card_index", 0)) for card in selected_cards],
         "selection_order": [str(card.get("card_id", "")) for card in selected_cards],
         "archetypes": [str(card.get("archetype")) for card in selected_cards if card.get("archetype")],
+        "categories": [str(card.get("category")) for card in selected_cards if card.get("category")],
+        "reading_groups": [str(card.get("reading_group")) for card in selected_cards if card.get("reading_group")],
         "resonance_recorded": bool(selected_cards),
     }
     if first_selected:
@@ -213,10 +215,10 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         }
     else:
         what_chose = {
-            "card_index": 1,
-            "title": "The First Specimen",
-            "statement": "An inquiry opened and acknowledged.",
-            "validation": "Session completed without card resonance selection.",
+            "card_index": None,
+            "title": None,
+            "statement": None,
+            "validation": "No card resonance was recorded for this session.",
         }
 
     # 6. Wall Specimens: Real cards from THIS session's deck for the Wall of Fame
