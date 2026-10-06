@@ -7,7 +7,7 @@ import type { DeckCard } from '../lib/deck';
  * Not a hacker glitch: the backstage infrastructure suddenly becomes visible.
  * Hard cuts, typographic replacement, spatial snapping, material collapse.
  */
-export default function Stage07Break({ card, onComplete }: { card: DeckCard; onComplete: () => void }) {
+export default function Stage07Break({ card, onComplete, selectionCount = 1 }: { card: DeckCard; onComplete: () => void; selectionCount?: number }) {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export default function Stage07Break({ card, onComplete }: { card: DeckCard; onC
               transition={{ duration: 0.08 }}
               className="font-mono text-lg md:text-3xl tracking-[0.3em] text-parchment"
             >
-              YOU PLAYED YOUR CARDS.
+              YOU PLAYED {selectionCount} CARD{selectionCount === 1 ? '' : 'S'}.
             </motion.div>
           )}
           {step >= 9 && (

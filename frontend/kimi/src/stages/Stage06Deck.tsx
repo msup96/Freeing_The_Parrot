@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { transition, MECHANICAL } from '../lib/motion';
 import type { DeckCard } from '../lib/deck';
+import type { SelectedCard } from '../lib/session';
 
 function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
   return (
@@ -55,13 +56,14 @@ export default function Stage06Deck({
   onRetry,
 }: {
   cards: DeckCard[];
-  onComplete: (card: DeckCard) => void;
+  onComplete: (cards: SelectedCard[]) => void;
   onRetry?: () => void;
 }) {
   const [phase, setPhase] = useState<'concluded' | 'silence' | 'deck'>('concluded');
   const [dealt, setDealt] = useState(0); // 1 → 3 → 9 → 27
   const [hovered, setHovered] = useState<number | null>(null);
-  const [selected, setSelected] = useState<DeckCard | null>(null);
+  const [selected, setSelected] = useState<DeckCard[]>([]);
+  const [shuffled, setShuffled] = useState(false);
   const [resonating, setResonating] = useState(false);
 
   // Transition ritual: CONVERSATION CONCLUDED → THE PARROT HAS NOTHING MORE TO SAY → 27 CARDS APPEAR
@@ -76,14 +78,16 @@ export default function Stage06Deck({
 
   const handleSelect = (card: DeckCard) => {
     if (resonating) return;
-    setSelected(card);
+    setSelected((current) => current.some((item) => item.cardId === card.cardId)
+      ? current.filter((item) => item.cardId !== card.cardId)
+      : [...current, card]);
   };
 
   const handleConfirmResonance = () => {
-    if (!selected || resonating) return;
+    if (selected.length === 0 || resonating) return;
     setResonating(true);
     window.setTimeout(() => {
-      onComplete(selected);
+      onComplete(selected.map((card, index) => ({ ...card, selectionOrder: index + 1 })));
     }, 1500);
   };
 
@@ -143,24 +147,27 @@ export default function Stage06Deck({
             className="text-center mb-6 md:mb-10"
           >
             <div className="meta-label mb-2">TWENTY-SEVEN CARDS</div>
-            <h2 className="font-display text-xl md:text-3xl tracking-[0.14em] text-balance text-parchment">
-              ONE OF THESE MAY FEEL FAMILIAR.
+              <h2 className="font-display text-xl md:text-3xl tracking-[0.14em] text-balance text-parchment">
+              READINGS, NOT REWARDS.
             </h2>
             <p className="mt-1 font-serif italic text-xs md:text-sm text-parchment-dim">
-              Turn the one that sounds like you
+              Flip the readings, shuffle them, then choose any number that resonates.
             </p>
+            <button type="button" className="mt-4 text-[10px] font-mono tracking-[0.25em] text-gold" onClick={() => setShuffled((value) => !value)}>
+              {shuffled ? 'SHUFFLE COMPLETE' : 'SHUFFLE THE READINGS'}
+            </button>
           </motion.div>
 
           {/* the 27-card grid */}
           <div
             className={`grid grid-cols-3 sm:grid-cols-6 md:grid-cols-9 gap-2 md:gap-3 w-full max-w-5xl transition-opacity duration-700 ${
-              selected ? 'opacity-20 pointer-events-none' : 'opacity-100'
+              'opacity-100'
             }`}
           >
-            {cards.slice(0, dealt).map((card, i) => (
+            {(shuffled ? [...cards].reverse() : cards).slice(0, dealt).map((card, i) => (
               <motion.button
                 key={card.cardId}
-                className="relative aspect-[2/3] min-h-[44px] cursor-pointer"
+                className={`relative aspect-[2/3] min-h-[44px] cursor-pointer ${selected.some((item) => item.cardId === card.cardId) ? 'ring-2 ring-gold ring-offset-2 ring-offset-[#0a0a09]' : ''}`}
                 initial={{ opacity: 0, y: 30, rotate: i % 2 ? 2 : -2 }}
                 animate={{ opacity: 1, y: 0, rotate: 0 }}
                 transition={{ duration: 0.5, delay: (i % 9) * 0.04, ease: MECHANICAL }}
@@ -168,17 +175,17 @@ export default function Stage06Deck({
                 onHoverStart={() => setHovered(card.id)}
                 onHoverEnd={() => setHovered(null)}
                 onClick={() => handleSelect(card)}
-                disabled={!!selected}
+                aria-pressed={selected.some((item) => item.cardId === card.cardId)}
                 style={{ transformStyle: 'preserve-3d' }}
                 aria-label={`Card № ${card.id}: ${card.title}`}
               >
                 <motion.div
                   className="w-full h-full"
-                  animate={hovered === card.id && !selected ? { scale: 1.04 } : { scale: 1 }}
+                  animate={hovered === card.id ? { scale: 1.04 } : { scale: 1 }}
                   transition={transition('SETTLE')}
                   style={{
                     filter:
-                      hovered === card.id && !selected
+                      hovered === card.id
                         ? 'drop-shadow(0 16px 20px rgba(0,0,0,0.65))'
                         : 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))',
                   }}
@@ -192,7 +199,7 @@ export default function Stage06Deck({
                 </motion.div>
                 {/* index hint on hover */}
                 <AnimatePresence>
-                  {hovered === card.id && !selected && (
+                  {hovered === card.id && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -212,7 +219,7 @@ export default function Stage06Deck({
 
       {/* Selected Card Modal — Prominently centered with mechanical archival presence */}
       <AnimatePresence>
-        {selected && (
+        {selected.length > 0 && (
           <motion.div
             className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 md:p-6 bg-[#070b08]/85 backdrop-blur-md"
             initial={{ opacity: 0 }}
@@ -250,7 +257,7 @@ export default function Stage06Deck({
                   : { duration: 0.7, ease: [0.16, 1, 0.3, 1] }
               }
             >
-              <CardFace card={selected} large />
+              <CardFace card={selected[0]} large />
             </motion.div>
 
             {/* Selection actions: RESONATES vs CHOOSE ANOTHER */}
@@ -273,7 +280,7 @@ export default function Stage06Deck({
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.42, duration: 0.4 }}
                     className="text-parchment-faint hover:text-parchment text-[11px] font-mono tracking-[0.2em] transition-colors py-1.5 cursor-pointer"
-                    onClick={() => setSelected(null)}
+                    onClick={() => setSelected([])}
                   >
                     CHOOSE ANOTHER
                   </motion.button>
