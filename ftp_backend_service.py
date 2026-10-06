@@ -98,38 +98,55 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "and conversational rhythm preserved in archival memory."
     )
 
-    # 3. WHAT WAS INTERPRETED: actual approved interpretation
+    # 3. WHAT WAS INTERPRETED: expose the actual evidence-backed interpretation.
+    # This is deliberately computed at reveal time from the locked session rather
+    # than reconstructed from generic copy.
     try:
+        from ftp.silent_reader.inference import evaluate_bundle
         from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
-        trajectory = NavarasaTrajectorySynthesizer(coord).synthesize()
-        dominant = trajectory.get("dominant_rasa", {}).get("label") or "Shanta"
-        detected_seq = trajectory.get("detected_sequence", [])
-        movement = " → ".join(detected_seq[:4]) if detected_seq else dominant
-    except Exception as exc:
-        logger.warning(f"Trajectory synthesis notice: {exc}")
-        dominant = "Shanta"
-        movement = "Shanta (stillness)"
 
+        bundle = coord.build_evidence_bundle()
+        evaluation = evaluate_bundle(bundle)
+        trajectory = NavarasaTrajectorySynthesizer(coord).synthesize()
+        detected_seq = trajectory.get("detected_sequence", [])
+        dominant = trajectory.get("dominant_rasa", {}).get("label")
+        eligible = [
+            item for item in evaluation.get("candidates", [])
+            if item.get("eligibility") == "eligible"
+        ]
+        interpretations = [str(item.get("claim")) for item in eligible if item.get("claim")]
+        evidence_count = len(bundle.get("evidence_items", []))
+    except Exception as exc:
+        logger.warning(f"Reveal analysis notice: {exc}")
+        bundle = {}
+        evaluation = {}
+        detected_seq = []
+        dominant = None
+        interpretations = []
+        evidence_count = 0
+
+    trajectory_text = " → ".join(str(label) for label in detected_seq[:4]) or "no stable trajectory was available"
+    interpretation_text = "; ".join(interpretations[:2]) or "no eligible session-specific inference was supported"
     what_interpreted_body = (
-        f"The emotional intelligence engine observed a trajectory characterized by {dominant} ({movement}). "
-        f"Your statements indicated a movement between searching and self-interrogation."
+        f"The locked session contained {evidence_count} evidence item(s). "
+        f"Its observed affective sequence was {trajectory_text}. "
+        f"The evidence contract retained this interpretation: {interpretation_text}."
     )
     what_interpreted_sub = (
-        f"Primary affective tone: {dominant}. Interpretation derived solely from linguistic rhythm and semantic cues."
+        f"Observed trajectory label: {dominant or 'unavailable'}. "
+        "Interpretation is session-specific and is not a claim about the participant beyond this interaction."
     )
 
-    # 4. WHAT WAS CONSTRUCTED: actual eligible inference / reading construction
+    # 4. WHAT WAS CONSTRUCTED: actual 27-card reading output and its provenance.
     deck_cards = (deck.get("cards") if deck else None) or []
     sample_archetypes = [c.get("archetype") for c in deck_cards[:4] if c.get("archetype")]
-    archetype_str = ", ".join(sample_archetypes) if sample_archetypes else "Archivist, Lantern-Bearer, Anchor, Seeker"
-
+    archetype_str = ", ".join(sample_archetypes) if sample_archetypes else "no archetype output"
     what_constructed_body = (
-        f"A 27-card Kili Josiyam reading was composed from your session's anchor seeds. "
-        f"The reading organized your reflections across 27 distinct archetypes, including the {archetype_str}."
+        f"The locked reading composer produced {len(deck_cards)} card(s) from this session's "
+        f"evidence-backed anchors, including {archetype_str}."
     )
     what_constructed_sub = (
-        "Each card combines a deterministic psychological seed with subjective completion, "
-        "presenting reflection hypotheses rather than diagnoses."
+        "Cards are INFERRED reflection hypotheses. Their hidden provenance retains the inference and evidence IDs; they are not diagnoses."
     )
 
     # 5. WHAT YOU CHOSE: selected card + resonance validation
@@ -161,16 +178,31 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
             "qualitative_reading": c["qualitative_reading"],
         })
 
+    limitations = list(bundle.get("limitations") or [])
+    limitations.extend(evaluation.get("limitations") or [])
+    if not limitations:
+        limitations = [
+            "This session does not establish a stable fact about the participant.",
+            "Resonance is participant-reported and is not objective psychological validation.",
+            "The Parrot did not receive the Silent Reader's analysis or card selection.",
+        ]
+
     return {
         "session_id": sid,
         "what_you_gave": offering_text,
+        "what_you_gave_channel": offering.get("modality"),
+        "turn_texts": turn_texts,
         "what_was_recorded": what_recorded_body,
+        "what_the_system_observed": what_recorded_body,
         "what_was_recorded_sub": what_recorded_sub,
         "what_was_interpreted": what_interpreted_body,
+        "what_the_system_interpreted": what_interpreted_body,
         "what_was_interpreted_sub": what_interpreted_sub,
         "what_was_constructed": what_constructed_body,
+        "what_the_system_inferred": what_constructed_body,
         "what_was_constructed_sub": what_constructed_sub,
         "what_you_chose": what_chose,
+        "what_we_cannot_know": list(dict.fromkeys(limitations)),
         "wall_specimens": wall_specimens,
     }
 
