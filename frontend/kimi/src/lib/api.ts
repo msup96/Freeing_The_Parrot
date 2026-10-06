@@ -1,3 +1,5 @@
+import type { SessionReveal } from './session';
+
 type Json = Record<string, unknown>;
 
 async function readJson(response: Response): Promise<Json> {
@@ -103,7 +105,15 @@ export async function advanceLifecycle(
   }));
 }
 
-export async function generateOutput(sessionId: string): Promise<void> {
+export async function getSessionReveal(sessionId: string): Promise<SessionReveal> {
+  const data = await readJson(await fetch(`/api/session-reveal?session_id=${encodeURIComponent(sessionId)}`));
+  if (data.ok === false || !data.reveal) {
+    throw new Error(typeof data.error === 'string' ? data.error : 'Reveal retrieval failed.');
+  }
+  return data.reveal as SessionReveal;
+}
+
+export async function generateOutput(sessionId: string): Promise<{ success: boolean; text: string }> {
   const data = await readJson(await fetch('/api/session-output', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -112,6 +122,10 @@ export async function generateOutput(sessionId: string): Promise<void> {
   if (data.success === false) {
     throw new Error(typeof data.error === 'string' ? data.error : 'Output failed.');
   }
+  return {
+    success: Boolean(data.success),
+    text: String(data.text ?? ''),
+  };
 }
 
 export async function resetSession(sessionId: string, consentType: string): Promise<void> {

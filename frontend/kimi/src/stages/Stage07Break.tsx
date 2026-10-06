@@ -13,77 +13,74 @@ export default function Stage07Break({ card, onComplete }: { card: DeckCard; onC
   useEffect(() => {
     // 1 card visible · 2 typo · 3 label changes · 4 texture dies · 5 serif→mono
     // 6 alignment snaps · 7 aesthetic collapses · 8 forensic system · 9-10 the words
-    const delays = [1200, 2600, 3600, 4500, 5400, 6300, 7200, 8400, 10200, 12400];
+    const delays = [600, 1200, 1800, 2400, 3000, 3600, 4200, 5000, 5800];
     const timers = delays.map((d, i) => window.setTimeout(() => setStep(i + 1), d));
-    const done = window.setTimeout(onComplete, 14400);
+    const done = window.setTimeout(onComplete, 7200);
     return () => { timers.forEach(clearTimeout); clearTimeout(done); };
   }, [onComplete]);
-
-  const brokenTitle = card.title.replace(/[AEIOU]/, 'Λ'); // the tiny typographic error
-  const forensic = step >= 5;
 
   return (
     <motion.div
       className="relative min-h-[100dvh] overflow-hidden"
-      animate={{ backgroundColor: step >= 6 ? '#0a0a09' : 'rgba(0,0,0,0)' }}
-      transition={{ duration: step >= 6 ? 0.12 : 1 }}
+      animate={{ backgroundColor: step >= 3 ? '#0a0a09' : 'rgba(0,0,0,0)' }}
+      transition={{ duration: step >= 3 ? 0.2 : 0.8 }}
     >
-      {/* crimson hairlines — forensic grid intrudes */}
-      {step >= 6 && (
+      {/* subtle archival alignment lines */}
+      {step >= 3 && (
         <>
-          <motion.div className="fixed left-[12%] top-0 bottom-0 w-px bg-crimson/40" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.15 }} />
-          <motion.div className="fixed right-[12%] top-0 bottom-0 w-px bg-crimson/40" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.15 }} />
-          <motion.div className="fixed top-[20%] left-0 right-0 h-px bg-crimson/25" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.15 }} />
+          <motion.div className="fixed left-[12%] top-0 bottom-0 w-px bg-crimson/30" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.2 }} />
+          <motion.div className="fixed right-[12%] top-0 bottom-0 w-px bg-crimson/30" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.2 }} />
+          <motion.div className="fixed top-[20%] left-0 right-0 h-px bg-crimson/20" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.2 }} />
         </>
       )}
 
-      <div className={`min-h-[100dvh] flex ${step >= 5 ? 'items-start justify-start pl-[14%] pt-[22%]' : 'items-center justify-center'} transition-all`} style={{ transitionDuration: '150ms' }}>
-        {/* the card — same object, betrayed by its own rendering */}
+      <div className={`min-h-[100dvh] flex ${step >= 3 ? 'items-start justify-start pl-[14%] pt-[18%]' : 'items-center justify-center'} transition-all`} style={{ transitionDuration: '250ms' }}>
+        {/* the card — participant's actual validated reading */}
         <motion.div
-          className="w-[min(60vw,220px)] md:w-[260px] aspect-[2/3] relative"
+          className="w-[min(64vw,240px)] md:w-[280px] aspect-[2/3] relative"
           layout
-          transition={{ duration: 0.15, ease: [0.85, 0, 0.15, 1] }}
+          transition={{ duration: 0.25, ease: [0.85, 0, 0.15, 1] }}
         >
           <motion.div
-            className="w-full h-full flex flex-col items-center justify-between text-center border"
+            className="w-full h-full flex flex-col items-center justify-between text-center border p-2"
             animate={{
-              borderColor: step >= 4 ? 'rgba(166,58,43,0.6)' : 'rgba(201,162,39,0.9)',
-              backgroundColor: step >= 4 ? '#0d0d0c' : '#10160f',
-              boxShadow: step >= 4 ? 'none' : '0 40px 80px rgba(0,0,0,0.7)',
+              borderColor: step >= 2 ? 'rgba(166,58,43,0.7)' : 'rgba(201,162,39,0.9)',
+              backgroundColor: step >= 2 ? '#0d0d0c' : '#10160f',
+              boxShadow: step >= 2 ? '0 20px 40px rgba(0,0,0,0.8)' : '0 40px 80px rgba(0,0,0,0.7)',
             }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.2 }}
           >
-            <div className={`${forensic ? 'font-mono' : 'font-mono'} text-[10px] tracking-[0.3em] pt-3 ${step >= 4 ? 'text-crimson/80' : 'text-gold/80'}`}>
+            <div className="font-mono text-[10px] tracking-[0.3em] pt-3 text-gold/80">
               № {String(card.id).padStart(2, '0')}
             </div>
             <div className="px-5">
-              {step < 4 && <div className="text-3xl text-gold/90">{card.glyph}</div>}
-              <div className={`mt-2 ${forensic ? 'font-mono text-sm' : 'font-display text-xl'} tracking-[0.14em] leading-snug ${step >= 4 ? 'text-parchment/80' : 'text-parchment'}`}>
-                {step >= 2 ? brokenTitle : card.title}
+              <div className="text-3xl text-gold/90">{card.glyph}</div>
+              <div className="mt-2 font-display text-lg md:text-xl tracking-[0.14em] leading-snug text-parchment">
+                {card.title}
               </div>
-              <p className={`mt-3 ${forensic ? 'font-mono text-[10px] tracking-[0.15em] not-italic' : 'font-serif italic text-sm'} ${step >= 4 ? 'text-parchment-faint' : 'text-parchment-dim'} leading-relaxed`}>
-                {step >= 3 ? 'SELF-DESCRIPTION STIMULUS. BARNUM CLASS.' : card.statement}
+              <p className="mt-3 font-serif italic text-xs md:text-sm text-parchment-dim leading-relaxed">
+                {card.statement}
               </p>
             </div>
-            <div className={`pb-3 font-mono text-[9px] tracking-[0.35em] ${step >= 4 ? 'text-crimson/70' : 'text-parchment-faint/60'}`}>
-              {step >= 3 ? `ITEM ${String(card.id).padStart(2, '0')} / 27` : 'THE TWENTY-SEVEN'}
+            <div className="pb-3 font-mono text-[9px] tracking-[0.35em] text-parchment-faint/60">
+              THE TWENTY-SEVEN
             </div>
           </motion.div>
 
-          {/* forensic annotations attach to the card */}
-          {step >= 7 && (
+          {/* archival status indicators */}
+          {step >= 3 && (
             <>
               {[
                 { text: 'SELECTION: VOLUNTARY', pos: '-left-2 top-6 -translate-x-full' },
-                { text: 'LATENCY: MEASURED', pos: '-right-2 top-16 translate-x-full' },
-                { text: 'COMPLIANCE: CONFIRMED', pos: '-left-2 bottom-10 -translate-x-full' },
+                { text: 'RESONANCE: VALIDATED', pos: '-right-2 top-16 translate-x-full' },
+                { text: 'OBSERVATION: ARCHIVED', pos: '-left-2 bottom-10 -translate-x-full' },
               ].map((a, i) => (
                 <motion.div
                   key={i}
                   className={`absolute ${a.pos} hidden md:block font-mono text-[9px] tracking-[0.25em] text-crimson/80 whitespace-nowrap`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ duration: 0.1, delay: i * 0.25 }}
+                  transition={{ duration: 0.15, delay: i * 0.15 }}
                 >
                   ▸ {a.text}
                 </motion.div>

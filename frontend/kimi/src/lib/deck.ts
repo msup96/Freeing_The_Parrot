@@ -3,6 +3,7 @@ export type DeckCard = {
   cardId: string;
   glyph: string;
   title: string;
+  archetype?: string;
   statement: string;
 };
 
@@ -22,6 +23,7 @@ export function cardsFromServer(cards: ServerCard[]): DeckCard[] {
     cardId: card.card_id,
     glyph: GLYPHS[(card.card_index - 1) % GLYPHS.length],
     title: card.title,
+    archetype: card.archetype,
     statement: card.qualitative_reading,
   }));
 }

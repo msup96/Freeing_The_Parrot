@@ -14,6 +14,7 @@ import {
   completeInput,
   endConversation,
   generateOutput,
+  getSessionReveal,
   resetSession,
   sendChat,
   startSession,
@@ -56,6 +57,7 @@ export default function App() {
     try {
       const started = await startSession();
       setSessionId(started.session_id);
+      setSession((current: Session) => ({ ...current, sessionId: started.session_id }));
       goTo(2);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The apparatus could not start.');
@@ -82,7 +84,7 @@ export default function App() {
       }
 
       await completeInput(sessionId);
-      setSession((current) => ({ ...current, offering }));
+      setSession((current: Session) => ({ ...current, offering }));
       goTo(3);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The offering could not be processed.');
@@ -103,7 +105,7 @@ export default function App() {
   }, [sessionId]);
 
   const handleTurns = useCallback((turns: ChatTurn[]) => {
-    setSession((current) => ({ ...current, turns }));
+    setSession((current: Session) => ({ ...current, turns }));
   }, []);
 
   const handleDeck = useCallback(async () => {
@@ -114,7 +116,7 @@ export default function App() {
       if (cards.length !== 27) {
         throw new Error('This session did not return a 27-card reading.');
       }
-      setSession((current) => ({ ...current, cards }));
+      setSession((current: Session) => ({ ...current, cards }));
       goTo(6);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The conversation could not close.');
@@ -128,7 +130,7 @@ export default function App() {
         card_index: card.id,
         card_id: card.cardId,
       });
-      setSession((current) => ({ ...current, cardId: card.id, selectedCard: card as Session['selectedCard'] }));
+      setSession((current: Session) => ({ ...current, cardId: card.id, selectedCard: card as Session['selectedCard'] }));
       goTo(7);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'That card could not be marked.');
@@ -139,6 +141,8 @@ export default function App() {
     if (!sessionId) return;
     try {
       await advanceLifecycle(sessionId, 'reveal');
+      const reveal = await getSessionReveal(sessionId);
+      setSession((current: Session) => ({ ...current, reveal }));
       goTo(8);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The reveal is not ready.');
@@ -150,8 +154,8 @@ export default function App() {
     const consentType = consent === 'wall' ? 'SHARE' : 'KEEP_PRIVATE';
     try {
       await advanceLifecycle(sessionId, 'consent', { consent_type: consentType });
-      await generateOutput(sessionId);
-      setSession((current) => ({ ...current, consent }));
+      const output = await generateOutput(sessionId);
+      setSession((current: Session) => ({ ...current, consent, receipt: output.text }));
       goTo(9);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Consent or output failed.');
