@@ -190,11 +190,21 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "Cards are INFERRED reflection hypotheses. Their hidden provenance retains the inference and evidence IDs; they are not diagnoses."
     )
 
-    # 5. WHAT YOU CHOSE: selected card + resonance validation
-    if selected:
-        card_title = selected.get("title", "The Chosen Card")
-        card_idx = selected.get("card_index") or selected.get("id") or 1
-        card_reading = selected.get("qualitative_reading") or selected.get("statement") or ""
+    # 5. WHAT YOU CHOSE: preserve the participant's complete selection pattern.
+    selected_cards = selected if isinstance(selected, list) else ([selected] if selected else [])
+    first_selected = selected_cards[0] if selected_cards else None
+    selection_pattern = {
+        "selected_count": len(selected_cards),
+        "selected_card_ids": [str(card.get("card_id", "")) for card in selected_cards],
+        "selected_card_indices": [int(card.get("card_index", 0)) for card in selected_cards],
+        "selection_order": [str(card.get("card_id", "")) for card in selected_cards],
+        "archetypes": [str(card.get("archetype")) for card in selected_cards if card.get("archetype")],
+        "resonance_recorded": bool(selected_cards),
+    }
+    if first_selected:
+        card_title = first_selected.get("title", "The Chosen Card")
+        card_idx = first_selected.get("card_index") or first_selected.get("id") or 1
+        card_reading = first_selected.get("qualitative_reading") or first_selected.get("statement") or ""
         what_chose = {
             "card_index": card_idx,
             "title": card_title,
@@ -245,6 +255,8 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "evidence_count": evidence_count,
         "eligible_inference_count": len(eligible),
         "navarasa_status": "ok" if navarasa_sufficient else "insufficient_evidence",
+        "card_selection_count": len(selected_cards) if isinstance(selected, list) else int(bool(selected)),
+        "card_selection_pattern": "participant-reported selection pattern; not psychological validation",
     }
 
     return {
@@ -271,6 +283,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "what_the_system_inferred": what_constructed_body,
         "what_was_constructed_sub": what_constructed_sub,
         "what_you_chose": what_chose,
+        "selection_pattern": selection_pattern,
         "what_we_cannot_know": list(dict.fromkeys(limitations)),
         "wall_specimens": wall_specimens,
     }
@@ -567,32 +580,39 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                     coord.advance(SessionState.LIVE_CONVERSATION)
 
             elif action == "card_selection":
-                card_index = int(body.get("card_index", 1))
-                card_id = str(body.get("card_id", "card_01"))
+                raw_cards = body.get("cards") or [{"card_index": body.get("card_index", 1), "card_id": body.get("card_id", "card_01")}]
+                if not isinstance(raw_cards, list) or not raw_cards:
+                    raise ValueError("At least one resonant card is required")
                 deck = SESSION_DECKS.get(sid) or {}
+                selected_cards = []
                 
-                # Validate card resonance against generated deck if available
-                if deck.get("cards"):
-                    try:
-                        validated_card = validate_card_resonance(deck, card_id=card_id, card_index=card_index)
-                    except Exception as exc:
-                        logger.warning(f"Card resonance validation fallback: {exc}")
-                        validated_card = next((c for c in deck["cards"] if c["card_index"] == card_index), deck["cards"][0])
-                else:
-                    validated_card = {"card_id": card_id, "card_index": card_index, "title": "The Resonant Card", "qualitative_reading": "A card chosen by reflection."}
+                # Validate every resonant card against this session's generated deck.
+                for order, item in enumerate(raw_cards, start=1):
+                    card_index = int(item.get("card_index", 1))
+                    card_id = str(item.get("card_id", f"card_{card_index:02d}"))
+                    if deck.get("cards"):
+                        try:
+                            validated_card = validate_card_resonance(deck, card_id=card_id, card_index=card_index)
+                        except Exception as exc:
+                            logger.warning(f"Card resonance validation fallback: {exc}")
+                            validated_card = next((c for c in deck["cards"] if c["card_index"] == card_index), deck["cards"][0])
+                    else:
+                        validated_card = {"card_id": card_id, "card_index": card_index, "title": "The Resonant Card", "qualitative_reading": "A card chosen by reflection."}
+                    selected_cards.append(validated_card)
+                    coord.record(
+                        event_type=EventType.CARD_RESONANCE_MARKED,
+                        provenance_level=ProvenanceLevel.VALIDATED,
+                        payload={
+                            "card_id": card_id,
+                            "card_index": card_index,
+                            "selection_order": order,
+                            "title": validated_card.get("title"),
+                            "qualitative_reading": validated_card.get("qualitative_reading"),
+                            "meaning": "participant_reported_resonance_not_truth",
+                        },
+                    )
 
-                SESSION_SELECTED[sid] = validated_card
-                coord.record(
-                    event_type=EventType.CARD_RESONANCE_MARKED,
-                    provenance_level=ProvenanceLevel.VALIDATED,
-                    payload={
-                        "card_id": card_id,
-                        "card_index": card_index,
-                        "title": validated_card.get("title"),
-                        "qualitative_reading": validated_card.get("qualitative_reading"),
-                        "meaning": "participant_reported_resonance_not_truth",
-                    },
-                )
+                SESSION_SELECTED[sid] = selected_cards
                 if coord.machine.state == SessionState.CARD_SELECTION:
                     coord.advance(SessionState.PROFILE_REVEAL)
 

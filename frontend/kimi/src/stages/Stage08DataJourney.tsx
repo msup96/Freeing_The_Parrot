@@ -313,6 +313,12 @@ export default function Stage08DataJourney({
           )}
         </EvidenceRow>
 
+        {reveal?.selection_pattern && (
+          <EvidenceRow label="HOW YOUR SELECTIONS FORMED A PATTERN" sub="Recorded selection behavior only; it is not psychological validation.">
+            {reveal.selection_pattern.selected_count ?? 0} selected · {(reveal.selection_pattern.selected_card_ids ?? []).join(' · ') || 'none'}
+          </EvidenceRow>
+        )}
+
         {/* ——— 6. WHAT WE CANNOT KNOW ——— */}
         {reveal?.what_we_cannot_know && (
           <>

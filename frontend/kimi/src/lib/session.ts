@@ -17,12 +17,24 @@ export type ChatTurn = {
 
 import type { DeckCard } from './deck';
 
+export type SelectedCard = DeckCard & { selectionOrder: number };
+
 export type ChosenCardReveal = {
   card_index: number;
   title: string;
   statement: string;
   validation: string;
   disclaimer: string;
+};
+
+export type SelectionPattern = {
+  selected_count?: number;
+  selected_card_ids?: string[];
+  selected_card_indices?: number[];
+  selection_order?: string[];
+  archetypes?: string[];
+  categories?: string[];
+  resonance_recorded?: boolean;
 };
 
 export type SessionReveal = {
@@ -50,6 +62,7 @@ export type SessionReveal = {
     quality_limitations?: { defaulted_shanta_turns?: number; status?: string };
   };
   interaction_profile?: Record<string, number | string>;
+  selection_pattern?: SelectionPattern;
   what_was_recorded: string;
   what_the_system_observed?: string;
   what_was_recorded_sub: string;
@@ -76,6 +89,7 @@ export type Session = {
   turns: ChatTurn[];
   cards: DeckCard[];
   selectedCard: DeckCard | null;
+  selectedCards: DeckCard[];
   cardId: number | null;
   reveal?: SessionReveal | null;
   consent: 'private' | 'wall' | null;
@@ -88,6 +102,7 @@ export const emptySession: Session = {
   turns: [],
   cards: [],
   selectedCard: null,
+  selectedCards: [],
   cardId: null,
   reveal: null,
   consent: null,
