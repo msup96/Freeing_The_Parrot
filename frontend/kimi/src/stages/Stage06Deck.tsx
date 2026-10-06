@@ -63,6 +63,7 @@ export default function Stage06Deck({
   const [dealt, setDealt] = useState(0); // 1 → 3 → 9 → 27
   const [hovered, setHovered] = useState<number | null>(null);
   const [selected, setSelected] = useState<DeckCard[]>([]);
+  const [flipped, setFlipped] = useState<Set<string>>(new Set());
   const [shuffled, setShuffled] = useState(false);
   const [resonating, setResonating] = useState(false);
 
@@ -76,8 +77,12 @@ export default function Stage06Deck({
     return () => [t1, t2, t3, t4, t5].forEach(clearTimeout);
   }, []);
 
-  const handleSelect = (card: DeckCard) => {
+  const handleCardClick = (card: DeckCard) => {
     if (resonating) return;
+    if (!flipped.has(card.cardId)) {
+      setFlipped((current) => new Set(current).add(card.cardId));
+      return;
+    }
     setSelected((current) => current.some((item) => item.cardId === card.cardId)
       ? current.filter((item) => item.cardId !== card.cardId)
       : [...current, card]);
@@ -174,10 +179,10 @@ export default function Stage06Deck({
                 whileHover={{ y: -8 }}
                 onHoverStart={() => setHovered(card.id)}
                 onHoverEnd={() => setHovered(null)}
-                onClick={() => handleSelect(card)}
+                onClick={() => handleCardClick(card)}
                 aria-pressed={selected.some((item) => item.cardId === card.cardId)}
+                aria-label={`${flipped.has(card.cardId) ? 'Select' : 'Flip'} card № ${card.id}: ${card.title}`}
                 style={{ transformStyle: 'preserve-3d' }}
-                aria-label={`Card № ${card.id}: ${card.title}`}
               >
                 <motion.div
                   className="w-full h-full"
@@ -190,12 +195,16 @@ export default function Stage06Deck({
                         : 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))',
                   }}
                 >
-                  <img
-                    src="/assets/card-back.png"
-                    alt=""
-                    className="w-full h-full object-cover rounded-[3px]"
-                    draggable={false}
-                  />
+                  {flipped.has(card.cardId) ? (
+                    <CardFace card={card} />
+                  ) : (
+                    <img
+                      src="/assets/card-back.png"
+                      alt=""
+                      className="w-full h-full object-cover rounded-[3px]"
+                      draggable={false}
+                    />
+                  )}
                 </motion.div>
                 {/* index hint on hover */}
                 <AnimatePresence>
