@@ -40,7 +40,7 @@ from ftp.input.multimodal_analyzer import (
     analyze_photo_offering,
     analyze_video_offering,
 )
-from interface_server import ROAST_BANKS, choose_random_line
+from interface_server import ROAST_BY_LEVEL as ROAST_BANKS, choose_random_line
 from navarasa_engine import analyse_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
