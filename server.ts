@@ -582,7 +582,7 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, version: "2.0", apparatus: "online" });
 });
 
-const PYTHON_BACKEND = "http://127.0.0.1:5002";
+const PYTHON_BACKEND = process.env.FTP_PYTHON_BACKEND || "https://ftp2-backend.onrender.com";
 const PYTHON_EXECUTABLE = fs.existsSync(path.join(__dirname, ".venv", "bin", "python"))
   ? path.join(__dirname, ".venv", "bin", "python")
   : process.platform === "win32"
