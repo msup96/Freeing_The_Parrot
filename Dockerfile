@@ -33,4 +33,4 @@ RUN mkdir -p /data
 ENV PORT=5000
 EXPOSE 5000
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 4 --timeout 120 interface_server:app"]
+CMD ["sh", "-c", "python ftp_backend_service.py ${PORT}"]

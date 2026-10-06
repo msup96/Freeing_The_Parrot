@@ -40,7 +40,7 @@ from ftp.input.multimodal_analyzer import (
     analyze_photo_offering,
     analyze_video_offering,
 )
-from interface_server import ROAST_BANKS, choose_random_line
+from interface_server import ROAST_BY_LEVEL as ROAST_BANKS, choose_random_line
 from navarasa_engine import analyse_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -60,16 +60,51 @@ SESSION_MULTIMODAL_CONTEXT: dict[str, dict[str, Any]] = {}
 SESSION_DECKS: dict[str, dict[str, Any]] = {}
 SESSION_SELECTED: dict[str, dict[str, Any]] = {}
 SESSION_REVEALS: dict[str, dict[str, Any]] = {}
+SESSION_CREATED_AT: dict[str, float] = {}
+SESSION_TTL_SECONDS = max(60, int(os.environ.get("FTP_SESSION_TTL_SECONDS", "3600")))
+
+
+def purge_expired_sessions(now: float | None = None) -> list[str]:
+    """Remove all expired in-memory state and return the purged session IDs."""
+    current = now if now is not None else time.time()
+    expired = [sid for sid, created_at in SESSION_CREATED_AT.items()
+               if current - created_at >= SESSION_TTL_SECONDS]
+    for sid in expired:
+        for store in (SESSIONS, SESSION_OFFERINGS, SESSION_MULTIMODAL_CONTEXT,
+                      SESSION_DECKS, SESSION_SELECTED, SESSION_REVEALS, SESSION_CREATED_AT):
+            store.pop(sid, None)
+        logger.info("Purged expired FTP session: %s", sid)
+    return expired
+
+
+def create_session() -> SessionCoordinator:
+    purge_expired_sessions()
+    sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(8).hex()}"
+    coord = SessionCoordinator(sid)
+    coord.start()
+    SESSIONS[sid] = coord
+    SESSION_CREATED_AT[sid] = time.time()
+    logger.info("Created new session coordinator: %s", sid)
+    return coord
+
+
+def get_session(session_id: str | None) -> SessionCoordinator | None:
+    purge_expired_sessions()
+    if not session_id:
+        return None
+    return SESSIONS.get(str(session_id))
+
+
+def require_session(session_id: str | None) -> SessionCoordinator:
+    coord = get_session(session_id)
+    if coord is None:
+        raise KeyError("Session not found or expired")
+    return coord
 
 
 def get_or_create_coordinator(session_id: str | None) -> SessionCoordinator:
-    sid = session_id or f"ftp2_{int(time.time()*1000)}_{os.urandom(4).hex()}"
-    if sid not in SESSIONS:
-        coord = SessionCoordinator(sid)
-        coord.start()
-        SESSIONS[sid] = coord
-        logger.info(f"Created new session coordinator: {sid}")
-    return SESSIONS[sid]
+    """Backward-compatible name; unknown IDs are never silently created."""
+    return require_session(session_id)
 
 
 def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | None, selected: dict[str, Any] | None) -> dict[str, Any]:
@@ -98,38 +133,55 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "and conversational rhythm preserved in archival memory."
     )
 
-    # 3. WHAT WAS INTERPRETED: actual approved interpretation
+    # 3. WHAT WAS INTERPRETED: expose the actual evidence-backed interpretation.
+    # This is deliberately computed at reveal time from the locked session rather
+    # than reconstructed from generic copy.
     try:
+        from ftp.silent_reader.inference import evaluate_bundle
         from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
-        trajectory = NavarasaTrajectorySynthesizer(coord).synthesize()
-        dominant = trajectory.get("dominant_rasa", {}).get("label") or "Shanta"
-        detected_seq = trajectory.get("detected_sequence", [])
-        movement = " → ".join(detected_seq[:4]) if detected_seq else dominant
-    except Exception as exc:
-        logger.warning(f"Trajectory synthesis notice: {exc}")
-        dominant = "Shanta"
-        movement = "Shanta (stillness)"
 
+        bundle = coord.build_evidence_bundle()
+        evaluation = evaluate_bundle(bundle)
+        trajectory = NavarasaTrajectorySynthesizer(coord).synthesize()
+        detected_seq = trajectory.get("detected_sequence", [])
+        dominant = trajectory.get("dominant_rasa", {}).get("label")
+        eligible = [
+            item for item in evaluation.get("candidates", [])
+            if item.get("eligibility") == "eligible"
+        ]
+        interpretations = [str(item.get("claim")) for item in eligible if item.get("claim")]
+        evidence_count = len(bundle.get("evidence_items", []))
+    except Exception as exc:
+        logger.warning(f"Reveal analysis notice: {exc}")
+        bundle = {}
+        evaluation = {}
+        detected_seq = []
+        dominant = None
+        interpretations = []
+        evidence_count = 0
+
+    trajectory_text = " → ".join(str(label) for label in detected_seq[:4]) or "no stable trajectory was available"
+    interpretation_text = "; ".join(interpretations[:2]) or "no eligible session-specific inference was supported"
     what_interpreted_body = (
-        f"The emotional intelligence engine observed a trajectory characterized by {dominant} ({movement}). "
-        f"Your statements indicated a movement between searching and self-interrogation."
+        f"The locked session contained {evidence_count} evidence item(s). "
+        f"Its observed affective sequence was {trajectory_text}. "
+        f"The evidence contract retained this interpretation: {interpretation_text}."
     )
     what_interpreted_sub = (
-        f"Primary affective tone: {dominant}. Interpretation derived solely from linguistic rhythm and semantic cues."
+        f"Observed trajectory label: {dominant or 'unavailable'}. "
+        "Interpretation is session-specific and is not a claim about the participant beyond this interaction."
     )
 
-    # 4. WHAT WAS CONSTRUCTED: actual eligible inference / reading construction
+    # 4. WHAT WAS CONSTRUCTED: actual 27-card reading output and its provenance.
     deck_cards = (deck.get("cards") if deck else None) or []
     sample_archetypes = [c.get("archetype") for c in deck_cards[:4] if c.get("archetype")]
-    archetype_str = ", ".join(sample_archetypes) if sample_archetypes else "Archivist, Lantern-Bearer, Anchor, Seeker"
-
+    archetype_str = ", ".join(sample_archetypes) if sample_archetypes else "no archetype output"
     what_constructed_body = (
-        f"A 27-card Kili Josiyam reading was composed from your session's anchor seeds. "
-        f"The reading organized your reflections across 27 distinct archetypes, including the {archetype_str}."
+        f"The locked reading composer produced {len(deck_cards)} card(s) from this session's "
+        f"evidence-backed anchors, including {archetype_str}."
     )
     what_constructed_sub = (
-        "Each card combines a deterministic psychological seed with subjective completion, "
-        "presenting reflection hypotheses rather than diagnoses."
+        "Cards are INFERRED reflection hypotheses. Their hidden provenance retains the inference and evidence IDs; they are not diagnoses."
     )
 
     # 5. WHAT YOU CHOSE: selected card + resonance validation
@@ -161,16 +213,31 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
             "qualitative_reading": c["qualitative_reading"],
         })
 
+    limitations = list(bundle.get("limitations") or [])
+    limitations.extend(evaluation.get("limitations") or [])
+    if not limitations:
+        limitations = [
+            "This session does not establish a stable fact about the participant.",
+            "Resonance is participant-reported and is not objective psychological validation.",
+            "The Parrot did not receive the Silent Reader's analysis or card selection.",
+        ]
+
     return {
         "session_id": sid,
         "what_you_gave": offering_text,
+        "what_you_gave_channel": offering.get("modality"),
+        "turn_texts": turn_texts,
         "what_was_recorded": what_recorded_body,
+        "what_the_system_observed": what_recorded_body,
         "what_was_recorded_sub": what_recorded_sub,
         "what_was_interpreted": what_interpreted_body,
+        "what_the_system_interpreted": what_interpreted_body,
         "what_was_interpreted_sub": what_interpreted_sub,
         "what_was_constructed": what_constructed_body,
+        "what_the_system_inferred": what_constructed_body,
         "what_was_constructed_sub": what_constructed_sub,
         "what_you_chose": what_chose,
+        "what_we_cannot_know": list(dict.fromkeys(limitations)),
         "wall_specimens": wall_specimens,
     }
 
@@ -291,6 +358,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
+        purge_expired_sessions()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -301,9 +369,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/session-reveal":
             sid = query.get("session_id", [""])[0]
-            coord = SESSIONS.get(sid)
+            coord = get_session(sid)
             if not coord:
-                self._send_json({"error": "Session not found"}, 404)
+                self._send_json({"error": "Session not found or expired"}, 404)
                 return
             deck = SESSION_DECKS.get(sid)
             selected = SESSION_SELECTED.get(sid)
@@ -317,6 +385,8 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             self._handle_post()
+        except KeyError:
+            self._send_json({"error": "Session not found or expired"}, 404)
         except Exception as exc:
             logger.exception(f"Unhandled error in do_POST: {exc}")
             self._send_json({"error": f"Internal FTP error: {str(exc)}"}, 500)
@@ -334,10 +404,8 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
         # 1. POST /api/session/start
         if path == "/api/session/start":
-            sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(4).hex()}"
-            coord = SessionCoordinator(sid)
-            coord.start()
-            SESSIONS[sid] = coord
+            coord = create_session()
+            sid = coord.session_id
             self._send_json({
                 "ok": True,
                 "session_id": sid,
@@ -655,18 +723,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
         # 8. POST /api/session-output-reset
         if path == "/api/session-output-reset":
             sid = body.get("session_id")
-            if sid in SESSIONS:
-                del SESSIONS[sid]
-            if sid in SESSION_OFFERINGS:
-                del SESSION_OFFERINGS[sid]
-            if sid in SESSION_MULTIMODAL_CONTEXT:
-                del SESSION_MULTIMODAL_CONTEXT[sid]
-            if sid in SESSION_DECKS:
-                del SESSION_DECKS[sid]
-            if sid in SESSION_SELECTED:
-                del SESSION_SELECTED[sid]
-            if sid in SESSION_REVEALS:
-                del SESSION_REVEALS[sid]
+            for store in (SESSIONS, SESSION_OFFERINGS, SESSION_MULTIMODAL_CONTEXT,
+                          SESSION_DECKS, SESSION_SELECTED, SESSION_REVEALS, SESSION_CREATED_AT):
+                store.pop(sid, None)
             self._send_json({
                 "ok": True,
                 "lifecycle_state": "IDLE_STANDBY",
@@ -676,13 +735,17 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
         self._send_json({"error": "Unknown POST route"}, 404)
 
 
-def run_server(port: int = 5001) -> None:
+def run_server(port: int | None = None) -> None:
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", port), FtpApiHandler) as httpd:
-        logger.info(f"FTP 2.0 Authoritative Python Backend running on http://127.0.0.1:{port}")
+    # Render and other managed services route traffic to the process over the
+    # container network, so the production default must not be loopback-only.
+    bind_host = os.environ.get("FTP_BIND_HOST", "0.0.0.0")
+    bind_port = port if port is not None else int(os.environ.get("PORT", "5000"))
+    with socketserver.ThreadingTCPServer((bind_host, bind_port), FtpApiHandler) as httpd:
+        logger.info("FTP 2.0 backend running on http://%s:%s", bind_host, bind_port)
         httpd.serve_forever()
 
 
 if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5001
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else None
     run_server(port)

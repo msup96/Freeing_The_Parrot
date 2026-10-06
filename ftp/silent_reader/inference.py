@@ -135,7 +135,14 @@ def apply_evidence_contract(
         reviewed["limitations"].append("contradiction_blocks_claim")
         return reviewed
 
-    temporal_ok = bool(candidate.get("requires_temporal_change"))
+    temporal_ok = False
+    if candidate.get("requires_temporal_change"):
+        length = next(
+            item for item in cited if item["signal_type"] == "message_length"
+        )
+        direction = (length.get("value") or {}).get("direction")
+        temporal_ok = direction in {"increased", "decreased"}
+
     reviewed["eligibility"] = "eligible"
     reviewed["provenance_level"] = ProvenanceLevel.INFERRED.value
     reviewed["confidence"] = support_confidence(

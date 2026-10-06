@@ -583,6 +583,11 @@ app.get("/health", (req, res) => {
 });
 
 const PYTHON_BACKEND = "http://127.0.0.1:5002";
+const PYTHON_EXECUTABLE = fs.existsSync(path.join(__dirname, ".venv", "bin", "python"))
+  ? path.join(__dirname, ".venv", "bin", "python")
+  : process.platform === "win32"
+    ? "python"
+    : "python3";
 
 // Ensure the authoritative Python FTP 2.0 service is running
 function ensurePythonService() {

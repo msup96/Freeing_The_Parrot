@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { transition } from '../lib/motion';
 import type { ChatTurn, Session } from '../lib/session';
-import type { DeckCard } from '../lib/deck';
 
 function EvidenceRow({
   label,
@@ -117,11 +116,6 @@ export default function Stage08DataJourney({
   const card = session.selectedCard;
   const reveal = session.reveal;
 
-  const firstWords = useMemo(() => {
-    const t = session.turns.find((turn: ChatTurn) => turn.role === 'participant');
-    return t ? `“${t.text.slice(0, 80)}${t.text.length > 80 ? '…' : ''}”` : '—';
-  }, [session.turns]);
-
   useEffect(() => {
     const t1 = window.setTimeout(() => setPhase(1), 2000);
     const t2 = window.setTimeout(() => setPhase(2), 4000);
@@ -131,28 +125,10 @@ export default function Stage08DataJourney({
     };
   }, []);
 
-  // Specimen tiles for the Wall of Fame
-  const wallSpecimens = useMemo(() => {
-    if (reveal?.wall_specimens && reveal.wall_specimens.length > 0) {
-      return reveal.wall_specimens;
-    }
-    if (session.cards && session.cards.length > 0) {
-      return session.cards.slice(0, 12).map((c: DeckCard) => ({
-        card_index: c.id,
-        title: c.title,
-        archetype: c.archetype,
-        qualitative_reading: c.statement,
-      }));
-    }
-    return Array.from({ length: 12 }, (_, i) => ({
-      card_index: i + 1,
-      title: `Specimen № ${String(i + 1).padStart(2, '0')}`,
-      archetype: 'Archivist',
-      qualitative_reading: 'A reflective trace preserved in the apparatus ledger.',
-    }));
-  }, [reveal?.wall_specimens, session.cards]);
-
-  const sessionIdShort = session.sessionId ? session.sessionId.slice(-8) : '027';
+  // Only backend-provided specimens are eligible for the wall. The participant's
+  // deck is session material, not a collection of other participants.
+  const wallSpecimens = reveal?.wall_specimens ?? [];
+  const sessionIdShort = session.sessionId ? session.sessionId.slice(-8) : '—';
 
   return (
     <div className="relative min-h-[100dvh] bg-[#0a0a09] px-6 md:px-0 py-24 text-parchment selection:bg-crimson selection:text-parchment">
@@ -169,6 +145,18 @@ export default function Stage08DataJourney({
             The Parrot was the performer. The Silent Reader was the observer.
           </p>
         </motion.div>
+
+        <div className="mb-10 border border-crimson/20 bg-black/30 p-4 font-mono text-[10px] tracking-[0.16em] text-parchment-faint" aria-label="Provenance path">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {['RAW', 'OBSERVED', 'INTERPRETED', 'INFERRED', 'VALIDATED'].map((level, index) => (
+              <span key={level} className="flex items-center gap-3">
+                <span className={index === 4 ? 'text-gold' : 'text-crimson/80'}>{level}</span>
+                {index < 4 && <span className="text-crimson/50">→</span>}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 text-[9px] text-parchment-faint/70">ONE SESSION · {session.turns.length} TURN{session.turns.length === 1 ? '' : 'S'} · SERVER REVEAL DATA ONLY</div>
+        </div>
 
         {/* ——— 1. WHAT YOU GAVE ——— */}
         <EvidenceRow
@@ -200,7 +188,7 @@ export default function Stage08DataJourney({
               )}
             </div>
           ) : (
-            reveal?.what_you_gave || 'An inquiry opened and acknowledged.'
+            reveal?.what_you_gave || 'No participant input is available in this reveal.'
           )}
         </EvidenceRow>
 
@@ -211,14 +199,7 @@ export default function Stage08DataJourney({
           label="WHAT THE SYSTEM OBSERVED"
           sub={reveal?.what_was_recorded_sub || 'Deterministic computational counts and timestamps preserved in the append-only event store.'}
         >
-          {reveal?.what_the_system_observed || reveal?.what_was_recorded || (
-            <>
-              The apparatus recorded {session.turns.length} conversational exchanges.
-              <span className="block mt-2 text-parchment-dim">
-                Keystrokes, timing cadences, and punctuation patterns were monitored passively by the Silent Reader.
-              </span>
-            </>
-          )}
+          {reveal?.what_the_system_observed || reveal?.what_was_recorded || 'The authoritative reveal did not provide an observation summary.'}
         </EvidenceRow>
 
         <Connector />
@@ -228,14 +209,7 @@ export default function Stage08DataJourney({
           label="WHAT THE SYSTEM INTERPRETED"
           sub={reveal?.what_was_interpreted_sub || 'Derived solely from linguistic rhythm, vocabulary, and sentiment tone.'}
         >
-          {reveal?.what_the_system_interpreted || reveal?.what_was_interpreted || (
-            <>
-              The emotional intelligence engine observed your linguistic signal and conversational rhythm.
-              <span className="block mt-2 text-parchment-dim">
-                Your opening dialogue: {firstWords}
-              </span>
-            </>
-          )}
+          {reveal?.what_the_system_interpreted || reveal?.what_was_interpreted || 'No interpreted output was returned for this session.'}
         </EvidenceRow>
 
         <Connector />
@@ -245,12 +219,7 @@ export default function Stage08DataJourney({
           label="WHAT THE SYSTEM INFERRED"
           sub={reveal?.what_was_constructed_sub || 'Hypotheses for reflection, combining archetype seeds with subjective completion.'}
         >
-          {reveal?.what_the_system_inferred || reveal?.what_was_constructed || (
-            <>
-              A 27-card Kili Josiyam reading was composed from your session's anchor seeds.
-              The reading organized your reflections across 27 distinct archetypes.
-            </>
-          )}
+          {reveal?.what_the_system_inferred || reveal?.what_was_constructed || 'No inferred output was returned for this session.'}
           <span className="block mt-3 text-[11px] text-parchment-dim/80 border-l border-crimson/40 pl-3 italic">
             Notice: The apparatus did not diagnose you. It prepared mirrors designed to allow personal projection.
           </span>
@@ -323,7 +292,7 @@ export default function Stage08DataJourney({
               THE WALL OF FAME
             </div>
             <p className="font-mono text-[11px] text-parchment-faint tracking-[0.15em] mb-8">
-              Archival specimens pinned where the theatre used to be. Your trace sits alongside others.
+              Session materials available for consent. No cross-session specimens are loaded here.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
