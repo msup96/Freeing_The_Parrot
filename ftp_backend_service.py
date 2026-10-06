@@ -245,6 +245,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
 
     # 5. WHAT YOU CHOSE: preserve the participant's complete selection pattern.
     selected_cards = selected if isinstance(selected, list) else ([selected] if selected else [])
+    selected_cards = [card for card in selected_cards if isinstance(card, dict)]
     first_selected = selected_cards[0] if selected_cards else None
     selection_pattern = {
         "selected_count": len(selected_cards),
@@ -410,9 +411,11 @@ def build_session_receipt(coord: SessionCoordinator) -> str:
     dialogue_events = [e for e in events if e.event_type == EventType.PARROT_TURN_GENERATED]
     offering = SESSION_OFFERINGS.get(sid, {})
     selected = SESSION_SELECTED.get(sid)
-    # Card selection stores the participant's ordered selections as a list;
-    # the receipt represents the first selected card without assuming a dict.
-    selected_card = selected[0] if isinstance(selected, list) and selected else selected
+    # Normalize legacy and current selection shapes before rendering the receipt.
+    # Older sessions can contain nested lists or an empty/non-dict selection.
+    selected_cards = selected if isinstance(selected, list) else ([selected] if selected else [])
+    selected_cards = [card for card in selected_cards if isinstance(card, dict)]
+    selected_card = selected_cards[0] if selected_cards else None
 
     user_chars = 0
     machine_chars = 0
