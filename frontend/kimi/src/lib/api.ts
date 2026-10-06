@@ -1,7 +1,8 @@
 import type { SessionReveal } from './session';
 
 type Json = Record<string, unknown>;
-const API_BASE_URL = (import.meta.env.VITE_FTP_API_URL ?? 'https://ftp2-backend.onrender.com').replace(/\/$/, '');
+const configuredApiBase = String(import.meta.env.VITE_FTP_API_URL ?? '').trim();
+const API_BASE_URL = configuredApiBase.replace(/\/$/, '');
 
 function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
@@ -83,6 +84,8 @@ export async function endConversation(sessionId: string): Promise<{
     card_id: string;
     card_index: number;
     title: string;
+    semantic_anchor?: string;
+    semantic_motif?: string;
     archetype?: string;
     qualitative_reading: string;
   }>;
@@ -100,6 +103,8 @@ export async function endConversation(sessionId: string): Promise<{
         card_id: String(row.card_id),
         card_index: Number(row.card_index),
         title: String(row.title ?? ''),
+        semantic_anchor: typeof row.semantic_anchor === 'string' ? row.semantic_anchor : undefined,
+        semantic_motif: typeof row.semantic_motif === 'string' ? row.semantic_motif : undefined,
         archetype: typeof row.archetype === 'string' ? row.archetype : undefined,
         qualitative_reading: String(row.qualitative_reading ?? ''),
       };
