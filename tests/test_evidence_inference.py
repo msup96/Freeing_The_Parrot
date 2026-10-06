@@ -210,6 +210,32 @@ class TestEvidenceContract:
         )
         assert 0.15 <= score <= 0.75
 
+    def test_temporal_bonus_requires_validated_change(self):
+        bundle = {
+            "evidence_items": [
+                {
+                    "evidence_id": "ev_length",
+                    "signal_type": "message_length",
+                    "value": {"direction": "unchanged"},
+                },
+            ]
+        }
+        candidate = {
+            "inference_id": "inf_length",
+            "claim": "Length changed.",
+            "category": "interaction_pattern",
+            "scope": "session_specific",
+            "evidence_refs": ["ev_length"],
+            "alternative_interpretations": [],
+            "contradictions": [],
+            "limitations": [],
+            "minimum_signal_types": 1,
+            "requires_temporal_change": False,
+        }
+        reviewed = apply_evidence_contract(candidate, bundle)
+        assert reviewed["eligibility"] == "eligible"
+        assert reviewed["confidence"] == 0.45
+
 
 _CONFIDENCE_FLOOR = 0.15
 
