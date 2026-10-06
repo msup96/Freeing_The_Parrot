@@ -287,6 +287,8 @@ export default function Stage08DataJourney({
   const nav = (key: string) => obj(navarasa[key]);
   const detected = (navarasa.detected_sequence as string[] | undefined) ?? [];
   const defaultedTurns = Number(navarasa.defaulted_shanta_turns ?? 0);
+  const conversationInference = obj(navarasa.conversation_inference);
+  const inferenceAlternatives = rows(conversationInference.alternative_readings);
   const readings = cardRecords.length;
 
   return (
@@ -435,9 +437,22 @@ export default function Stage08DataJourney({
               rows={[
                 ['TRAJECTORY', detected.length ? detected.join(' → ') : 'INSUFFICIENT EVIDENCE FOR A STABLE RASA TRAJECTORY'],
                 ['TRANSITIONS', fmt(nav('transition_count').value)],
-                ['DOMINANT SIGNAL', fmt(nav('dominant_rasa').label)],
-                [
-                  'DEFAULTED TURNS',
+  ['DOMINANT SIGNAL', fmt(nav('dominant_rasa').label)],
+  [
+  'CONVERSATION INFERENCE',
+  conversationInference.status === 'supported'
+    ? `${fmt(conversationInference.label)} (${fmt(conversationInference.confidence)} confidence; ${fmt(conversationInference.evidence_turn_count)} detected turns)`
+    : 'INSUFFICIENT EVIDENCE — NO STABLE CONVERSATION-LEVEL INFERENCE',
+  ],
+  [
+  'ALTERNATIVE READINGS',
+  inferenceAlternatives.length
+    ? inferenceAlternatives.map((item) => `${fmt(item.label)} (${fmt(item.share)})`).join(' · ')
+    : 'NONE RECORDED',
+  ],
+  [
+  'DEFAULTED TURNS',
+
                   defaultedTurns > 0 ? `${defaultedTurns} turn(s) had no emotional vocabulary; their default label is not shown as evidence.` : '0',
                 ],
               ]}
