@@ -30,6 +30,26 @@ export type SessionReveal = {
   what_you_gave: string;
   what_you_gave_channel?: string;
   turn_texts?: string[];
+  machine_transformation?: {
+    raw_text?: { character_count?: number; turn_count?: number };
+    turn_sequence?: number[];
+    evidence_ids?: string[];
+    inference_ids?: Array<string | null>;
+  };
+  observed_signals?: Array<{
+    evidence_id?: string;
+    signal_type?: string;
+    observation?: string;
+    source_event_ids?: string[];
+  }>;
+  navarasa_trajectory?: {
+    detected_sequence?: string[];
+    dominant_rasa?: { label?: string | null; status?: string };
+    transition_count?: { value?: number | null; status?: string };
+    beginning_end_changed?: { value?: boolean | null; status?: string };
+    quality_limitations?: { defaulted_shanta_turns?: number; status?: string };
+  };
+  interaction_profile?: Record<string, number | string>;
   what_was_recorded: string;
   what_the_system_observed?: string;
   what_was_recorded_sub: string;

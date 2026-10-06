@@ -146,11 +146,12 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         detected_seq = trajectory.get("detected_sequence", [])
         dominant = trajectory.get("dominant_rasa", {}).get("label")
         eligible = [
-            item for item in evaluation.get("candidates", [])
+            item for item in evaluation.get("records", [])
             if item.get("eligibility") == "eligible"
         ]
         interpretations = [str(item.get("claim")) for item in eligible if item.get("claim")]
-        evidence_count = len(bundle.get("evidence_items", []))
+        evidence_items = bundle.get("evidence_items", [])
+        evidence_count = len(evidence_items)
     except Exception as exc:
         logger.warning(f"Reveal analysis notice: {exc}")
         bundle = {}
@@ -222,10 +223,38 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
             "The Parrot did not receive the Silent Reader's analysis or card selection.",
         ]
 
+    observed_signals = [
+        {
+            "evidence_id": item.get("evidence_id"),
+            "signal_type": item.get("signal_type"),
+            "observation": item.get("observation"),
+            "source_event_ids": item.get("source_event_ids", []),
+        }
+        for item in evidence_items
+    ]
+    navarasa_sufficient = bool(detected_seq)
+    interaction_profile = {
+        "turn_count": turn_count,
+        "question_count": question_count,
+        "character_count": total_chars,
+        "evidence_count": evidence_count,
+        "eligible_inference_count": len(eligible),
+        "navarasa_status": "ok" if navarasa_sufficient else "insufficient_evidence",
+    }
+
     return {
         "session_id": sid,
         "what_you_gave": offering_text,
         "what_you_gave_channel": offering.get("modality"),
+        "machine_transformation": {
+            "raw_text": {"character_count": total_chars, "turn_count": turn_count},
+            "turn_sequence": [int(e.payload.get("turn_index", i)) for i, e in enumerate(dialogue_events)],
+            "evidence_ids": [item["evidence_id"] for item in evidence_items],
+            "inference_ids": [item.get("inference_id") for item in eligible],
+        },
+        "observed_signals": observed_signals,
+        "navarasa_trajectory": trajectory,
+        "interaction_profile": interaction_profile,
         "turn_texts": turn_texts,
         "what_was_recorded": what_recorded_body,
         "what_the_system_observed": what_recorded_body,
