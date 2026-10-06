@@ -15,6 +15,9 @@ from ftp.silent_reader.reading.cards import (
     COMPOSITION_STRATEGIES,
     READING_FRAGMENTS,
     TITLE_FRAGMENTS,
+    ANCHOR_TERMS,
+    SEMANTIC_ANCHORS,
+    SEMANTIC_MOTIFS,
 )
 from ftp.silent_reader.reading.profile import build_reading_profile
 from ftp.silent_reader.reading.validate import validate_deck
@@ -67,12 +70,16 @@ def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
         anchor = anchors[(index * 5 + index // 3 + session_seed) % len(anchors)]
         strategy = COMPOSITION_STRATEGIES[(index - 1 + session_seed) % len(COMPOSITION_STRATEGIES)]
         technique = BARNUM_TECHNIQUES[(index - 1 + session_seed) % len(BARNUM_TECHNIQUES)]
-        title = _unique_title(index, used_readings, session_seed)
+        semantic_anchor = SEMANTIC_ANCHORS[index - 1]
+        semantic_motif = SEMANTIC_MOTIFS[semantic_anchor]
+        title = _unique_title(index, used_readings)
         archetype = ARCHETYPES[(index - 1 + session_seed) % len(ARCHETYPES)]
         fragment = READING_FRAGMENTS[(index * 3 + len(anchor["reading_seed"]) + session_seed) % len(READING_FRAGMENTS)]
         qualitative = _compose_reading(
             title=title,
             archetype=archetype,
+            semantic_anchor=semantic_anchor,
+            anchor_term=ANCHOR_TERMS[semantic_anchor],
             seed=anchor["reading_seed"],
             fragment=fragment,
             strategy=strategy,
@@ -83,6 +90,8 @@ def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
             "card_id": f"card_{index:02d}_{_slugify(title)}",
             "card_index": index,
             "title": title,
+            "semantic_anchor": semantic_anchor,
+            "semantic_motif": semantic_motif,
             "archetype": archetype,
             "qualitative_reading": qualitative,
             "provenance_level": ProvenanceLevel.INFERRED.value,
@@ -91,6 +100,8 @@ def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
                 "evidence_ids": evidence_ids,
                 "barnum_technique": technique,
                 "composition_strategy": strategy,
+                "semantic_anchor": semantic_anchor,
+                "semantic_motif": semantic_motif,
                 "provenance_level": ProvenanceLevel.INFERRED.value,
             },
         })
@@ -106,25 +117,29 @@ def _compose_reading(
     *,
     title: str,
     archetype: str,
+    semantic_anchor: str,
+    anchor_term: str,
     seed: str,
     fragment: str,
     strategy: str,
 ) -> str:
     seed_clause = seed.rstrip(".")
+    territory = f"Within the territory of {anchor_term},"
+
     if strategy == "REFRACTION":
-        body = f"As {archetype}, you may notice how {seed_clause.lower()}."
+        body = f"{territory} {seed_clause.lower()}."
     elif strategy == "MIRRORING":
-        body = f"{fragment} It mirrors the sense that {seed_clause.lower()}."
+        body = f"{fragment} {territory.lower()} {seed_clause.lower()}."
     elif strategy == "ACCUMULATION":
-        body = f"{fragment} Something similar to {seed_clause.lower()} keeps returning."
+        body = f"{fragment} {territory.lower()} something similar to {seed_clause.lower()} keeps returning."
     elif strategy == "THRESHOLD":
-        body = f"At a threshold moment, {seed_clause.lower()}."
+        body = f"{territory} {seed_clause.lower()}."
     elif strategy == "RETURNING motif":
-        body = f"{fragment} The motif of returning touches {seed_clause.lower()}."
+        body = f"{fragment} {territory.lower()} the movement touches {seed_clause.lower()}."
     elif strategy == "CONTRAST":
-        body = f"{fragment} Yet another layer suggests {seed_clause.lower()}."
+        body = f"{fragment} {territory.lower()} another layer suggests {seed_clause.lower()}."
     else:
-        body = f"Perhaps {seed_clause.lower()}, though the reading stays open."
+        body = f"{territory} perhaps {seed_clause.lower()}, though the reading stays open."
     return f"{title}: {body}"
 
 
@@ -163,8 +178,8 @@ def _session_seed(profile: dict[str, Any]) -> int:
     return int(hashlib.sha256(material.encode("utf-8")).hexdigest()[:8], 16)
 
 
-def _unique_title(index: int, used: set[str], session_seed: int) -> str:
-    title = TITLE_FRAGMENTS[(index - 1 + session_seed) % len(TITLE_FRAGMENTS)]
+def _unique_title(index: int, used: set[str]) -> str:
+    title = TITLE_FRAGMENTS[index - 1]
     if title not in used:
         used.add(title)
         return title

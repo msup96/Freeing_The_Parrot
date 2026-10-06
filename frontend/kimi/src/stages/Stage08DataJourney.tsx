@@ -364,6 +364,9 @@ export default function Stage08DataJourney({
         {reveal?.selection_pattern && (
           <EvidenceRow label="HOW YOUR SELECTIONS FORMED A PATTERN" sub="Recorded selection behavior only; RESONATES is participant-reported and is not validation.">
             <MachineTable rows={Object.entries(reveal.selection_pattern)} />
+            <div className="mt-3 text-[10px] uppercase tracking-[0.18em] text-gold/80">
+              Semantic territories: {(reveal.selection_pattern.semantic_anchors ?? []).join(' · ') || 'none recorded'}
+            </div>
           </EvidenceRow>
         )}
 
