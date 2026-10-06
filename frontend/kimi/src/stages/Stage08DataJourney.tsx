@@ -62,6 +62,22 @@ function EvidenceRow({
   );
 }
 
+function Tier({ number, title, level, description, children }: { number: string; title: string; level: string; description: string; children: React.ReactNode }) {
+  return (
+    <section className="relative mb-10 border border-parchment/10 bg-[#11110f]/70 px-4 py-5 md:px-6 md:py-7" aria-labelledby={`tier-${number}`}>
+      <div className="mb-5 border-b border-crimson/20 pb-4">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono">
+          <span className="text-[10px] tracking-[0.3em] text-crimson">{number}</span>
+          <h3 id={`tier-${number}`} className="text-sm tracking-[0.22em] text-parchment">{title}</h3>
+          <span className="text-[9px] uppercase tracking-[0.2em] text-gold/80">{level}</span>
+        </div>
+        <p className="mt-2 max-w-2xl font-serif text-xs italic leading-relaxed text-parchment-dim">{description}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function Connector() {
   return (
     <motion.div
@@ -289,16 +305,17 @@ export default function Stage08DataJourney({
 
         <div className="mb-10 border border-crimson/20 bg-black/30 p-4 font-mono text-[10px] tracking-[0.16em] text-parchment-faint" aria-label="Provenance path">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            {['RAW', 'OBSERVED', 'INTERPRETED', 'INFERRED', 'VALIDATED'].map((level, index) => (
+            {['RAW', 'OBSERVED', 'MEASURED', 'EVIDENCE', 'INFERRED', 'CONSTRUCTED', 'SELECTED', 'CANNOT KNOW'].map((level, index, levels) => (
               <span key={level} className="flex items-center gap-3">
-                <span className={index === 4 ? 'text-gold' : 'text-crimson/80'}>{level}</span>
-                {index < 4 && <span className="text-crimson/50">→</span>}
+                <span className={index === levels.length - 1 ? 'text-gold' : 'text-crimson/80'}>{level}</span>
+                {index < levels.length - 1 && <span className="text-crimson/50">→</span>}
               </span>
             ))}
           </div>
           <div className="mt-3 text-[9px] text-parchment-faint/70">ONE SESSION · SERVER REVEAL DATA ONLY</div>
         </div>
 
+        <Tier number="01" title="RAW" level="WHAT WAS RECORDED" description="The material that entered this session, before analysis or interpretation.">
         {/* ——— 01 WHAT YOU GAVE ——— */}
         <EvidenceRow label="01 — WHAT YOU GAVE" sub="Your own input, as it entered the system.">
           <Kv
@@ -327,6 +344,8 @@ export default function Stage08DataJourney({
 
         <Connector />
 
+        </Tier>
+        <Tier number="02" title="OBSERVED" level="WHAT WAS RECORDED" description="Turn-by-turn signals recorded from this interaction, without a claim about who you are.">
         {/* ——— 02 WHAT THE SYSTEM OBSERVED ——— */}
         <EvidenceRow label="02 — WHAT THE SYSTEM OBSERVED" sub="Turn by turn. Measured from your text and timing; not interpreted.">
           {lingRows.length === 0 ? (
@@ -353,6 +372,8 @@ export default function Stage08DataJourney({
 
         <Connector />
 
+        </Tier>
+        <Tier number="03" title="MEASURED" level="WHAT WAS CALCULATED" description="Numerical summaries describe this interaction; they are not a profile of you.">
         {/* ——— 03 WHAT THE SYSTEM MEASURED ——— */}
         <EvidenceRow label="03 — WHAT THE SYSTEM MEASURED" sub="Session-wide signals. A measurement describes the interaction, not you.">
           <Tag>LINGUISTIC</Tag>
@@ -395,6 +416,8 @@ export default function Stage08DataJourney({
 
         <Connector />
 
+        </Tier>
+        <Tier number="05" title="INFERRED" level="WHAT THE SYSTEM INTERPRETED" description="Bounded interpretations are interaction-scoped claims, not facts or diagnoses.">
         {/* ——— 04 NAVARASA TRAJECTORY ——— */}
         <EvidenceRow label="04 — NAVARASA TRAJECTORY" sub="Detected emotional vocabulary per turn. A default label is not a detection.">
           {rows(navarasa.turn_sequence).length > 0 && (
@@ -444,6 +467,8 @@ export default function Stage08DataJourney({
 
         <Connector />
 
+        </Tier>
+        <Tier number="04" title="EVIDENCE" level="WHAT SUPPORTS A CLAIM" description="Observed records that the system used as support, with their event references and limitations.">
         {/* ——— 06 EVIDENCE ——— */}
         <EvidenceRow label="06 — EVIDENCE" sub="OBSERVATION → EVIDENCE → INFERENCE. This is how the machine got there.">
           {signals.length === 0
@@ -489,6 +514,8 @@ export default function Stage08DataJourney({
 
         <Connector />
 
+        </Tier>
+        <Tier number="06" title="CONSTRUCTED" level="WHAT THE SYSTEM ASSEMBLED" description="Readings and machine artifacts constructed from the interaction, not discovered truths.">
         {/* ——— 08 WHAT THE SYSTEM CONSTRUCTED ——— */}
         <EvidenceRow label="08 — WHAT THE SYSTEM CONSTRUCTED" sub="From analysis to qualitative readings.">
           {readings === 0 ? (
@@ -539,6 +566,8 @@ export default function Stage08DataJourney({
 
         <Connector />
 
+        </Tier>
+        <Tier number="07" title="SELECTED" level="WHAT YOU CHOSE" description="Your selection and reported resonance are recorded choices, not validation or proof.">
         {/* ——— 10 WHAT YOU CHOSE ——— */}
         <EvidenceRow label="10 — WHAT YOU CHOSE" sub={reveal?.what_you_chose?.disclaimer || 'Selected by you from the cards presented.'}>
           <Kv
@@ -599,6 +628,8 @@ export default function Stage08DataJourney({
 
         <Connector />
 
+        </Tier>
+        <Tier number="08" title="CANNOT KNOW" level="EXPLICIT LIMITS" description="The boundaries of what this single interaction can support or establish.">
         {/* ——— 13 WHAT THE SYSTEM CANNOT KNOW ——— */}
         <EvidenceRow label="13 — WHAT THE SYSTEM CANNOT KNOW" sub="THIS IS NOT WHO YOU ARE. THIS IS WHAT THIS INTERACTION MADE LEGIBLE.">
           {reveal?.what_we_cannot_know && reveal.what_we_cannot_know.length > 0 ? (
@@ -614,6 +645,7 @@ export default function Stage08DataJourney({
             'THE SYSTEM DID NOT REPORT ITS LIMITS FOR THIS SESSION.'
           )}
         </EvidenceRow>
+        </Tier>
       </div>
 
       {/* ——— Wall of Fame ——— */}
