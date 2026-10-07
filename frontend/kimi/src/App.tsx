@@ -68,15 +68,16 @@ export default function App() {
     if (!sessionId) return;
     setError(null);
     try {
-      const result = offering.text
-        ? await submitInitialText(sessionId, offering.text)
-        : offering.media
-          ? await submitInitialMedia(
-              sessionId,
-              offering.channel === 'speak' ? 'AUDIO' : offering.channel === 'look' ? 'CAMERA' : 'IMAGE',
-              offering.media,
-              offering.filename || 'offering.bin',
-            )
+  const result = offering.channel === 'write' && offering.text
+    ? await submitInitialText(sessionId, offering.text)
+    : offering.media
+      ? await submitInitialMedia(
+        sessionId,
+        offering.channel === 'speak' ? 'AUDIO' : offering.channel === 'look' ? 'VIDEO' : 'IMAGE',
+        offering.media,
+        offering.filename || 'offering.bin',
+        { transcript: offering.transcript, faceDetected: offering.faceDetected, expressionCues: offering.expressionCues },
+      )
           : null;
 
       if (!result?.analysis_ready) {

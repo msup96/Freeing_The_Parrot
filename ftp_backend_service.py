@@ -657,6 +657,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             duration_sec = float(body.get("duration_sec", 0.0) or 0.0)
             is_doc = body.get("is_document")
             ocr_hint = body.get("ocr_hint")
+            transcript = str(body.get("transcript") or "").strip()
+            face_detected = body.get("face_detected")
+            expression_cues = body.get("expression_cues")
 
             coord = get_or_create_coordinator(sid)
             coord.record_raw_input({"modality": modality})
@@ -666,7 +669,11 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 multi_ctx = analyze_voice_offering(transcript=transcript or "Voice offering received.", duration_sec=duration_sec or 3.5)
                 channel = "speak"
             elif modality in ("VIDEO",):
-                multi_ctx = analyze_video_offering(duration_sec=duration_sec or 15.0)
+                multi_ctx = analyze_video_offering(
+                    duration_sec=duration_sec or 15.0,
+                    face_detected=face_detected,
+                    expression_cues=expression_cues if isinstance(expression_cues, list) else None,
+                )
                 channel = "look"
             else:
                 multi_ctx = analyze_photo_offering(filename=filename, ocr_hint=ocr_hint, is_document=is_doc)
