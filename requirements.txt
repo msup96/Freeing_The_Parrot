@@ -6,3 +6,4 @@ opencv-python-headless==5.0.0.93
 pytesseract==0.3.13
 vaderSentiment==3.3.2
 pytest==9.1.1
+psycopg[binary]==3.2.3

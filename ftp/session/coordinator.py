@@ -114,9 +114,13 @@ class SessionCoordinator:
             coordinator.record_parrot_turn(turn_text=user_turn, reply=reply)
     """
 
-    def __init__(self, session_id: str | None = None) -> None:
+    def __init__(self, session_id: str | None = None, persistence=None) -> None:
         self._identity = SessionIdentity(session_id=session_id)
-        self._store = EventStore(session_id=self._identity.session_id)
+        self._persistence = persistence
+        self._store = EventStore(
+            session_id=self._identity.session_id,
+            on_append=(persistence.append_event if persistence is not None else None),
+        )
         self._machine = SessionStateMachine(
             on_transition=self._on_state_change,
         )
