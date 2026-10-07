@@ -4,6 +4,7 @@ import ftp_backend_service as backend
 from ftp.events.model import EventType
 from ftp.session.coordinator import SessionCoordinator
 from ftp.session.states import SessionState
+from ftp.silent_reader.navarasa_trajectory import NavarasaTrajectorySynthesizer
 
 TURNS = [
     "Why does it repeat me?",
@@ -58,6 +59,31 @@ def test_interaction_profile_serializes_existing_artifacts_only():
     # No Rasa was detected, so none may be reported as a trajectory.
     assert reveal["navarasa_trajectory"]["detected_sequence"] == []
     assert profile["navarasa_status"] == "insufficient_evidence"
+
+
+def test_trajectory_uses_live_analysis_snapshot_without_reanalysis():
+    coordinator = SessionCoordinator()
+    coordinator.start()
+    coordinator.advance(SessionState.LIVE_CONVERSATION)
+    snapshot = {
+        "primary_rasa": "Karuna",
+        "analysis_quality": "detected",
+        "rasa_scores": {"Karuna": 0.9},
+        "emotional_words": ["grief"],
+        "sentiment": {"label": "negative"},
+    }
+    coordinator.record_parrot_turn(
+        "neutral wording",
+        "response",
+        analysis_snapshot=snapshot,
+    )
+
+    trajectory = NavarasaTrajectorySynthesizer(coordinator).synthesize()
+    row = trajectory["turn_sequence"][0]
+
+    assert row["primary_rasa"] == "Karuna"
+    assert row["emotional_words"] == ["grief"]
+    assert row["method"] == "navarasa_engine.analyse_text"
 
 
 def test_turn_lineage_carries_analysis_and_decision_metadata():
