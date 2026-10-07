@@ -59,7 +59,7 @@ export default function Stage07Break({
         </>
       )}
 
-      <div className={`min-h-[100dvh] flex ${step >= 3 ? 'items-start justify-start pl-[14%] pt-[12%] md:pt-[18%]' : 'items-center justify-center'} transition-all`} style={{ transitionDuration: '250ms' }}>
+      <div className={`min-h-[100dvh] flex ${step >= 3 ? 'items-start justify-start pl-4 sm:pl-[8%] md:pl-[14%] pt-[16%] sm:pt-[12%] md:pt-[18%] pb-40' : 'items-center justify-center'} transition-all`} style={{ transitionDuration: '250ms' }}>
         {/* the card the participant turned and reported as resonating */}
         <motion.div
           className="w-[min(56vw,210px)] md:w-[280px] aspect-[2/3] relative"
@@ -137,7 +137,7 @@ export default function Stage07Break({
             {ANNOTATIONS.filter((a) => step >= a.at).map((a) => (
               <motion.div
                 key={`m-${a.text}`}
-                className="font-mono text-[9px] tracking-[0.2em] text-crimson/80 whitespace-nowrap"
+                className="max-w-[calc(100vw-2rem)] font-mono text-[8px] sm:text-[9px] tracking-[0.12em] sm:tracking-[0.2em] leading-snug text-crimson/80 whitespace-normal break-words"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.15 }}
