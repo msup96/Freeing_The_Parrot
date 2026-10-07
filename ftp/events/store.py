@@ -45,9 +45,10 @@ class EventStore:
         The UUIDv4 string identifying the session this store belongs to.
     """
 
-    def __init__(self, session_id: str) -> None:
+    def __init__(self, session_id: str, on_append: Callable[[InteractionEvent], None] | None = None) -> None:
         self._session_id: str = session_id
         self._events: list[InteractionEvent] = []
+        self._on_append = on_append
         self._lock: threading.Lock = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -77,6 +78,8 @@ class EventStore:
             # We create a new instance rather than mutate to preserve the
             # immutability contract of the *returned* event object.
             stamped = _stamp_sequence(event, seq)
+            if self._on_append is not None:
+                self._on_append(stamped)
             self._events.append(stamped)
             return stamped
 

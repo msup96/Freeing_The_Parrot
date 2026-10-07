@@ -31,6 +31,7 @@ from ftp.parrot.director import BehaviourDirector
 from ftp.parrot.gemini_adapter import GeminiParrotAdapter
 from ftp.parrot.realizer import LanguageRealizer, build_realizer_request
 from ftp.session.coordinator import SessionCoordinator
+from ftp.session.neon_persistence import build_neon_persistence
 from ftp.session.states import SessionState
 from ftp.silent_reader.reading.compose import compose_reading_deck
 from ftp.silent_reader.reading.validate import validate_card_resonance
@@ -80,7 +81,13 @@ def purge_expired_sessions(now: float | None = None) -> list[str]:
 def create_session() -> SessionCoordinator:
     purge_expired_sessions()
     sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(8).hex()}"
-    coord = SessionCoordinator(sid)
+    persistence = build_neon_persistence()
+    coord = SessionCoordinator(sid, persistence=persistence)
+    if persistence is not None:
+        persistence.create_session(
+            sid,
+            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + SESSION_TTL_SECONDS)),
+        )
     coord.start()
     SESSIONS[sid] = coord
     SESSION_CREATED_AT[sid] = time.time()
