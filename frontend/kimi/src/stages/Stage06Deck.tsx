@@ -23,7 +23,7 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
         <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[8px] sm:text-[9px] md:text-xs'} tracking-[0.08em] text-parchment leading-tight break-words max-w-full`}>
           {card.title}
         </div>
-        <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[8px] md:text-[9px]'} tracking-[0.22em] text-gold/70 uppercase`}>
+        <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[5px] sm:text-[6px] md:text-[7px]'} tracking-[0.1em] text-gold/70 uppercase`}>
           TERRITORY · {card.semanticAnchor}
         </div>
         {card.archetype && (
