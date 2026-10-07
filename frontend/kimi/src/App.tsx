@@ -11,7 +11,6 @@ import Stage08DataJourney from './stages/Stage08DataJourney';
 import Stage09Exit from './stages/Stage09Exit';
 import {
   advanceLifecycle,
-  completeInput,
   endConversation,
   generateOutput,
   getSessionReveal,
@@ -84,8 +83,9 @@ export default function App() {
         throw new Error('This offering was received, but its required analysis is not available yet.');
       }
 
-      await completeInput(sessionId);
-      setSession((current: Session) => ({ ...current, offering }));
+    // The ingest endpoint already advances the authoritative analysis state.
+    // The legacy input_complete endpoint is unavailable on the production backend.
+    setSession((current: Session) => ({ ...current, offering }));
       goTo(3);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The offering could not be processed.');
