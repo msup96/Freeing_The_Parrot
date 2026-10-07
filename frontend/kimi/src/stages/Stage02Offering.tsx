@@ -81,9 +81,13 @@ function SpeakChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
   const [listening, setListening] = useState(false);
   const [done, setDone] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [transcript, setTranscript] = useState('');
+  const recognitionRef = useRef<{ start: () => void; stop: () => void; onresult: ((event: any) => void) | null; onerror: (() => void) | null } | null>(null);
   const barsRef = useRef<number[]>(Array.from({ length: 24 }, () => 0.15));
   const [bars, setBars] = useState<number[]>(barsRef.current);
   const streamRef = useRef<MediaStream | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
@@ -91,10 +95,31 @@ function SpeakChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
     const iv = window.setInterval(() => setSeconds((s) => s + 1), 1000);
     let analyser: AnalyserNode | null = null;
     let ctx: AudioContext | null = null;
+    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (Recognition) {
+      const recognition = new Recognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = document.documentElement.lang || 'en-US';
+      recognition.onresult = (event: any) => {
+        const next = Array.from(event.results as ArrayLike<{ 0: { transcript: string } }>).map((result: any) => result[0].transcript).join(' ');
+        setTranscript(next.trim());
+      };
+      recognition.onerror = () => { recognitionRef.current = null; };
+      recognitionRef.current = recognition;
+      recognition.start();
+    }
     navigator.mediaDevices
       ?.getUserMedia({ audio: true })
       .then((stream) => {
         streamRef.current = stream;
+        if (typeof MediaRecorder !== 'undefined') {
+          chunksRef.current = [];
+          const recorder = new MediaRecorder(stream);
+          recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
+          recorder.start();
+          recorderRef.current = recorder;
+        }
         ctx = new AudioContext();
         analyser = ctx.createAnalyser();
         analyser.fftSize = 64;
@@ -121,6 +146,8 @@ function SpeakChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
       clearInterval(iv);
       cancelAnimationFrame(rafRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
       ctx?.close().catch(() => {});
     };
   }, [listening]);
@@ -128,10 +155,17 @@ function SpeakChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
   const finish = () => {
     setListening(false);
     setDone(true);
-    window.setTimeout(
-      () => onSubmit({ channel: 'speak', text: `[signal received — ${seconds}s]`, timestamp: Date.now() }),
-      1600,
-    );
+    const recorder = recorderRef.current;
+    const submit = () => {
+      const media = chunksRef.current.length ? new Blob(chunksRef.current, { type: recorder?.mimeType || 'audio/webm' }) : undefined;
+      onSubmit({ channel: 'speak', text: transcript.trim() || `[signal received — ${seconds}s]`, transcript: transcript.trim(), media, filename: 'voice.webm', timestamp: Date.now() });
+    };
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.onstop = submit;
+      recorder.stop();
+    } else {
+      submit();
+    }
   };
 
   return (
@@ -245,6 +279,7 @@ function LookChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
   const [state, setState] = useState<'closed' | 'open' | 'denied' | 'captured'>('closed');
   const [count, setCount] = useState<number | null>(null);
   const [img, setImg] = useState<string | null>(null);
+  const [faceDetected, setFaceDetected] = useState(false);
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
 
@@ -275,11 +310,15 @@ function LookChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
     ctx.scale(-1, 1);
     ctx.drawImage(v, 0, 0);
     const url = c.toDataURL('image/jpeg', 0.82);
+    const Detector = (window as any).FaceDetector;
+    if (Detector) {
+      new Detector({ fastMode: true, maxDetectedFaces: 1 }).detect(c).then((faces: unknown[]) => setFaceDetected(faces.length > 0)).catch(() => setFaceDetected(false));
+    }
     setImg(url);
     setState('captured');
     streamRef.current?.getTracks().forEach((t) => t.stop());
     c.toBlob((blob) => {
-      if (blob) window.setTimeout(() => onSubmit({ channel: 'look', imageDataUrl: url, media: blob, filename: 'camera.jpg', timestamp: Date.now() }), 1800);
+      if (blob) window.setTimeout(() => onSubmit({ channel: 'look', imageDataUrl: url, media: blob, filename: 'camera.jpg', faceDetected, expressionCues: faceDetected ? ['face present in capture; expression analysis bounded to visible cues'] : ['face not confirmed by device detector'], timestamp: Date.now() }), 1800);
     }, 'image/jpeg', 0.82);
   };
 

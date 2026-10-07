@@ -3,8 +3,11 @@ export type OfferingChannel = 'write' | 'speak' | 'show' | 'look';
 export type Offering = {
   channel: OfferingChannel;
   text?: string;
+  transcript?: string;
   imageDataUrl?: string;
   media?: Blob;
+  faceDetected?: boolean;
+  expressionCues?: string[];
   filename?: string;
   timestamp: number;
 };

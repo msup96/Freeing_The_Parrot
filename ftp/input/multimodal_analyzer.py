@@ -175,15 +175,19 @@ def analyze_photo_offering(
 def analyze_video_offering(
     duration_sec: float = 10.0,
     frame_count: int = 30,
+    face_detected: bool | None = None,
+    expression_cues: list[str] | None = None,
 ) -> dict[str, Any]:
     """Temporal facial and expression analysis constrained to 60 seconds maximum."""
     bounded_duration = min(60.0, max(0.5, float(duration_sec)))
 
-    temporal_cues = [
+    temporal_cues = list(expression_cues or [
         "observable subtle head and gaze adjustments across recording",
         f"apparent expression stability across {bounded_duration:.1f}s window",
         "natural eye blink frequency",
-    ]
+    ])
+    if face_detected is False:
+        temporal_cues.append("no face confirmed by the device detector")
 
     summary = (
         f"Video recording of {bounded_duration:.1f}s analyzed for temporal expression signals. "
