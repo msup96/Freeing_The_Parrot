@@ -105,6 +105,9 @@ export default function Stage09Exit({ session, onRestart }: { session: Session; 
           >
             <div className="font-mono text-[10px] tracking-[0.5em] text-parchment-faint/70">FORTUNA VIDET OMNIA</div>
             <div className="mt-3 font-serif italic text-xs text-parchment-faint/50">fortune sees everything</div>
+            <p className="mx-auto mt-8 max-w-sm font-serif text-xs leading-relaxed text-parchment-faint/60">
+              Freeing the Parrot turns one consented session into a reflective portrait—your words, choices, and signals remain a conversation, not a fixed identity.
+            </p>
             <button
               onClick={onRestart}
               className="mt-14 font-mono text-[10px] tracking-[0.45em] text-parchment-faint hover:text-gold transition-colors duration-700 min-h-[44px] px-6"
