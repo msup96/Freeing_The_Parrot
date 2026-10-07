@@ -259,15 +259,15 @@ def _apply_directive_overlay(
         return base
 
     if directive == "familiarity":
-        prefix = f"Earlier you mentioned {excerpt}."
+        prefix = f"You mentioned {excerpt} earlier. I kept that in mind."
     elif directive == "reciprocity":
-        prefix = f'You called it "{excerpt}".'
+        prefix = f'You called it "{excerpt}". I am still curious about that.'
     elif directive == "curiosity":
-        prefix = f"You brought up {excerpt} —"
+        prefix = f"You brought up {excerpt}. What made that the part worth mentioning?"
     elif directive == "expectation":
-        prefix = "You left that question open —"
+        prefix = "You left that question open. I noticed."
     elif directive == "repair":
-        prefix = "Let's try that again."
+        prefix = "Let's try that again; I lost the thread for a moment."
     else:
         return base
 
