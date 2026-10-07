@@ -103,6 +103,17 @@ class SessionStateMachine:
         if self._on_transition is not None:
             self._on_transition(previous, target)
 
+    def hydrate_history(self, states: list[SessionState]) -> None:
+        """Restore validated persisted history without firing callbacks."""
+        if not states:
+            return
+        self._history = [SessionState.IDLE_STANDBY]
+        self._state = SessionState.IDLE_STANDBY
+        for target in states:
+            if self.can_transition_to(target):
+                self._state = target
+                self._history.append(target)
+
     # ------------------------------------------------------------------
     # Convenience shortcuts used by SessionCoordinator
     # ------------------------------------------------------------------

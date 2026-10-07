@@ -11,7 +11,7 @@ from typing import Any
 
 import psycopg
 
-from ftp.events.model import InteractionEvent
+from ftp.events.model import EventType, InteractionEvent, ProvenanceLevel
 
 
 class NeonSessionPersistence:
@@ -88,6 +88,23 @@ class NeonSessionPersistence:
                 "timestamp": row[5],
             }
             for row in rows
+        ]
+
+    def load_interaction_events(self, session_id: str) -> list[InteractionEvent]:
+        """Rebuild immutable events without invoking persistence callbacks."""
+        return [
+            InteractionEvent(
+                session_id=session_id,
+                event_type=EventType(row["event_type"]),
+                provenance_level=ProvenanceLevel(row["provenance_level"]),
+                payload=dict(row["payload"] or {}),
+                sequence_num=int(row["sequence_num"]),
+                event_id=row["event_id"],
+                timestamp=row["timestamp"].isoformat()
+                if hasattr(row["timestamp"], "isoformat")
+                else str(row["timestamp"]),
+            )
+            for row in self.load_events(session_id)
         ]
 
     def update_session_state(self, session_id: str, state: dict[str, Any]) -> None:

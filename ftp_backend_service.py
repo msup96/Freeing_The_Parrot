@@ -99,7 +99,26 @@ def get_session(session_id: str | None) -> SessionCoordinator | None:
     purge_expired_sessions()
     if not session_id:
         return None
-    return SESSIONS.get(str(session_id))
+    sid = str(session_id)
+    cached = SESSIONS.get(sid)
+    if cached is not None:
+        return cached
+    persistence = build_neon_persistence()
+    if persistence is None:
+        return None
+    try:
+        events = persistence.load_events(sid)
+        if not events:
+            return None
+        coord = SessionCoordinator(sid, persistence=persistence)
+        coord.hydrate_from_persistence()
+        SESSIONS[sid] = coord
+        SESSION_CREATED_AT.setdefault(sid, time.time())
+        logger.info("Hydrated FTP session coordinator: %s", sid)
+        return coord
+    except Exception as exc:
+        logger.warning("Could not hydrate FTP session %s: %s", sid, exc)
+        return None
 
 
 def require_session(session_id: str | None) -> SessionCoordinator:
