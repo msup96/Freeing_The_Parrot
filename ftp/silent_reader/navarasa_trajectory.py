@@ -80,7 +80,15 @@ class NavarasaTrajectorySynthesizer:
         ):
             turn_index = int(parrot_event.payload.get("turn_index", index))
             user_text = str(parrot_event.payload.get("user_text") or "")
-            analysis = analyse_text(user_text)
+            stored_analysis = parrot_event.payload.get("analysis_snapshot")
+            # Prefer the immutable live-turn snapshot so the showdown reports the
+            # same evidence that informed the Parrot. Older sessions predate this
+            # contract, so they retain the deterministic re-analysis fallback.
+            analysis = (
+                dict(stored_analysis)
+                if isinstance(stored_analysis, dict) and stored_analysis
+                else analyse_text(user_text)
+            )
             quality = str(analysis.get("analysis_quality") or "")
             defaulted = quality in _DEFAULT_QUALITIES
             rows.append(
