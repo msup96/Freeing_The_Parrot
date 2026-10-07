@@ -1,620 +1,259 @@
-## Freeing the Parrot 2.0 — Execution & Deployment Report
-
-1. Project Overview
-
-Freeing the Parrot 2.0 (FTP 2.0) is an interactive research apparatus that guides a participant through a conversation, observes interaction signals, generates post-session interpretations, presents 27 reflective readings, allows participant selection, and concludes with a machine-readable reflection.
-The system is designed to produce readings, not rewards or diagnoses.
-The project currently consists of:
-- A frontend experience in frontend/kimi
-- A Python backend in ftp_backend_service.py
-- Supporting modules in ftp/
-- A Navarasa analysis engine
-- A session lifecycle and state machine
-- Evidence and interaction-profile pipelines
-- A post-session reading and 27-card deck pipeline
-- Data Showdown / Data Journey stages
-- Participant selection and resonance interaction
-- Final machine reveal and closing stages
-- Vercel deployment for the frontend
-- Render deployment for the backend
-- Optional persistence infrastructure
-
-2. Core Experience Flow
-
-The intended FTP 2.0 journey is:
-MULTIMODAL INPUT
-        ↓
-EVENT NORMALIZATION
-        ↓
-EVENT STORE
-        ↓
-LIVE PARROT
-        ↓
-SILENT READER
-        ↓
-"I AM DONE!"
-        ↓
-SESSION LOCK
-        ↓
-POST-SESSION INTERPRETATION
-        ↓
-27 QUALITATIVE READINGS
-        ↓
-PARTICIPANT SELECTION
-        ↓
-DATA REVEAL
-        ↓
-INTERACTION PROFILE
-        ↓
-WHAT THE SYSTEM CANNOT KNOW
-        ↓
-CONSENT / PURGE
-
-The central architectural principle is:
-The Parrot Remains Ignorant.
-
-The live Parrot does not receive the Silent Reader's telemetry or post-session analytical interpretation during the conversation.
-The participant-facing reading layer is also separated from the internal analytical layer.
-
-3. Deployment Architecture
-
-FTP 2.0 is deployed as two primary services:
-                    PARTICIPANT
-                         │
-                         ▼
-              ┌─────────────────────┐
-              │       VERCEL        │
-              │   FTP 2.0 Frontend  │
-              └──────────┬──────────┘
-                         │
-                         │ API requests
-                         ▼
-              ┌─────────────────────┐
-              │       RENDER        │
-              │   FTP 2.0 Backend   │
-              └──────────┬──────────┘
-                         │
-              ┌──────────┴──────────┐
-              │                     │
-              ▼                     ▼
-        Session / Analysis    Optional Persistence
-              │
-              ▼
-        Silent Reader
-              │
-              ▼
-       Reading Pipeline
-              │
-              ▼
-          27 Cards
-              │
-              ▼
-        Data Reveal
-
-The public frontend is hosted through Vercel.
-The backend is hosted through Render at:
-https://ftp2-backend.onrender.com
-
-The production frontend is served through the Vercel deployment associated with the FTP_2.0 branch.
-
-4. Major Failure States Encountered
-
-4.1 Backend Unavailable — “Failed to Fetch”
-The browser initially displayed:
-The apparatus could not reach its backend. Please try again.
-
-The frontend was unable to complete requests to the backend.
-The configured backend URL was subsequently confirmed as:
-
-https://ftp2-backend.onrender.com
-
-An additional issue was identified around optional persistence. A persistence failure could occur while the live session itself was otherwise usable.
-The system was subsequently adjusted so that optional persistence is treated as best-effort rather than allowing a temporary persistence failure to immediately destroy the live participant experience.
-
-5. Vercel 404
-
-The public site initially displayed:
-404 NOT_FOUND
-
-Cause
-The frontend was being built into:
-kimi_dist
-
-while Vercel was configured to look for:
-dist
-
-As a result, the source could build successfully while the deployed site still had no published entry point.
-The output directory was corrected so that Vercel serves:
-kimi_dist
-
-Frontend Dependency Issue
-A second deployment problem was discovered.
-Vercel installed the root project's dependencies but did not automatically install the separate frontend dependencies contained within:
-frontend/kimi
-
-The frontend required dependencies such as Vite and its React plugin.
-The root build process was therefore updated so that frontend dependencies are installed before the frontend production build is executed.
-Branch Alignment Issue
-A further deployment lesson emerged:
-A successful deployment of a v0/... branch does not mean that the production URL has received that change.
-The production branch must contain the fix.
-For FTP 2.0, the production branch is:
-FTP_2.0
-
-6. Lifecycle 404 / Unknown POST Route
-
-A backend lifecycle issue was discovered around:
-input_complete
-
-and:
-card_selection
-
-The backend correctly processed the requested state transition.
-However, those branches did not return a success response.
-Execution therefore continued into the generic unknown-route response.
-This produced a 404 even though the underlying action had actually succeeded.
-Fix
-Explicit JSON success responses were added immediately after both lifecycle actions.
-The backend now returns a successful response after completing these actions rather than falling through to the generic 404 handler.
-
-7. Participant-Facing Card Spoiler Validation Failure
-
-During post-session interpretation, the frontend displayed:
-Internal FTP error:
-participant-facing card text contains analytical spoilers
-
-This was traced to the reading-deck generation pipeline.
-The relevant sequence was:
-LIVE CONVERSATION
-        ↓
-I AM DONE
-        ↓
-SESSION LOCK
-        ↓
-POST-SESSION INTERPRETATION
-        ↓
-READING PROFILE
-        ↓
-READING SEED
-        ↓
-27-CARD COMPOSITION
-        ↓
-DECK VALIDATION
-
-The validator correctly rejected a participant-facing card when analytical or internal system language appeared in the generated reading.
-Examples of prohibited material included:
-- evidence IDs
-- inference IDs
-- event IDs
-- confidence
-- telemetry
-- Gemini
-- Navarasa labels
-- analytical wording
-- internal system terminology
-Corrective Approach
-The validator itself was not weakened.
-Instead, the reading-seed sanitization layer was strengthened.
-The principle is:
-INTERNAL ANALYTICAL INFORMATION
-                ↓
-        SANITIZATION BOUNDARY
-                ↓
-PARTICIPANT-SAFE QUALITATIVE READING
-
-This preserves the original analytical information internally as provenance while preventing it from leaking into participant-facing prose.
-The issue was intermittent because the analytical material produced during different conversations could vary. A given session might generate a safe seed, while another session could produce language containing one of the validator's prohibited terms.
-The final reproduction condition was identified as:
-ENGAGED CONVERSATION
-        ↓
-I AM DONE
-        ↓
-POST-SESSION READING GENERATION
-        ↓
-CARD VALIDATION
-        ↓
-POSSIBLE SPOILER REJECTION
-
-This isolated the problem to the transition between analytical interpretation and participant-facing reading composition.
-
-8. Navarasa Engagement Detection
-Another issue appeared during engaged conversations.
-The Data Showdown could display:
-NO RASA DETECTED
-
-even when the participant was clearly engaged.
-Cause
-The original Navarasa engine relied heavily on a narrow vocabulary of explicit emotional words and phrases.
-Natural engagement expressions such as:
-tell me more
-I want to understand
-I am interested
-this matters to me
-
-could therefore be treated as ordinary text.
-The system could subsequently fall back to:
-Shanta
-no_emotion_detected
-
-even though the interaction contained meaningful curiosity or engagement.
-Fix
-Engagement and curiosity signals were added to the existing:
-Adbhuta
-
-category.
-Additional expressions included:
-- “tell me more”
-- “keep going”
-- “I want to understand”
-- “I want to know”
-- “this matters to me”
-Engaged examples were then verified to produce Adbhuta rather than no_emotion_detected.
-
-9. Git Push Failure
-
-During development, the system reported:
-There was an error auto committing and pushing changes:
-Unknown error.
-
-The local work remained preserved in:
-f31966e
-
-on:
-v0/session-archetype
-
-Manual push attempts subsequently encountered a GitHub server-side Internal Server Error.
-This was treated as a GitHub/push-service issue rather than a code failure.
-No destructive reset, deletion, or repository reconstruction was performed.
-The important recovery principle was:
-FAILED PUSH
-     ↓
-CHECK LOCAL COMMIT
-     ↓
-CHECK REMOTE STATE
-     ↓
-PRESERVE WORK
-     ↓
-RETRY / MERGE
-
-10. Reliability and Persistence Changes
-
-Changes were made to make optional persistence best-effort.
-The system was adjusted so that:
-- A temporary persistence failure does not necessarily terminate the live session.
-- Session creation can fall back safely when optional persistence is unavailable.
-- The participant can continue interacting with the live system when persistence is temporarily unavailable.
-- Frontend server-error messaging is clearer.
-Commit:
-a844d93
-
-Branch:
-v0/prevent-ftp-runtime-failures
-
-11. Reading Seed Privacy and Spoiler Protection
-
-The reading pipeline was strengthened to ensure that internal analytical material cannot accidentally become participant-facing prose.
-Changes included:
-- Participant-facing reading-seed sanitization.
-- Detection of internal identifiers.
-- Detection of analytical terminology.
-- Safe fallback prose.
-- Preservation of original claims internally.
-- Preservation of interpretation data internally.
-- Preservation of confidence and evidence references internally.
-- Regression tests covering analytical and internal terms.
-Commits included:
-18462f7
-
-Branch:
-v0/sanitize-reading-seeds
-
-and:
-3380287
-
-Branch:
-v0/harden-reading-seed-sanitizer
-
-12. Vercel Deployment Fixes
-
-The Vercel deployment was corrected in several stages.
-Changes included:
-- Correcting the output directory from dist to kimi_dist.
-- Installing frontend dependencies during the production build.
-- Confirming that the frontend could produce the expected production output.
-- Aligning production deployment with the FTP_2.0 branch.
-Commits included:
-be8f8b9
-
-Branch:
-v0/restore-public-project
-
-and:
-3954acc
-
-Branch:
-v0/fix-vercel-frontend-install
-
-13. Lifecycle Response Fix
-
-Explicit successful JSON responses were added for:
-input_complete
-
-and:
-card_selection
-
-This prevented successful lifecycle operations from falling through to the generic 404 response.
-Commit:
-e54c390
-
-14. UI Changes
-
-Two targeted interface changes were implemented:
-1. Added a short four-line FTP 2.0 explanation above the BEGIN AGAIN button.
-2. Reduced the title size of cards in the 27-card grid.
-Validation at that checkpoint included:
-- Frontend production build passed.
-- 60 backend regression tests passed.
-- Live backend health check returned HTTP 200.
-- Browser homepage smoke test passed without browser errors.
-Commit:
-c4e5db9
-
-Branch:
-v0/ftp2-about-and-card-scale
-
-15. Navarasa Engagement Fix
-
-The Navarasa engine was expanded to recognize engagement, curiosity, excitement, and exploratory interaction.
-Examples included:
-- “tell me more”
-- “keep going”
-- “I want to understand”
-- “I want to know”
-- “this matters to me”
-The purpose was not to turn engagement into a psychological diagnosis, but to allow the existing Navarasa analytical layer to recognize conversational curiosity that was previously invisible to the narrow vocabulary.
-Commit:
-477f766
-
-Branch:
-v0/fix-navarasa-engagement
-
-16. Session Archetype
-
-A session-scoped archetype was introduced using information from:
-- interaction profile
-- selection pattern
-- trajectory
-Possible archetypes include:
-- The Curious Cartographer
-- The Pattern Keeper
-- The Inner Witness
-- The Quiet Observer
-The archetype is explicitly scoped to the single interaction.
-It is not intended to function as a permanent psychological label.
-The result is returned by the backend and displayed in the Data Journey.
-Local commit:
-f31966e
-
-Branch:
-v0/session-archetype
-
-17. Validation and Testing
-
-Across the development and deployment process, the following checks were repeatedly used:
-- Python syntax compilation
-- Frontend production builds
-- git diff --check
-- Reading-specific tests
-- Session lifecycle tests
-- Navarasa golden tests
-- Backend regression tests
-- Full Python test suites
-- Live backend health checks
-- Browser smoke tests
-Reported successful checkpoints included:
-Validation	Result
-Backend reliability checkpoint	497 tests passed
-Full Python spoiler-sanitizer checkpoint	488 tests passed
-Reading-specific sanitizer tests	23 tests passed
-Targeted backend UI audit	60 tests passed
-Frontend production builds	Passed
-Live backend health	HTTP 200
-Browser homepage smoke test	Passed
-
-
-18. Git and Branch History
-
-The project used separate development branches to isolate changes and reduce the risk of damaging the working production branch.
-Important branches and commits included:
-Branch	Commit	Purpose
-v0/prevent-ftp-runtime-failures	a844d93	Runtime and persistence protection
-v0/sanitize-reading-seeds	18462f7	Reading-seed sanitization
-v0/restore-public-project	be8f8b9	Vercel deployment restoration
-v0/fix-vercel-frontend-install	3954acc	Frontend dependency installation
-v0/ftp2-about-and-card-scale	c4e5db9	UI changes
-v0/harden-reading-seed-sanitizer	3380287	Hardened spoiler protection
-v0/fix-navarasa-engagement	477f766	Engagement detection
-v0/session-archetype	f31966e	Session archetype
-
-
-The project also underwent controlled version reversions through the v0 interface during recovery.
-Version 30 had previously been identified as the last version reported as working without errors.
-
-19. Current Operational State
-The major implementation and deployment problems encountered during development have been addressed.
-The system currently supports:
-- Public frontend deployment.
-- Live backend communication.
-- Session creation.
-- Live Parrot interaction.
-- Silent Reader processing.
-- Navarasa analysis.
-- Post-session interpretation.
-- 27-card reading generation.
-- Participant card selection.
-- Data Showdown / Data Journey.
-- Session-scoped interaction profiling.
-- Participant-facing analytical safeguards.
-- Final machine reveal.
-- Session completion and restart.
-The production branch is:
-FTP_2.0
-
-The backend is hosted at:
-https://ftp2-backend.onrender.com
-
-The public frontend is hosted through the project's Vercel deployment.
-
-20. Deployment Alignment
-
-One of the most important operational lessons from the project is that a successful development branch is not necessarily the production deployment.
-The deployment chain must remain aligned:
-GitHub
-   ↓
-FTP_2.0
-   ↓
-Vercel Production
-
-and:
-GitHub
-   ↓
-FTP_2.0
-   ↓
-Render Backend
-
-A fix existing only on a v0/... branch does not affect the public experience until it is merged into the branch used for production deployment.
-
-21. Working With Future Failures
-
-If a professor, reviewer, or participant encounters an unexpected error in the public deployment, the appropriate response is not to immediately reset or rebuild the repository.
-The recommended diagnostic sequence is:
-SCREENSHOT / ERROR
-        ↓
-IDENTIFY EXACT ACTION
-        ↓
-REPRODUCE
-        ↓
-CHECK FRONTEND
-        ↓
-CHECK BACKEND
-        ↓
-CHECK RENDER LOGS
-        ↓
-CHECK GITHUB COMMIT
-        ↓
-ISOLATE ROOT CAUSE
-        ↓
-MAKE SMALLEST FIX
-        ↓
-RUN TESTS
-        ↓
-DEPLOY
-        ↓
-VERIFY PUBLIC URL
-
-For an external reviewer, the useful information to collect is:
-1. A screenshot of the error.
-2. The approximate time it occurred.
-3. The action immediately preceding the error.
-4. Whether the issue occurred again after restarting the session.
-This is sufficient to distinguish most frontend, backend, deployment, and application-logic failures.
-
-22. Known Limitations
-
-FTP 2.0 is an experimental research prototype, not a production-grade commercial system.
-The system consists of multiple services and analytical stages, so transient infrastructure or runtime failures remain possible.
-The intended experience is:
-INPUT
-  ↓
-LIVE CONVERSATION
-  ↓
-I AM DONE
-  ↓
-SESSION LOCK
-  ↓
-POST-SESSION INTERPRETATION
-  ↓
-READING DECK
-  ↓
-PARTICIPANT SELECTION
-  ↓
-DATA REVEAL
-  ↓
-REFLECTION
-
-If a failure occurs during a post-session stage, restarting the session may be required.
-The system should not be interpreted as:
-- a psychological assessment
-- a diagnostic tool
-- a permanent personality profiler
-- an objective statement of who the participant is
-Its readings are generated within the context of a single interaction.
-
-23. Important Engineering Lessons
-
-23.1 Local success does not prove production success
-A successful local build does not prove that production is running that same build.
-23.2 Production branch alignment matters
-The branch containing the fix must match the branch used by the production deployment.
-For FTP 2.0:
-FTP_2.0
-
-23.3 Build output configuration must match
-The build output folder must exactly match Vercel's configured output directory.
-FTP 2.0 uses:
-kimi_dist
-
-23.4 Backend state changes require responses
-A backend operation can successfully change the server-side state and still appear broken to the browser if the server does not return a successful response.
-23.5 Analytical data must remain separated from participant-facing language
-Internal evidence, inference, telemetry, identifiers, confidence values, and analytical terminology must not accidentally become participant-facing prose.
-23.6 Validators can be safety mechanisms
-A validator rejecting a reading deck is not necessarily a system failure.
-In FTP 2.0, the validator exists partly to prevent internal analytical information from leaking into the participant-facing experience.
-23.7 Failed Git pushes do not necessarily mean lost work
-When GitHub reports a server-side push failure, the correct response is to inspect the local commit and remote branch before performing any destructive operation.
-The local repository can still contain the complete work.
-23.8 Recovery should be controlled
-The preferred recovery pattern is:
-INSPECT
-   ↓
-TEST
-   ↓
-PRESERVE
-   ↓
-MERGE
-   ↓
-DEPLOY
-   ↓
-VERIFY
-
-rather than:
-ERROR
-   ↓
-RESET
-   ↓
-DELETE
-   ↓
-REBUILD EVERYTHING
-
-24. Final Status
-
-FTP 2.0 has progressed from a locally developed prototype through iterative debugging, testing, deployment, recovery, and public validation into a functioning deployed research apparatus.
-The most significant technical achievement is not simply that the application runs.
-It is that the system now maintains a deliberate separation between:
-WHAT THE PARTICIPANT SAYS
-        ↓
-WHAT THE SYSTEM OBSERVES
-        ↓
-WHAT THE SYSTEM MEASURES
-        ↓
-WHAT THE SYSTEM INTERPRETS
-        ↓
-WHAT THE SYSTEM CONSTRUCTS
-        ↓
-WHAT THE PARTICIPANT SELECTS
-        ↓
-WHAT THE SYSTEM CAN AND CANNOT KNOW
-
-This separation is central to the conceptual and technical integrity of Freeing the Parrot 2.0.
-The system is therefore best understood not as an AI that claims to know the participant, but as an experimental apparatus that makes visible how an interaction can be transformed into machine-readable signals, interpretations, selections, and ultimately a representation of the person who interacted with it.
+FREEING THE PARROT 2.0
+
+FTP2.0 — Execution Report
+
+FINAL STATUS: LOCKED PRODUCTION BASELINE
+
+##
+
+Project and purpose FTP2.0 is an interactive “apparatus” that guides a participant through a conversation, analyzes interaction signals, presents a Data Showdown, generates 27 reflective readings, allows card selection, and ends with a closing reflection. It is designed to produce readings, not rewards or diagnoses. The project consists of:
+
+A frontend experience in frontend/kimi.
+
+A Python backend in ftp_backend_service.py and supporting ftp/ modules.
+
+A Navarasa analysis engine.
+
+A session lifecycle, evidence, interaction-profile, reading, card-deck, and reveal pipeline.
+
+Vercel deployment for the frontend.
+
+A Render backend URL configured through VITE_FTP_API_URL.
+
+Neon-related environment variables and persistence support.
+
+##
+
+Original execution flow The intended journey is:
+
+Participant opens FTP2.0.
+
+Participant enters the experience and supplies conversational input.
+
+The backend creates a session.
+
+The parrot conducts the conversation.
+
+Interaction evidence and analysis are collected.
+
+The Navarasa engine analyzes emotional signals.
+
+The Data Showdown presents the collected interaction information.
+
+The participant reaches the 27-card reading deck.
+
+Cards can be flipped, selected, shuffled, and reviewed.
+
+The final reveal and closing stage are shown.
+
+The participant can begin again.
+
+##
+
+Failure states encountered
+
+A. Backend unavailable / “Failed to fetch” The browser displayed:
+
+The apparatus could not reach its backend. Please try again. The frontend was unable to complete requests to the backend. The configured backend variable was later confirmed as: `https\://ftp2-backend.onrender.com` The backend’s optional persistence layer could also fail while the live session was still otherwise usable.
+
+B. Vercel 404 The public site displayed:
+
+404 NOT_FOUND The cause was a deployment-output mismatch. The frontend built into `kimi_dist`, but Vercel was configured to look for `dist`. The live site therefore had no published entry page even though source files existed. A second deployment problem was found: Vercel installed root dependencies but did not install the frontend’s separate dependencies. The frontend needed packages such as Vite and its React plugin. The root build command was updated to install `frontend/kimi` dependencies before building. Another important deployment issue was branch mismatch: the live deployment was still using an older `FTP_2.0` commit while fixes existed on separate `v0/...` branches. A successful build on a separate branch did not automatically mean the production URL had received the fix.
+
+C. Lifecycle 404 / unknown POST route The backend correctly advanced state for input_complete and card_selection, but those branches did not return a success response. Execution continued into the generic unknown-route response, producing a 404 even though the action itself had succeeded. This was fixed by returning JSON success responses immediately after both lifecycle actions.
+
+D. Card spoiler validation failure The frontend displayed:
+
+Internal FTP error: participant-facing card text contains analytical spoilers The reading seed sent into the participant-facing deck could contain internal analytical terms, IDs, or model language. Examples included evidence IDs, inference IDs, confidence, telemetry, Gemini, Navarasa labels, and analysis wording. The deck validator correctly rejected this text rather than showing internal system information to the participant. The sanitizer was strengthened so contaminated seeds are replaced with safe qualitative language while the original analytical information remains available internally as provenance.
+
+E. “NO RASA DETECTED” during engaged conversations The Data Showdown showed no rasa even when the participant was clearly engaged. The cause was an overly narrow Navarasa dictionary. The engine recognized only exact emotional words and phrases. Natural engagement such as “tell me more,” “I want to understand,” “I am interested,” and “this matters to me” was treated as ordinary text. The system then fell back to Shanta with no_emotion_detected. Engagement and curiosity signals were added to the existing Adbhuta category.
+
+F. Auto-commit and push failure The system reported:
+
+There was an error auto committing and pushing changes: Unknown error. The local work was preserved in commit `f31966e` on `v0/session-archetype`. Manual Git pushes were attempted twice, but GitHub returned a server-side Internal Server Error. This was a GitHub/push-service failure, not a code failure. No reset, revert, or deletion was performed.
+
+##
+
+Changes made during the last two days
+
+Reliability and persistence protection
+
+Made optional artifact persistence best-effort.
+
+If database persistence temporarily fails, the live participant session can continue in memory instead of immediately failing.
+
+Made session creation fall back safely when optional persistence is unavailable.
+
+Improved the frontend message for server errors so a temporary service problem is clearer. Commit: a844d93 on v0/prevent-ftp-runtime-failures.
+
+Reading seed privacy and spoiler protection
+
+Added sanitization for participant-facing reading seeds.
+
+Added detection for internal identifiers and analytical terms.
+
+Added safe fallback prose by category.
+
+Preserved original claims, interpretations, confidence, and evidence references internally.
+
+Added regression tests for confidence, Gemini, evidence IDs, Navarasa, telemetry, and safe qualitative text. Commits included:
+
+18462f7 on v0/sanitize-reading-seeds.
+
+3380287 on v0/harden-reading-seed-sanitizer.
+
+Vercel deployment fixes
+
+Corrected Vercel’s output directory from dist to kimi_dist.
+
+Updated the root build to install frontend dependencies before building.
+
+Confirmed local production builds could create the expected output. Commits included:
+
+be8f8b9 on v0/restore-public-project.
+
+3954acc on v0/fix-vercel-frontend-install.
+
+Lifecycle response fix
+
+Added explicit successful JSON responses for input_complete.
+
+Added explicit successful JSON responses for card_selection.
+
+Prevented successful actions from falling through to the generic 404 response. Commit: e54c390.
+
+Requested UI changes Two targeted UI changes were made:
+
+Added a short four-line FTP2.0 explanation above the “BEGIN AGAIN” button.
+
+Reduced the title size of the cards in the 27-card grid. Validation at that point included:
+
+Frontend production build passed.
+
+60 backend regression tests passed.
+
+Live backend health check returned HTTP
+
+200.
+
+Browser smoke check loaded the homepage without browser errors. Commit: c4e5db9 on v0/ftp2-about-and-card-scale.
+
+Navarasa engagement fix
+
+Added engagement, interest, curiosity, excitement, and exploratory phrases to the Navarasa engine.
+
+Added phrases such as “tell me more,” “keep going,” “I want to understand,” “I want to know,” and “this matters to me.”
+
+Verified engaged examples returned Adbhuta rather than no emotion. Commit: 477f766 on v0/fix-navarasa-engagement.
+
+Session archetype implementation A session-scoped archetype was added from the interaction profile, selection pattern, and trajectory. Possible results include:
+
+The Curious Cartographer.
+
+The Pattern Keeper.
+
+The Inner Witness.
+
+The Quiet Observer. The result is explicitly described as applying to the single interaction, not as a permanent psychological label. It is returned by the backend and displayed in the Data Journey. Local commit: f31966e on v0/session-archetype.
+
+##
+
+Validation performed Across the fixes, the following checks were run:
+
+Python syntax compilation.
+
+Frontend production builds.
+
+git diff --check.
+
+Reading-specific tests.
+
+Session lifecycle tests.
+
+Navarasa golden tests.
+
+Backend regression tests.
+
+Full Python test suites at different checkpoints. Reported successful results included:
+
+497 backend tests passed during an earlier reliability checkpoint.
+
+488 full Python tests passed during the spoiler-sanitizer checkpoint.
+
+23 reading tests passed for the final sanitizer checkpoint.
+
+60 targeted backend tests passed during the UI audit.
+
+Frontend production builds passed at multiple checkpoints.
+
+Live backend health returned HTTP
+
+200.
+
+Browser homepage smoke test passed without browser errors.
+
+##
+
+Git and version history The project used separate safety branches rather than directly changing the base branch during fixes. Important branches and commits included:
+
+v0/prevent-ftp-runtime-failures — a844d93
+
+v0/sanitize-reading-seeds — 18462f7
+
+v0/restore-public-project — be8f8b9
+
+v0/fix-vercel-frontend-install — 3954acc
+
+v0/ftp2-about-and-card-scale — c4e5db9
+
+v0/harden-reading-seed-sanitizer — 3380287
+
+v0/fix-navarasa-engagement — 477f766
+
+v0/session-archetype — f31966e The project was also reverted through the v0 interface from version 30 into v43, and from version 29 into v44. Version 30 had previously been identified as the last version the user reported as working without errors.
+
+##
+
+Current known state The code fixes were designed to address:
+
+Backend fetch failures caused by persistence or deployment problems.
+
+Vercel 404s caused by incorrect output configuration and missing frontend dependencies.
+
+Lifecycle action 404s.
+
+Participant-facing analytical spoilers.
+
+False “NO RASA DETECTED” results for engaged conversations.
+
+The new session-archetype display. The main remaining operational requirement is deployment alignment: fixes on v0/... branches must be merged into the branch Vercel actually deploys, which is FTP_2.0, before they affect the public URL. The final Git push for the archetype work encountered a GitHub server-side error. The local commit remained safe, but remote synchronization was not confirmed for that final change.
+
+##
+
+Important lessons
+
+A successful local build does not prove that production is using that build.
+
+The Vercel production branch and the branch containing the fix must match.
+
+The build output folder must exactly match Vercel’s Output Directory setting.
+
+A successful backend state transition must also return a response to the browser.
+
+Analytical data must be separated from participant-facing language.
+
+A validator rejecting a deck is protecting internal data from being shown.
+
+A failed Git push does not mean local work was lost; the local commit and GitHub version history must be checked before taking any destructive action.
+
+The safest recovery actions are inspection, testing, branch preservation, and controlled merging—not resetting or deleting the project.
+
+FINAL PRODUCTION STATUS — LOCKED
+
+Status: FTP2.0 is now considered locked for production.
+
+The final working version has been verified by the project owner and is deployed. GitHub and the production deployment are aligned with the latest locked implementation. No further code changes are planned.
+
+Operational note: the backend is hosted on a free Render instance, so an inactive service may take longer to wake on the first request after a period of inactivity. This is a hosting characteristic, not a code failure.
+
+The project should now be treated as a frozen exhibition / research baseline. Any future experimentation should happen on a separate branch or copy rather than modifying the locked production version.
