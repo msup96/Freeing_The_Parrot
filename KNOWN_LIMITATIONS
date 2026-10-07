@@ -1,0 +1,39 @@
+# Known Limitations
+
+Freeing the Parrot 2.0 is an experimental interactive system.
+
+The system consists of a client-facing Parrot interaction and a
+post-session Silent Reader pipeline. Because the system is deployed
+across a frontend and backend service, transient deployment or
+runtime failures may occur.
+
+## Session lifecycle
+
+The intended flow is:
+
+INPUT
+→ LIVE CONVERSATION
+→ I AM DONE
+→ SESSION LOCK
+→ POST-SESSION INTERPRETATION
+→ READING DECK
+→ PARTICIPANT SELECTION
+→ MACHINE REVEAL
+→ CONSENT / PURGE
+
+If a failure occurs during post-session interpretation, refreshing
+or restarting the session may be required.
+
+## Data architecture
+
+The Parrot does not receive Silent Reader telemetry during the
+conversation.
+
+Post-session analytical material is generated only after the
+participant ends the interaction.
+
+## Experimental status
+
+This is an experimental research prototype rather than a
+production-grade commercial system. Behaviour may vary depending
+on the participant's interaction with the system.
