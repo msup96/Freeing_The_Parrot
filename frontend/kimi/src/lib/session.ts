@@ -111,6 +111,7 @@ export type SessionReveal = {
     quality_limitations?: { defaulted_shanta_turns?: number; status?: string };
   };
   interaction_profile?: Record<string, number | string | null>;
+  session_archetype?: { name: string; basis: string };
   selection_pattern?: SelectionPattern & { total_cards_presented?: number; cards_inspected?: number | null; selection_status?: string };
   what_was_recorded: string;
   what_the_system_observed?: string;
