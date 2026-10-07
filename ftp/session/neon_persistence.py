@@ -52,9 +52,10 @@ class NeonSessionPersistence:
                 ),
             )
 
-    def record_consent(self, session_id: str, consent_type: str) -> bool:
-        """Record consent once; repeated submissions are successful no-ops."""
-        consent_key = consent_type.strip().upper()
+    def record_consent(self, session_id: str, consent_type: str, *, finalization: bool = False) -> bool:
+        """Atomically claim a consent/finalization operation exactly once."""
+        normalized_type = consent_type.strip().upper()
+        consent_key = f"FINALIZE:{normalized_type}" if finalization else normalized_type
         with psycopg.connect(self._database_url) as connection:
             cursor = connection.execute(
                 """
@@ -63,7 +64,7 @@ class NeonSessionPersistence:
                 ON CONFLICT (session_id, consent_key) DO NOTHING
                 RETURNING consent_key
                 """,
-                (session_id, consent_key, consent_key),
+                (session_id, normalized_type, consent_key),
             )
             return cursor.fetchone() is not None
 
@@ -106,6 +107,29 @@ class NeonSessionPersistence:
             )
             for row in self.load_events(session_id)
         ]
+
+    def update_artifact(self, session_id: str, artifact: str, value: Any) -> None:
+        allowed = {"offerings", "multimodal_context", "decks", "selected", "reveals"}
+        if artifact not in allowed:
+            raise ValueError(f"Unsupported FTP session artifact: {artifact}")
+        with psycopg.connect(self._database_url) as connection:
+            connection.execute(
+                f"UPDATE ftp_sessions SET {artifact} = %s::jsonb WHERE session_id = %s",
+                (json.dumps(value), session_id),
+            )
+
+    def load_artifacts(self, session_id: str) -> dict[str, Any] | None:
+        with psycopg.connect(self._database_url) as connection:
+            row = connection.execute(
+                """
+                SELECT offerings, multimodal_context, decks, selected, reveals
+                FROM ftp_sessions WHERE session_id = %s
+                """,
+                (session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return dict(zip(("offerings", "multimodal_context", "decks", "selected", "reveals"), row))
 
     def update_session_state(self, session_id: str, state: dict[str, Any]) -> None:
         with psycopg.connect(self._database_url) as connection:

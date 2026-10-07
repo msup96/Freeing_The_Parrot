@@ -65,6 +65,11 @@ SESSION_CREATED_AT: dict[str, float] = {}
 SESSION_TTL_SECONDS = max(60, int(os.environ.get("FTP_SESSION_TTL_SECONDS", "3600")))
 
 
+def persist_artifact(coord: SessionCoordinator, session_id: str, artifact: str, value: Any) -> None:
+    if coord._persistence is not None:
+        coord._persistence.update_artifact(session_id, artifact, value)
+
+
 def purge_expired_sessions(now: float | None = None) -> list[str]:
     """Remove all expired in-memory state and return the purged session IDs."""
     current = now if now is not None else time.time()
@@ -112,6 +117,17 @@ def get_session(session_id: str | None) -> SessionCoordinator | None:
             return None
         coord = SessionCoordinator(sid, persistence=persistence)
         coord.hydrate_from_persistence()
+        artifacts = persistence.load_artifacts(sid) or {}
+        for store, key in (
+            (SESSION_OFFERINGS, "offerings"),
+            (SESSION_MULTIMODAL_CONTEXT, "multimodal_context"),
+            (SESSION_DECKS, "decks"),
+            (SESSION_SELECTED, "selected"),
+            (SESSION_REVEALS, "reveals"),
+        ):
+            value = artifacts.get(key)
+            if value:
+                store[sid] = value
         SESSIONS[sid] = coord
         SESSION_CREATED_AT.setdefault(sid, time.time())
         logger.info("Hydrated FTP session coordinator: %s", sid)
@@ -568,6 +584,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             selected = SESSION_SELECTED.get(sid)
             reveal = SESSION_REVEALS.get(sid) or build_participant_reveal(coord, deck, selected)
             SESSION_REVEALS[sid] = reveal
+            persist_artifact(coord, sid, "reveals", reveal)
             self._send_json({"ok": True, "session_id": sid, "reveal": reveal})
             return
 
@@ -618,7 +635,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             coord.mark_analysis_ready(nav)
             multi_ctx = analyze_text_offering(text)
             SESSION_MULTIMODAL_CONTEXT[sid] = multi_ctx
+            persist_artifact(coord, sid, "multimodal_context", multi_ctx)
             SESSION_OFFERINGS[sid] = {"channel": "write", "text": text, "modality": "TEXT"}
+            persist_artifact(coord, sid, "offerings", SESSION_OFFERINGS[sid])
             self._send_json({
                 "ok": True,
                 "session_id": sid,
@@ -767,6 +786,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                     },
                 )
                 SESSION_SELECTED[sid] = selected_cards
+                persist_artifact(coord, sid, "selected", selected_cards)
                 if coord.machine.state == SessionState.CARD_SELECTION:
                     coord.advance(SessionState.PROFILE_REVEAL)
 
@@ -777,6 +797,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 selected = SESSION_SELECTED.get(sid)
                 reveal = build_participant_reveal(coord, deck, selected)
                 SESSION_REVEALS[sid] = reveal
+                persist_artifact(coord, sid, "reveals", reveal)
                 self._send_json({
                     "ok": True,
                     "session_id": sid,
@@ -790,7 +811,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     recorded = True
                     if coord._persistence is not None:
-                        recorded = coord._persistence.record_consent(sid, consent_type)
+                        recorded = coord._persistence.record_consent(
+                            sid, consent_type, finalization=True
+                        )
                     if recorded:
                         coord.record(
                             event_type=EventType.CONSENT_RECORDED,
@@ -802,7 +825,8 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 if coord.machine.state == SessionState.DATA_WALL_CONSENT:
                     coord.advance(SessionState.OUTPUT_GENERATION)
 
-            self._send_json({
+                self._send_json({
+
                 "ok": True,
                 "session_id": sid,
                 "lifecycle_state": coord.machine.state.value,
@@ -898,6 +922,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             # Execute real Phase 4C 27-card composition pipeline
             deck = compose_reading_deck(coord)
             SESSION_DECKS[sid] = deck
+            persist_artifact(coord, sid, "decks", deck)
 
             if coord.machine.state == SessionState.LIVE_CONVERSATION:
                 coord.advance(SessionState.SESSION_CONCLUDED)
