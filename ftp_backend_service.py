@@ -11,6 +11,7 @@ Runs the authentic Python FTP 2.0 backend architecture:
 
 from __future__ import annotations
 import http.server
+import hashlib
 import json
 import logging
 import os
@@ -191,6 +192,26 @@ def _participant_limitations(bundle: dict[str, Any], evaluation: dict[str, Any])
     categories = ", ".join(sorted(c.replace("_", " ") for c in PROHIBITED_INFERENCE_CATEGORIES))
     out.append(f"The evidence contract does not permit the system to infer: {categories}.")
     return out
+
+
+def build_session_archetype(
+    session_id: str,
+    trajectory: dict[str, Any],
+    profile: dict[str, Any],
+    selected_cards: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Create a one-session reflection label, never a reusable identity class."""
+    sequence = [str(item) for item in trajectory.get("detected_sequence", [])[:3]]
+    anchors = [str(card.get("semantic_anchor")) for card in selected_cards if card.get("semantic_anchor")][:3]
+    basis = "|".join(sequence + anchors + [str(profile.get("turn_count", 0)), session_id])
+    digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()[:8].upper()
+    motif = sequence[-1].replace("_", " ").title() if sequence else "Unresolved Signal"
+    return {
+        "label": f"The {motif} / {digest}",
+        "scope": "this session only",
+        "basis": {"navarasa_sequence": sequence, "selected_territories": anchors, "turn_count": profile.get("turn_count", 0)},
+        "disclaimer": "A poetic, session-specific construction—not a general category, identity, diagnosis, or prediction.",
+    }
 
 
 def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | None, selected: dict[str, Any] | None) -> dict[str, Any]:
@@ -407,6 +428,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "resonance": "participant-reported" if selected_cards else "none recorded",
         "card_selection_pattern": "participant-reported selection pattern; not psychological validation",
     }
+    session_archetype = build_session_archetype(sid, trajectory, interaction_profile, selected_cards)
 
     return {
         "session_id": sid,
@@ -432,6 +454,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "card_provenance": card_provenance,
         "navarasa_trajectory": trajectory,
         "interaction_profile": interaction_profile,
+        "session_archetype": session_archetype,
         "turn_texts": turn_texts,
         "sensitive_disclosures_omitted": sensitive_disclosure_count,
         "what_was_recorded": what_recorded_body,
@@ -885,7 +908,14 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             )
 
             # Language Realizer assemble and render
-            initial_ctx = SESSION_MULTIMODAL_CONTEXT.get(sid)
+            initial_ctx = dict(SESSION_MULTIMODAL_CONTEXT.get(sid) or {})
+            prior_turns = [
+                event.payload.get("analysis_snapshot")
+                for event in coord.store.events_of_type(EventType.PARROT_TURN_GENERATED)
+                if event.payload.get("analysis_snapshot")
+            ]
+            initial_ctx["prior_navarasa_signals"] = prior_turns[-4:]
+            initial_ctx["signal_continuity"] = "Use multimodal cues as bounded context; update only from explicit new evidence."
             req = build_realizer_request(
                 coord,
                 instruction,
