@@ -676,7 +676,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 channel = "speak"
             elif modality in ("VIDEO",):
                 multi_ctx = analyze_video_offering(
-                    duration_sec=duration_sec or 15.0,
+                    duration_sec=duration_sec or 10.0,
                     face_detected=face_detected,
                     expression_cues=expression_cues if isinstance(expression_cues, list) else None,
                 )
@@ -691,7 +691,14 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 "channel": channel,
                 "modality": modality,
                 "text": offering_text,
+                "transcript": transcript if modality in ("AUDIO", "VOICE", "SPEAK") else None,
+                "face_detected": face_detected if modality == "VIDEO" else None,
+                "expression_cues": expression_cues if modality == "VIDEO" and isinstance(expression_cues, list) else [],
+                "duration_seconds": duration_sec if modality == "VIDEO" else None,
             }
+            SESSION_MULTIMODAL_CONTEXT[sid] = multi_ctx
+            persist_artifact(coord, sid, "multimodal_context", multi_ctx)
+            persist_artifact(coord, sid, "offerings", SESSION_OFFERINGS[sid])
             self._send_json({
                 "ok": True,
                 "session_id": sid,

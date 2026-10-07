@@ -203,7 +203,9 @@ export default function Stage04Parrot({
                       setInput(e.target.value);
                       if (emerged && state === 'IDLE' && !isEnding) setState('LISTENING');
                     }}
-                    onKeyDown={(e) => e.key === 'Enter' && !isEnding && send()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229 && !isEnding) send();
+                    }}
                     placeholder={isEnding ? 'Conversation concluded.' : emerged ? 'Say something true…' : '…'}
                     disabled={!emerged || isEnding || state === 'THINKING'}
                     className="w-full bg-transparent font-serif italic text-base md:text-lg text-parchment placeholder:text-parchment-faint/60 focus:outline-none py-3 min-h-[44px]"
