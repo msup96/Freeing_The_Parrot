@@ -1041,6 +1041,27 @@ def _find_contextual_cue(text):
     return None
 
 
+SOCIAL_OPENINGS = (
+    "What brings you here?",
+    "How are you, really?",
+)
+
+CURIOSITY_OPENINGS = (
+    "What are you working on at the moment?",
+    "Where do you come from?",
+)
+
+
+def _early_parrot_response(text, session):
+    """Keep the opening social before interpretation or contamination begins."""
+    turn = int(session.get("substantive_turns", 0) or 0)
+    if turn <= 1:
+        return choose_random_line(SOCIAL_OPENINGS, session, "recent_openings")
+    if turn == 2:
+        return choose_random_line(CURIOSITY_OPENINGS, session, "recent_openings")
+    return None
+
+
 def choose_perceived_understanding(text, analysis, session):
     """
     Produce one apparently personalised observation.
@@ -1053,6 +1074,10 @@ def choose_perceived_understanding(text, analysis, session):
     The observation is deliberately broad enough to avoid diagnosis,
     but concrete enough to feel responsive.
     """
+
+    early_response = _early_parrot_response(text, session)
+    if early_response:
+        return early_response
 
     primary = analysis.get("primary_rasa", "Shanta")
 
