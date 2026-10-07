@@ -20,7 +20,7 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
       </div>
       <div className={large ? 'px-6 max-h-[72%] overflow-y-auto' : 'px-2'}>
         <div className={`${large ? 'text-3xl md:text-4xl' : 'text-lg md:text-2xl'} text-gold/90 mb-1`}>{card.glyph}</div>
-        <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[11px] md:text-xs'} tracking-[0.14em] text-parchment leading-snug`}>
+        <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[9px] md:text-[10px]'} tracking-[0.14em] text-parchment leading-snug`}>
           {card.title}
         </div>
         <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[8px] md:text-[9px]'} tracking-[0.22em] text-gold/70 uppercase`}>
