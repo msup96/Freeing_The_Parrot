@@ -759,13 +759,17 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             elif action == "consent":
-                consent_type = body.get("consent_type", "KEEP_PRIVATE")
+                consent_type = str(body.get("consent_type", "KEEP_PRIVATE")).strip().upper()
                 try:
-                    coord.record(
-                        event_type=EventType.CONSENT_RECORDED,
-                        provenance_level=ProvenanceLevel.OBSERVED,
-                        payload={"consent_type": consent_type},
-                    )
+                    recorded = True
+                    if coord._persistence is not None:
+                        recorded = coord._persistence.record_consent(sid, consent_type)
+                    if recorded:
+                        coord.record(
+                            event_type=EventType.CONSENT_RECORDED,
+                            provenance_level=ProvenanceLevel.OBSERVED,
+                            payload={"consent_type": consent_type},
+                        )
                 except Exception as e:
                     logger.warning(f"Consent recording notice: {e}")
                 if coord.machine.state == SessionState.DATA_WALL_CONSENT:
