@@ -54,7 +54,7 @@
 @layer components {
   /* Catalogue micro-label, e.g. APPARATUS / ARCHIVE — NO. 027 */
   .meta-label {
-    @apply font-mono text-[9px] sm:text-[10px] md:text-[11px] tracking-[0.2em] sm:tracking-[0.3em] md:tracking-[0.35em] uppercase text-parchment-faint;
+    @apply font-mono text-[10px] md:text-[11px] tracking-[0.35em] uppercase text-parchment-faint;
   }
 
   .gold-rule {
@@ -64,7 +64,7 @@
 
   /* Brass-rimmed physical control */
   .brass-button {
-    @apply relative font-mono text-[10px] sm:text-[11px] md:text-xs tracking-[0.22em] sm:tracking-[0.3em] md:tracking-[0.4em] uppercase text-parchment select-none cursor-pointer;
+    @apply relative font-mono text-[11px] md:text-xs tracking-[0.4em] uppercase text-parchment select-none cursor-pointer;
     border: 1px solid rgba(176, 141, 62, 0.55);
     background:
       linear-gradient(180deg, rgba(56, 71, 50, 0.5), rgba(16, 22, 15, 0.9));

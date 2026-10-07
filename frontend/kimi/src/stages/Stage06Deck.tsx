@@ -20,14 +20,14 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
       </div>
       <div className={large ? 'px-6 max-h-[72%] overflow-y-auto' : 'px-2'}>
         <div className={`${large ? 'text-3xl md:text-4xl' : 'text-lg md:text-2xl'} text-gold/90 mb-1`}>{card.glyph}</div>
-        <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[8px] sm:text-[9px] md:text-xs'} tracking-[0.08em] text-parchment leading-tight break-words max-w-full`}>
+        <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[11px] md:text-xs'} tracking-[0.14em] text-parchment leading-snug`}>
           {card.title}
         </div>
-        <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[5px] sm:text-[6px] md:text-[7px]'} tracking-[0.1em] text-gold/70 uppercase`}>
+        <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[8px] md:text-[9px]'} tracking-[0.22em] text-gold/70 uppercase`}>
           TERRITORY · {card.semanticAnchor}
         </div>
         {card.archetype && (
-          <div className={`mt-1 font-mono ${large ? 'text-[10px]' : 'text-[5px] sm:text-[6px]'} tracking-[0.14em] leading-tight text-gold/60 uppercase break-words max-w-full`}>
+          <div className={`mt-1 font-mono ${large ? 'text-[10px]' : 'text-[6px]'} tracking-[0.25em] text-gold/60 uppercase`}>
             {card.archetype}
           </div>
         )}

@@ -35,35 +35,6 @@ def _post_session(*messages: str) -> SessionCoordinator:
 
 
 class TestReadingComposer:
-    @pytest.mark.parametrize("unsafe_seed", [
-        "The confidence score rose.",
-        "Gemini described a return.",
-        "The evidence_id ev_12 supports this.",
-        "Navarasa shaped the response.",
-        "Telemetry recorded a pause.",
-        "A quiet rhythm gathered between the moments.",
-    ])
-    def test_profile_sanitizes_participant_seed_and_preserves_provenance(self, unsafe_seed):
-        record = {
-            "inference_id": "inf_test",
-            "category": "interaction_pattern",
-            "claim": "Original analytical claim",
-            "evidence_refs": ["ev_12"],
-            "confidence": 0.4,
-            "interpretation": {"status": "accepted", "text": unsafe_seed},
-        }
-        profile = build_reading_profile(
-            bundle={"session_id": "session-test", "evidence_items": [{"evidence_id": "ev_12", "signal_type": "pause", "observation": "A pause occurred."}]},
-            evaluation={"status": "sufficient", "limitations": []},
-            reader_result={"status": "accepted", "records": [record]},
-        )
-        deck = compose_deck(profile)
-        validate_deck(deck, profile)
-        assert len(deck["cards"]) == 27
-        assert profile["anchors"][0]["analytical_source"]["claim"] == "Original analytical claim"
-        assert profile["anchors"][0]["analytical_source"]["interpretation"]["text"] == unsafe_seed
-        assert all(not contains_spoiler(card["qualitative_reading"]) for card in deck["cards"])
-
     def test_exactly_27_unique_cards(self):
         deck = _post_session(
             "aa",

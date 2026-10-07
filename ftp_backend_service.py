@@ -11,7 +11,6 @@ Runs the authentic Python FTP 2.0 backend architecture:
 
 from __future__ import annotations
 import http.server
-import hashlib
 import json
 import logging
 import os
@@ -28,7 +27,6 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from ftp.events.model import EventType, ProvenanceLevel
-from ftp.privacy.disclosures import participant_safe_text
 from ftp.parrot.director import BehaviourDirector
 from ftp.parrot.gemini_adapter import GeminiParrotAdapter
 from ftp.parrot.realizer import LanguageRealizer, build_realizer_request
@@ -68,13 +66,8 @@ SESSION_TTL_SECONDS = max(60, int(os.environ.get("FTP_SESSION_TTL_SECONDS", "360
 
 
 def persist_artifact(coord: SessionCoordinator, session_id: str, artifact: str, value: Any) -> None:
-    """Persist best-effort without taking a live participant flow offline."""
-    if coord._persistence is None:
-        return
-    try:
+    if coord._persistence is not None:
         coord._persistence.update_artifact(session_id, artifact, value)
-    except Exception as exc:
-        logger.exception("Optional artifact persistence failed for %s (%s): %s", session_id, artifact, exc)
 
 
 def purge_expired_sessions(now: float | None = None) -> list[str]:
@@ -93,18 +86,13 @@ def purge_expired_sessions(now: float | None = None) -> list[str]:
 def create_session() -> SessionCoordinator:
     purge_expired_sessions()
     sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(8).hex()}"
-    persistence = None
-    try:
-        persistence = build_neon_persistence()
-        if persistence is not None:
-            persistence.create_session(
-                sid,
-                time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + SESSION_TTL_SECONDS)),
-            )
-    except Exception as exc:
-        logger.exception("Optional session persistence unavailable; continuing in memory: %s", exc)
-        persistence = None
+    persistence = build_neon_persistence()
     coord = SessionCoordinator(sid, persistence=persistence)
+    if persistence is not None:
+        persistence.create_session(
+            sid,
+            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + SESSION_TTL_SECONDS)),
+        )
     coord.start()
     SESSIONS[sid] = coord
     SESSION_CREATED_AT[sid] = time.time()
@@ -204,26 +192,6 @@ def _participant_limitations(bundle: dict[str, Any], evaluation: dict[str, Any])
     return out
 
 
-def build_session_archetype(
-    session_id: str,
-    trajectory: dict[str, Any],
-    profile: dict[str, Any],
-    selected_cards: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Create a one-session reflection label, never a reusable identity class."""
-    sequence = [str(item) for item in trajectory.get("detected_sequence", [])[:3]]
-    anchors = [str(card.get("semantic_anchor")) for card in selected_cards if card.get("semantic_anchor")][:3]
-    basis = "|".join(sequence + anchors + [str(profile.get("turn_count", 0)), session_id])
-    digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()[:8].upper()
-    motif = sequence[-1].replace("_", " ").title() if sequence else "Unresolved Signal"
-    return {
-        "label": f"The {motif} / {digest}",
-        "scope": "this session only",
-        "basis": {"navarasa_sequence": sequence, "selected_territories": anchors, "turn_count": profile.get("turn_count", 0)},
-        "disclaimer": "A poetic, session-specific construction—not a general category, identity, diagnosis, or prediction.",
-    }
-
-
 def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | None, selected: dict[str, Any] | None) -> dict[str, Any]:
     """Assemble the dedicated participant-facing reveal payload preserving provenance."""
     sid = coord.session_id
@@ -232,10 +200,8 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
 
     # 1. WHAT YOU GAVE: actual participant inputs
     dialogue_events = [e for e in events if e.event_type == EventType.PARROT_TURN_GENERATED]
-    raw_turn_texts = [str(e.payload.get("user_text") or "") for e in dialogue_events]
-    turn_texts = [participant_safe_text(text)[0] for text in raw_turn_texts]
+    turn_texts = [str(e.payload.get("user_text") or "") for e in dialogue_events]
     offering_text = offering.get("text") or (turn_texts[0] if turn_texts else "")
-    sensitive_disclosure_count = sum(1 for text in raw_turn_texts if participant_safe_text(text)[1])
 
     # 2. WHAT WAS RECORDED: actual approved observed session material
     turn_count = len(dialogue_events)
@@ -364,8 +330,6 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         })
 
     limitations = _participant_limitations(bundle, evaluation)
-    if sensitive_disclosure_count:
-        limitations.append("sensitive voluntary disclosure was purpose-limited: not classified, inferred, card-used, or published")
 
     observed_signals = [
         {
@@ -438,7 +402,6 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "resonance": "participant-reported" if selected_cards else "none recorded",
         "card_selection_pattern": "participant-reported selection pattern; not psychological validation",
     }
-    session_archetype = build_session_archetype(sid, trajectory, interaction_profile, selected_cards)
 
     return {
         "session_id": sid,
@@ -464,9 +427,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "card_provenance": card_provenance,
         "navarasa_trajectory": trajectory,
         "interaction_profile": interaction_profile,
-        "session_archetype": session_archetype,
         "turn_texts": turn_texts,
-        "sensitive_disclosures_omitted": sensitive_disclosure_count,
         "what_was_recorded": what_recorded_body,
         "what_the_system_observed": what_recorded_body,
         "what_was_recorded_sub": what_recorded_sub,
@@ -709,7 +670,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 channel = "speak"
             elif modality in ("VIDEO",):
                 multi_ctx = analyze_video_offering(
-                    duration_sec=duration_sec or 10.0,
+                    duration_sec=duration_sec or 15.0,
                     face_detected=face_detected,
                     expression_cues=expression_cues if isinstance(expression_cues, list) else None,
                 )
@@ -724,14 +685,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 "channel": channel,
                 "modality": modality,
                 "text": offering_text,
-                "transcript": transcript if modality in ("AUDIO", "VOICE", "SPEAK") else None,
-                "face_detected": face_detected if modality == "VIDEO" else None,
-                "expression_cues": expression_cues if modality == "VIDEO" and isinstance(expression_cues, list) else [],
-                "duration_seconds": duration_sec if modality == "VIDEO" else None,
             }
-            SESSION_MULTIMODAL_CONTEXT[sid] = multi_ctx
-            persist_artifact(coord, sid, "multimodal_context", multi_ctx)
-            persist_artifact(coord, sid, "offerings", SESSION_OFFERINGS[sid])
             self._send_json({
                 "ok": True,
                 "session_id": sid,
@@ -826,29 +780,20 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
                 # One participant-level confirmation represents the complete set.
                 # Card identity/order remain in the payload; resonance is not emitted per card.
-                selection_payload = {
-                    "selected_cards": [
-                        {"card_id": card.get("card_id"), "card_index": card.get("card_index"), "selection_order": card.get("selection_order")}
-                        for card in selected_cards
-                    ],
-                    "selected_count": len(selected_cards),
-                    "meaning": "participant_reported_resonance_not_truth",
-                }
-                # A card choice is participant state, so it must remain usable even
-                # when optional persistence is temporarily unavailable.
-                try:
-                    coord.record(
-                        event_type=EventType.CARD_RESONANCE_MARKED,
-                        provenance_level=ProvenanceLevel.VALIDATED,
-                        payload=selection_payload,
-                    )
-                except Exception as exc:
-                    logger.exception("Card resonance persistence failed for %s: %s", sid, exc)
+                coord.record(
+                    event_type=EventType.CARD_RESONANCE_MARKED,
+                    provenance_level=ProvenanceLevel.VALIDATED,
+                    payload={
+                        "selected_cards": [
+                            {"card_id": card.get("card_id"), "card_index": card.get("card_index"), "selection_order": card.get("selection_order")}
+                            for card in selected_cards
+                        ],
+                        "selected_count": len(selected_cards),
+                        "meaning": "participant_reported_resonance_not_truth",
+                    },
+                )
                 SESSION_SELECTED[sid] = selected_cards
-                try:
-                    persist_artifact(coord, sid, "selected", selected_cards)
-                except Exception as exc:
-                    logger.exception("Selected-card artifact persistence failed for %s: %s", sid, exc)
+                persist_artifact(coord, sid, "selected", selected_cards)
                 if coord.machine.state == SessionState.CARD_SELECTION:
                     coord.advance(SessionState.PROFILE_REVEAL)
 
@@ -927,14 +872,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             )
 
             # Language Realizer assemble and render
-            initial_ctx = dict(SESSION_MULTIMODAL_CONTEXT.get(sid) or {})
-            prior_turns = [
-                event.payload.get("analysis_snapshot")
-                for event in coord.store.events_of_type(EventType.PARROT_TURN_GENERATED)
-                if event.payload.get("analysis_snapshot")
-            ]
-            initial_ctx["prior_navarasa_signals"] = prior_turns[-4:]
-            initial_ctx["signal_continuity"] = "Use multimodal cues as bounded context; update only from explicit new evidence."
+            initial_ctx = SESSION_MULTIMODAL_CONTEXT.get(sid)
             req = build_realizer_request(
                 coord,
                 instruction,
