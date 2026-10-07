@@ -15,7 +15,6 @@ import json
 import logging
 import os
 import re
-import socketserver
 import sys
 import time
 import urllib.parse
@@ -55,6 +54,13 @@ def _authoritative_behavior_response(turn_index: int, message: str, coordinator:
         (event.turn_text.strip() for event in reversed(recent) if getattr(event, "turn_text", "").strip()),
         "",
     )
+    greeting = re.fullmatch(
+        r"(?:hi|hello|hey|greetings|good\s+(?:morning|afternoon|evening|day))(?:[!.?]*)",
+        message.strip(),
+        re.IGNORECASE,
+    )
+    if greeting:
+        return f"{message.strip().rstrip('!.?')} .".replace(" .", ".")
     if turn_index == 1:
         return "What brings you here?"
     if turn_index == 2:
@@ -66,7 +72,8 @@ def _authoritative_behavior_response(turn_index: int, message: str, coordinator:
         excerpt = earlier[:72].rstrip(".,!? ") if earlier else "that"
         return f"I keep returning to {excerpt}. Where does it lead you?"
     if turn_index == 5:
-        return "Let's try that again. I was listening, though I may have heard the shape of it strangely."
+        current = message.strip().rstrip(".,!? ") or "that"
+        return f"Ah yes, where were we? I heard you mention {current}. What made you say so?"
     return None
 
 # Configure Gemini language realization adapter
