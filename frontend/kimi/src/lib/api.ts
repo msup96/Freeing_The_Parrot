@@ -42,7 +42,7 @@ export async function submitInitialMedia(
   modality: 'AUDIO' | 'IMAGE' | 'CAMERA' | 'VIDEO',
   media: Blob,
   filename: string,
-  metadata: { transcript?: string; faceDetected?: boolean; expressionCues?: string[] } = {},
+  metadata: { transcript?: string; faceDetected?: boolean; expressionCues?: string[]; durationSeconds?: number } = {},
 ): Promise<{ analysis_ready: boolean }> {
   // The authoritative backend accepts a normalized JSON ingest contract. The
   // raw media bytes are intentionally not sent to the analytical pipeline;
@@ -59,6 +59,7 @@ export async function submitInitialMedia(
       transcript: metadata.transcript,
       face_detected: metadata.faceDetected,
       expression_cues: metadata.expressionCues,
+      duration_sec: metadata.durationSeconds,
     }),
   }));
   return { analysis_ready: Boolean(data.analysis_ready ?? data.ok) };

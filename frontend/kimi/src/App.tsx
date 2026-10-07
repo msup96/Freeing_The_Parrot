@@ -76,7 +76,7 @@ export default function App() {
         offering.channel === 'speak' ? 'AUDIO' : offering.channel === 'look' ? 'VIDEO' : 'IMAGE',
         offering.media,
         offering.filename || 'offering.bin',
-        { transcript: offering.transcript, faceDetected: offering.faceDetected, expressionCues: offering.expressionCues },
+        { transcript: offering.transcript, faceDetected: offering.faceDetected, expressionCues: offering.expressionCues, durationSeconds: offering.channel === 'look' ? 10 : undefined },
       )
           : null;
 
