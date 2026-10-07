@@ -276,50 +276,82 @@ function ShowChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
 function LookChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [state, setState] = useState<'closed' | 'open' | 'denied' | 'captured'>('closed');
-  const [count, setCount] = useState<number | null>(null);
-  const [img, setImg] = useState<string | null>(null);
+  const [state, setState] = useState<'closed' | 'recording' | 'captured' | 'denied'>('closed');
+  const [seconds, setSeconds] = useState(0);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   const [faceDetected, setFaceDetected] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
 
-  useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
+  useEffect(() => () => {
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    recorderRef.current?.stop();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, [videoUrl]);
+
+  const stopRecording = () => {
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = null;
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  };
 
   const openLens = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') throw new Error('Video capture is not supported.');
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setState('open');
-      // the apparatus looks back — then captures on its own
-      window.setTimeout(() => setCount(3), 900);
-      window.setTimeout(() => setCount(2), 1900);
-      window.setTimeout(() => setCount(1), 2900);
-      window.setTimeout(capture, 3900);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm' });
+      recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' });
+        setVideoBlob(blob);
+        setVideoUrl(URL.createObjectURL(blob));
+        setState('captured');
+      };
+      recorder.start(250);
+      recorderRef.current = recorder;
+      setSeconds(0);
+      setState('recording');
+      timerRef.current = window.setInterval(() => {
+        setSeconds((current) => {
+          const next = current + 1;
+          if (next >= 10) stopRecording();
+          return next;
+        });
+      }, 1000);
     } catch {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
       setState('denied');
     }
   };
 
-  const capture = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    const c = document.createElement('canvas');
-    c.width = v.videoWidth || 640;
-    c.height = v.videoHeight || 480;
-    const ctx = c.getContext('2d')!;
-    ctx.translate(c.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(v, 0, 0);
-    const url = c.toDataURL('image/jpeg', 0.82);
+  const submitVideo = () => {
+    if (!videoBlob) return;
     const Detector = (window as any).FaceDetector;
-    if (Detector) {
-      new Detector({ fastMode: true, maxDetectedFaces: 1 }).detect(c).then((faces: unknown[]) => setFaceDetected(faces.length > 0)).catch(() => setFaceDetected(false));
+    if (Detector && videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      new Detector({ fastMode: true, maxDetectedFaces: 1 }).detect(canvas).then((faces: unknown[]) => {
+        const detected = faces.length > 0;
+        setFaceDetected(detected);
+        onSubmit({ channel: 'look', media: videoBlob, filename: 'facial-cues-10s.webm', faceDetected: detected, expressionCues: [detected ? 'face present in recorded video; expression analysis bounded to visible cues' : 'face not confirmed by device detector'], timestamp: Date.now() });
+      }).catch(() => onSubmit({ channel: 'look', media: videoBlob, filename: 'facial-cues-10s.webm', expressionCues: ['face analysis unavailable on this device'], timestamp: Date.now() }));
+      return;
     }
-    setImg(url);
-    setState('captured');
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    c.toBlob((blob) => {
-      if (blob) window.setTimeout(() => onSubmit({ channel: 'look', imageDataUrl: url, media: blob, filename: 'camera.jpg', faceDetected, expressionCues: faceDetected ? ['face present in capture; expression analysis bounded to visible cues'] : ['face not confirmed by device detector'], timestamp: Date.now() }), 1800);
-    }, 'image/jpeg', 0.82);
+    onSubmit({ channel: 'look', media: videoBlob, filename: 'facial-cues-10s.webm', expressionCues: ['face analysis unavailable on this device'], timestamp: Date.now() });
   };
 
   return (
@@ -330,18 +362,13 @@ function LookChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
             <div className="font-mono text-[10px] tracking-[0.35em] text-parchment-faint text-center leading-loose px-8">THE LENS IS SHUT</div>
           </div>
         )}
-        {(state === 'open') && (
-          <>
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover -scale-x-100" />
-            {count !== null && (
-              <motion.div key={count} initial={{ opacity: 0, scale: 1.4 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 flex items-center justify-center">
-                <span className="font-display text-7xl text-parchment/90">{count}</span>
-              </motion.div>
-            )}
-          </>
+        {(state === 'recording' || state === 'captured') && (
+          <video ref={videoRef} src={state === 'captured' ? videoUrl ?? undefined : undefined} autoPlay={state === 'recording'} controls={state === 'captured'} playsInline muted={state === 'recording'} className="w-full h-full object-cover -scale-x-100" aria-label="Ten second facial-cue video" />
         )}
-        {state === 'captured' && img && (
-          <motion.img src={img} alt="capture" className="w-full h-full object-cover" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={transition('ARCHIVE')} />
+        {state === 'recording' && (
+          <div className="absolute inset-x-0 bottom-4 text-center font-mono text-xs tracking-[0.25em] text-parchment bg-ink/60 py-2">
+            RECORDING {seconds}/10
+          </div>
         )}
         {state === 'denied' && (
           <div className="absolute inset-0 flex items-center justify-center px-8">
@@ -355,12 +382,18 @@ function LookChannel({ onSubmit }: { onSubmit: (o: Offering) => void }) {
       </div>
       {state === 'captured' && (
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 font-mono text-[10px] tracking-[0.35em] text-amber/80">
-          THE MACHINE HAS YOUR FACE
+          TEN SECOND CAPTURE READY{faceDetected ? ' — FACE DETECTED' : ''}
         </motion.p>
       )}
-      <div className="mt-8 flex justify-center">
+      <div className="mt-8 flex justify-center gap-3">
         {state === 'closed' && (
-          <button className="brass-button px-8 py-3 min-h-[44px]" onClick={openLens}>LET IT LOOK</button>
+          <button className="brass-button px-8 py-3 min-h-[44px]" onClick={openLens}>RECORD 10 SECONDS</button>
+        )}
+        {state === 'recording' && (
+          <button className="brass-button px-8 py-3 min-h-[44px]" onClick={stopRecording}>STOP RECORDING</button>
+        )}
+        {state === 'captured' && (
+          <button className="brass-button px-8 py-3 min-h-[44px]" onClick={submitVideo} disabled={!videoBlob}>SUBMIT VIDEO</button>
         )}
       </div>
     </motion.div>
