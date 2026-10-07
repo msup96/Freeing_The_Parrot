@@ -20,10 +20,10 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
       </div>
       <div className={large ? 'px-6 max-h-[72%] overflow-y-auto' : 'px-2'}>
         <div className={`${large ? 'text-3xl md:text-4xl' : 'text-lg md:text-2xl'} text-gold/90 mb-1`}>{card.glyph}</div>
-        <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[9px] md:text-xs'} tracking-[0.14em] text-parchment leading-snug`}>
+        <div className={`font-display ${large ? 'text-lg md:text-xl' : 'text-[11px] md:text-xs'} tracking-[0.14em] text-parchment leading-snug`}>
           {card.title}
         </div>
-        <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[5px]'} tracking-[0.22em] text-gold/70 uppercase`}>
+        <div className={`mt-1 font-mono ${large ? 'text-[9px]' : 'text-[8px] md:text-[9px]'} tracking-[0.22em] text-gold/70 uppercase`}>
           TERRITORY · {card.semanticAnchor}
         </div>
         {card.archetype && (
@@ -40,7 +40,7 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
           </>
         )}
       </div>
-      <div className={`pb-3 font-mono ${large ? 'text-[9px]' : 'text-[6px] md:text-[7px]'} tracking-[0.35em] text-parchment-faint/60`}>
+      <div className={`pb-3 font-mono ${large ? 'text-[9px]' : 'text-[8px] md:text-[9px]'} tracking-[0.35em] text-parchment-faint/60`}>
         THE TWENTY-SEVEN
       </div>
       {/* registration marks */}
@@ -69,6 +69,15 @@ export default function Stage06Deck({
   const [flipped, setFlipped] = useState<Set<string>>(new Set());
   const [shuffled, setShuffled] = useState(false);
   const [resonating, setResonating] = useState(false);
+  const allCardsFlipped = dealt === 27 && flipped.size === cards.length;
+
+  const toggleAllCards = () => {
+    if (allCardsFlipped) {
+      setFlipped(new Set());
+      return;
+    }
+    setFlipped(new Set(cards.map((card) => card.cardId)));
+  };
 
   // Transition ritual: CONVERSATION CONCLUDED → THE PARROT HAS NOTHING MORE TO SAY → 27 CARDS APPEAR
   useEffect(() => {
@@ -167,13 +176,26 @@ export default function Stage06Deck({
             <p className="mt-1 font-serif italic text-xs md:text-sm text-parchment-dim">
               Flip the readings, shuffle them, then choose any number that resonates.
             </p>
-            <button type="button" className="mt-4 text-[10px] font-mono tracking-[0.25em] text-gold" onClick={() => setShuffled((value) => !value)}>
-              {shuffled ? 'SHUFFLE COMPLETE' : 'SHUFFLE THE READINGS'}
-            </button>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <button type="button" className="brass-button min-h-11 px-4 py-2 text-[10px] tracking-[0.2em]" onClick={() => setShuffled((value) => !value)}>
+                {shuffled ? 'SHUFFLE COMPLETE' : 'SHUFFLE THE READINGS'}
+              </button>
+              <button
+                type="button"
+                className="brass-button min-h-11 px-4 py-2 text-[10px] tracking-[0.2em]"
+                onClick={toggleAllCards}
+                aria-expanded={allCardsFlipped}
+                aria-controls="twenty-seven-card-grid"
+              >
+                {allCardsFlipped ? 'CLOSE ALL CARDS' : 'OPEN ALL CARDS'}
+              </button>
+            </div>
           </motion.div>
 
           {/* the 27-card grid */}
           <div
+            id="twenty-seven-card-grid"
+            aria-label="Twenty-seven reading cards"
             className={`grid grid-cols-3 sm:grid-cols-6 md:grid-cols-9 gap-2 md:gap-3 w-full max-w-5xl transition-opacity duration-700 ${
               'opacity-100'
             }`}
