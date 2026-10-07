@@ -60,6 +60,25 @@ def test_interaction_profile_serializes_existing_artifacts_only():
     assert profile["navarasa_status"] == "insufficient_evidence"
 
 
+def test_turn_lineage_carries_analysis_and_decision_metadata():
+    coordinator = SessionCoordinator()
+    coordinator.start()
+    coordinator.advance(SessionState.LIVE_CONVERSATION)
+    analysis = {"primary_rasa": "Karuna", "confidence": 0.8}
+    event = coordinator.record_parrot_turn(
+        "I feel lost",
+        "I hear you.",
+        behaviour="understanding",
+        gate="trust_window",
+        analysis_snapshot=analysis,
+        decision_metadata={"selection_mode": "trust_window"},
+    )
+
+    assert event.payload["lineage_id"].endswith(":turn:1")
+    assert event.payload["analysis_snapshot"] == analysis
+    assert event.payload["decision_metadata"]["selection_mode"] == "trust_window"
+
+
 def test_conversation_inference_requires_consistent_detected_evidence():
     reveal, _ = _reveal()
     inference = reveal["navarasa_trajectory"]["conversation_inference"]

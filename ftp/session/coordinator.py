@@ -298,6 +298,25 @@ class SessionCoordinator:
             )
         )
 
+    def record_turn_analysis(
+        self,
+        *,
+        turn_index: int,
+        analysis: dict,
+    ) -> InteractionEvent:
+        """Record the sanitized, immutable analysis snapshot for one turn."""
+        if self._machine.is_locked():
+            raise SessionLockedError("Cannot record analysis after the session is locked.")
+        return self.record(
+            event_type=EventType.NAVARASA_CLASSIFIED,
+            provenance_level=ProvenanceLevel.INTERPRETED,
+            payload={
+                "turn_index": turn_index,
+                "lineage_id": f"{self.session_id}:turn:{turn_index}",
+                "analysis": dict(analysis),
+            },
+        )
+
     def record_observed_parrot_turn(
         self,
         *,
@@ -306,6 +325,8 @@ class SessionCoordinator:
         reply: str,
         behaviour: str = "",
         gate: str = "",
+        analysis_snapshot: dict | None = None,
+        decision_metadata: dict | None = None,
     ) -> InteractionEvent:
         """Record a Parrot turn at a fixed index without incrementing turn_count."""
         if self._machine.is_locked():
@@ -319,10 +340,13 @@ class SessionCoordinator:
                 "turn_index": turn_index,
                 "user_text": turn_text,
                 "parrot_reply": reply,
-                "behaviour": behaviour,
-                "gate": gate,
-            },
-        )
+            "behaviour": behaviour,
+            "gate": gate,
+            "lineage_id": f"{self.session_id}:turn:{turn_index}",
+            "analysis_snapshot": dict(analysis_snapshot or {}),
+            "decision_metadata": dict(decision_metadata or {}),
+        },
+    )
 
     def record_parrot_turn(
         self,
@@ -330,6 +354,8 @@ class SessionCoordinator:
         reply: str,
         behaviour: str = "",
         gate: str = "",
+        analysis_snapshot: dict | None = None,
+        decision_metadata: dict | None = None,
     ) -> InteractionEvent:
         """Record one completed Parrot turn and increment the turn counter."""
         if self._machine.is_locked():
@@ -344,10 +370,13 @@ class SessionCoordinator:
                 "turn_index": self._turn_count,
                 "user_text": turn_text,
                 "parrot_reply": reply,
-                "behaviour": behaviour,
-                "gate": gate,
-            },
-        )
+            "behaviour": behaviour,
+            "gate": gate,
+            "lineage_id": f"{self.session_id}:turn:{self._turn_count}",
+            "analysis_snapshot": dict(analysis_snapshot or {}),
+            "decision_metadata": dict(decision_metadata or {}),
+        },
+    )
 
     # ------------------------------------------------------------------
     # Parrot ignorance boundary
