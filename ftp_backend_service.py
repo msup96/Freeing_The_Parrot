@@ -794,6 +794,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
             # Behaviour Director Decision
             turn_idx = coord._turn_count + 1
+            coord.record_turn_analysis(turn_index=turn_idx, analysis=nav)
             instruction = BehaviourDirector.decide(
                 coord,
                 turn_index=turn_idx,
@@ -828,9 +829,15 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             coord.record_parrot_turn(
                 turn_text=message,
                 reply=parrot_text,
-                behaviour=instruction["behaviour"],
-                gate=instruction.get("selection_mode", ""),
-            )
+        behaviour=instruction["behaviour"],
+        gate=instruction.get("selection_mode", ""),
+        analysis_snapshot=nav,
+        decision_metadata={
+            "selection_mode": instruction.get("selection_mode", ""),
+            "behaviour_intensity": instruction.get("behaviour_intensity", ""),
+            "directive": instruction.get("directive"),
+        },
+    )
 
             self._send_json({
                 "session_id": sid,
