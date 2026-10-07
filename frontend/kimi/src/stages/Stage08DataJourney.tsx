@@ -260,6 +260,8 @@ export default function Stage08DataJourney({
   const cardRecords = useMemo(() => reveal?.card_provenance ?? [], [reveal?.card_provenance]);
   const pattern = reveal?.selection_pattern;
   const profile = reveal?.interaction_profile;
+  const sessionArchetype = reveal?.session_archetype ?? {};
+  const archetypeBasis = sessionArchetype.basis ?? {};
 
   // Labels only: E-01.. / I-01.. number the records the backend returned, in order.
   const evidenceLabel = useMemo(() => new Map(signals.map((s, i) => [s.evidence_id, `E-${pad(i + 1)}`])), [signals]);
@@ -616,11 +618,28 @@ export default function Stage08DataJourney({
               ['RESONANCE', 'PARTICIPANT-REPORTED · VALIDATED PROVENANCE · NOT PROOF'],
             ]}
           />
-        </EvidenceRow>
+  </EvidenceRow>
 
-        <Connector />
+  <Connector />
 
-        {/* ——— 12 INTERACTION PROFILE ——— */}
+  <EvidenceRow label="11 — YOUR SESSION ARCHETYPE" sub={String(sessionArchetype.disclaimer ?? 'Created from this session only; not a generalized identity category.')}>
+    <div className="border border-gold/30 bg-gold/5 p-4">
+      <div className="font-display text-2xl text-gold">{String(sessionArchetype.label ?? NA)}</div>
+      <p className="mt-3 text-xs leading-relaxed text-parchment-dim">
+        This archetype is a one-session poetic construction based on the interaction&apos;s observed sequence, selected territories, and turn count. It is not a diagnosis, identity label, prediction, or reusable class.
+      </p>
+      <div className="mt-4 grid gap-2 text-[10px] uppercase tracking-[0.12em] text-parchment-faint md:grid-cols-3">
+        <span>Scope: {String(sessionArchetype.scope ?? 'this session only')}</span>
+        <span>Navarasa: {Array.isArray(archetypeBasis.navarasa_sequence) ? archetypeBasis.navarasa_sequence.join(' → ') || NA : NA}</span>
+        <span>Territories: {Array.isArray(archetypeBasis.selected_territories) ? archetypeBasis.selected_territories.join(' · ') || NA : NA}</span>
+      </div>
+    </div>
+  </EvidenceRow>
+
+  <Connector />
+
+  {/* ——— 12 INTERACTION PROFILE ——— */}
+
         <EvidenceRow label="12 — INTERACTION PROFILE" sub="NOT A PROFILE OF YOU. A profile of this interaction.">
           {profile ? (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

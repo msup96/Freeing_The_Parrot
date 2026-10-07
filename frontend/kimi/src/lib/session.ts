@@ -111,6 +111,12 @@ export type SessionReveal = {
     quality_limitations?: { defaulted_shanta_turns?: number; status?: string };
   };
   interaction_profile?: Record<string, number | string | null>;
+  session_archetype?: {
+    label?: string;
+    scope?: string;
+    disclaimer?: string;
+    basis?: { navarasa_sequence?: string[]; selected_territories?: string[]; turn_count?: number };
+  };
   selection_pattern?: SelectionPattern & { total_cards_presented?: number; cards_inspected?: number | null; selection_status?: string };
   what_was_recorded: string;
   what_the_system_observed?: string;
