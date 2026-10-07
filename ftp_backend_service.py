@@ -68,8 +68,13 @@ SESSION_TTL_SECONDS = max(60, int(os.environ.get("FTP_SESSION_TTL_SECONDS", "360
 
 
 def persist_artifact(coord: SessionCoordinator, session_id: str, artifact: str, value: Any) -> None:
-    if coord._persistence is not None:
+    """Persist best-effort without taking a live participant flow offline."""
+    if coord._persistence is None:
+        return
+    try:
         coord._persistence.update_artifact(session_id, artifact, value)
+    except Exception as exc:
+        logger.exception("Optional artifact persistence failed for %s (%s): %s", session_id, artifact, exc)
 
 
 def purge_expired_sessions(now: float | None = None) -> list[str]:
@@ -88,13 +93,18 @@ def purge_expired_sessions(now: float | None = None) -> list[str]:
 def create_session() -> SessionCoordinator:
     purge_expired_sessions()
     sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(8).hex()}"
-    persistence = build_neon_persistence()
+    persistence = None
+    try:
+        persistence = build_neon_persistence()
+        if persistence is not None:
+            persistence.create_session(
+                sid,
+                time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + SESSION_TTL_SECONDS)),
+            )
+    except Exception as exc:
+        logger.exception("Optional session persistence unavailable; continuing in memory: %s", exc)
+        persistence = None
     coord = SessionCoordinator(sid, persistence=persistence)
-    if persistence is not None:
-        persistence.create_session(
-            sid,
-            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + SESSION_TTL_SECONDS)),
-        )
     coord.start()
     SESSIONS[sid] = coord
     SESSION_CREATED_AT[sid] = time.time()
