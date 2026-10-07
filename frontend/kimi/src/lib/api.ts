@@ -42,6 +42,9 @@ async function readJson(response: Response): Promise<Json> {
   const data = (await response.json().catch(() => ({}))) as Json;
   if (!response.ok) {
     const message = typeof data.error === 'string' ? data.error : `Request failed (${response.status}).`;
+    if (response.status >= 500) {
+      throw new Error(`The apparatus is temporarily unavailable (${response.status}). Please try again.`);
+    }
     throw new Error(message);
   }
   return data;
