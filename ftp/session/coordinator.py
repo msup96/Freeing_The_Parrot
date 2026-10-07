@@ -35,6 +35,7 @@ Architecture notes
 from __future__ import annotations
 
 from ftp.events.model import EventType, InteractionEvent, ProvenanceLevel
+from ftp.privacy.disclosures import assess_disclosure
 from ftp.events.store import EventStore, StrictBoundaryViolationError
 from ftp.session.identity import SessionIdentity
 from ftp.session.machine import IllegalTransitionError, SessionStateMachine
@@ -359,11 +360,13 @@ class SessionCoordinator:
                 "Cannot record Parrot turns after the session is locked."
             )
         return self.record(
-            event_type=EventType.PARROT_TURN_GENERATED,
-            provenance_level=ProvenanceLevel.OBSERVED,
-            payload={
-                "turn_index": turn_index,
-                "user_text": turn_text,
+        event_type=EventType.PARROT_TURN_GENERATED,
+        provenance_level=ProvenanceLevel.OBSERVED,
+        payload={
+            "turn_index": turn_index,
+            "user_text": turn_text,
+            "sensitive_disclosure": assess_disclosure(turn_text).disclosed,
+
                 "parrot_reply": reply,
             "behaviour": behaviour,
             "gate": gate,
@@ -394,6 +397,7 @@ class SessionCoordinator:
             payload={
                 "turn_index": self._turn_count,
                 "user_text": turn_text,
+                "sensitive_disclosure": assess_disclosure(turn_text).disclosed,
                 "parrot_reply": reply,
             "behaviour": behaviour,
             "gate": gate,

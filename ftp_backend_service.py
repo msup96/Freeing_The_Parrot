@@ -27,6 +27,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from ftp.events.model import EventType, ProvenanceLevel
+from ftp.privacy.disclosures import participant_safe_text
 from ftp.parrot.director import BehaviourDirector
 from ftp.parrot.gemini_adapter import GeminiParrotAdapter
 from ftp.parrot.realizer import LanguageRealizer, build_realizer_request
@@ -200,8 +201,10 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
 
     # 1. WHAT YOU GAVE: actual participant inputs
     dialogue_events = [e for e in events if e.event_type == EventType.PARROT_TURN_GENERATED]
-    turn_texts = [str(e.payload.get("user_text") or "") for e in dialogue_events]
+    raw_turn_texts = [str(e.payload.get("user_text") or "") for e in dialogue_events]
+    turn_texts = [participant_safe_text(text)[0] for text in raw_turn_texts]
     offering_text = offering.get("text") or (turn_texts[0] if turn_texts else "")
+    sensitive_disclosure_count = sum(1 for text in raw_turn_texts if participant_safe_text(text)[1])
 
     # 2. WHAT WAS RECORDED: actual approved observed session material
     turn_count = len(dialogue_events)
@@ -330,6 +333,8 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         })
 
     limitations = _participant_limitations(bundle, evaluation)
+    if sensitive_disclosure_count:
+        limitations.append("sensitive voluntary disclosure was purpose-limited: not classified, inferred, card-used, or published")
 
     observed_signals = [
         {
@@ -428,6 +433,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "navarasa_trajectory": trajectory,
         "interaction_profile": interaction_profile,
         "turn_texts": turn_texts,
+        "sensitive_disclosures_omitted": sensitive_disclosure_count,
         "what_was_recorded": what_recorded_body,
         "what_the_system_observed": what_recorded_body,
         "what_was_recorded_sub": what_recorded_sub,
