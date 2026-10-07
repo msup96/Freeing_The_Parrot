@@ -2,7 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+
+
+_SAFE_SEED_FALLBACK = "A pattern in the exchange remained open to reflection."
+_SPOILER_WORDS = frozenset({
+    "navarasa", "ocr", "sentiment", "evidence_id", "inference_id", "event_id",
+    "telemetry", "shanta", "raudra", "hasya", "karuna", "bibhatsa", "adbhuta",
+    "bhayanaka", "veera", "confidence", "gemini", "system", "analysis", "evidence",
+    "inference", "score", "detection", "measurement", "profiling",
+})
+_SPOILER_PHRASES = (
+    "you said", "system matched", "system detected", "sentiment score", "ocr detected", "parrot turn",
+)
 
 
 def build_reading_profile(
@@ -80,6 +93,17 @@ def _evidence_only_anchors(
 
 
 def _sanitize_seed(seed: str) -> str:
+    """Keep analytical language from crossing into participant-facing prose."""
     cleaned = seed.replace("Within this session,", "").replace("Within this interaction,", "")
     cleaned = cleaned.replace("Interaction evidence in this session is classified as", "A rhythm in this session resembled")
-    return " ".join(cleaned.split())
+    cleaned = " ".join(cleaned.split())
+    lowered = cleaned.lower()
+    has_internal_identifier = bool(re.search(r"\b(?:ev|inf)_[a-z0-9_]+\b", lowered))
+    has_spoiler_phrase = any(phrase in lowered for phrase in _SPOILER_PHRASES)
+    has_spoiler_word = any(
+        re.search(rf"\b{re.escape(word)}\b", lowered)
+        for word in _SPOILER_WORDS
+    )
+    if has_internal_identifier or has_spoiler_phrase or has_spoiler_word:
+        return _SAFE_SEED_FALLBACK
+    return cleaned or _SAFE_SEED_FALLBACK
