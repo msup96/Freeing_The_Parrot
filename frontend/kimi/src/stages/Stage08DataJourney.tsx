@@ -623,6 +623,14 @@ export default function Stage08DataJourney({
         {/* ——— 12 INTERACTION PROFILE ——— */}
         <EvidenceRow label="12 — INTERACTION PROFILE" sub="NOT A PROFILE OF YOU. A profile of this interaction.">
           {profile ? (
+            <>
+            {reveal?.session_archetype && (
+              <div className="mb-4 border border-gold/30 p-3">
+                <div className="text-[9px] uppercase tracking-[0.18em] text-crimson/80">SESSION ARCHETYPE</div>
+                <div className="mt-1 font-serif text-lg text-gold">{reveal.session_archetype.name}</div>
+                <div className="mt-1 text-[10px] text-parchment-faint">Based on {reveal.session_archetype.basis}. This describes this interaction, not you.</div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {PROFILE_FIELDS.map(([label, key, suffix]) => {
                 const value = profile[key];
@@ -636,6 +644,7 @@ export default function Stage08DataJourney({
                 );
               })}
             </div>
+            </>
           ) : (
             NA
           )}

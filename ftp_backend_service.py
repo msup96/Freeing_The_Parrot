@@ -192,6 +192,22 @@ def _participant_limitations(bundle: dict[str, Any], evaluation: dict[str, Any])
     return out
 
 
+def _session_archetype(interaction_profile: dict[str, Any], selection_pattern: dict[str, Any], trajectory: dict[str, Any]) -> dict[str, str]:
+    """Create a session-scoped archetype from observed interaction and choices."""
+    questions = float(interaction_profile.get("question_count") or 0)
+    turns = max(float(interaction_profile.get("turn_count") or 1), 1.0)
+    selection_count = float(selection_pattern.get("selected_count") or 0)
+    question_density = questions / turns
+    dominant = str(trajectory.get("dominant_rasa", {}).get("label") or "")
+    if question_density >= 0.35 or dominant in {"Adbhuta", "Vira"}:
+        return {"name": "The Curious Cartographer", "basis": "question density, exploratory turns, and selected territories"}
+    if selection_count >= 3 or interaction_profile.get("readings_constructed", 0) >= 27:
+        return {"name": "The Pattern Keeper", "basis": "breadth of interaction and the pattern of selected readings"}
+    if interaction_profile.get("self_reference_mean") and float(interaction_profile["self_reference_mean"]) >= 0.2:
+        return {"name": "The Inner Witness", "basis": "self-reference and reflective selection signals"}
+    return {"name": "The Quiet Observer", "basis": "the measured shape of this single interaction"}
+
+
 def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | None, selected: dict[str, Any] | None) -> dict[str, Any]:
     """Assemble the dedicated participant-facing reveal payload preserving provenance."""
     sid = coord.session_id
@@ -402,6 +418,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "resonance": "participant-reported" if selected_cards else "none recorded",
         "card_selection_pattern": "participant-reported selection pattern; not psychological validation",
     }
+    session_archetype = _session_archetype(interaction_profile, selection_pattern, trajectory)
 
     return {
         "session_id": sid,
@@ -427,6 +444,7 @@ def build_participant_reveal(coord: SessionCoordinator, deck: dict[str, Any] | N
         "card_provenance": card_provenance,
         "navarasa_trajectory": trajectory,
         "interaction_profile": interaction_profile,
+        "session_archetype": session_archetype,
         "turn_texts": turn_texts,
         "what_was_recorded": what_recorded_body,
         "what_the_system_observed": what_recorded_body,
