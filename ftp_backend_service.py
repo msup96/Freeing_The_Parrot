@@ -748,6 +748,12 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
             if action == "input_complete":
                 if coord.machine.state == SessionState.INPUT_INGESTION:
                     coord.advance(SessionState.LIVE_CONVERSATION)
+                self._send_json({
+                    "ok": True,
+                    "session_id": sid,
+                    "lifecycle_state": coord.machine.state.value,
+                })
+                return
 
             elif action == "card_selection":
                 raw_cards = body.get("cards") or [{"card_index": body.get("card_index", 1), "card_id": body.get("card_id", "card_01")}]
@@ -796,6 +802,12 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 persist_artifact(coord, sid, "selected", selected_cards)
                 if coord.machine.state == SessionState.CARD_SELECTION:
                     coord.advance(SessionState.PROFILE_REVEAL)
+                self._send_json({
+                    "ok": True,
+                    "session_id": sid,
+                    "lifecycle_state": coord.machine.state.value,
+                })
+                return
 
             elif action == "reveal":
                 if coord.machine.state == SessionState.PROFILE_REVEAL:
