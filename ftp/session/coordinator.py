@@ -170,6 +170,27 @@ class SessionCoordinator:
         """Session-local Parrot behaviour state (not for Parrot context export)."""
         return self._director_state
 
+    def hydrate_from_persistence(self) -> None:
+        """Restore event history and state without emitting new events."""
+        if self._persistence is None:
+            return
+        events = self._persistence.load_interaction_events(self.session_id)
+        self._store.hydrate(events)
+        state_events = [
+            event for event in events if event.event_type == EventType.SESSION_STATE_CHANGED
+        ]
+        if state_events:
+            restored_state = SessionState(
+                state_events[-1].payload["current_state"]
+            )
+            self._machine = SessionStateMachine(initial_state=restored_state)
+            self._machine.hydrate_history(
+                [SessionState(event.payload["current_state"]) for event in state_events]
+            )
+        self._turn_count = sum(
+            1 for event in events if event.event_type == EventType.PARROT_TURN_GENERATED
+        )
+
     def reset_director_state(self) -> None:
         """Clear behaviour counters/history for this session."""
         self._director_state.clear()

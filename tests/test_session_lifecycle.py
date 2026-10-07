@@ -19,6 +19,34 @@ from ftp.session.states import SessionState
 from ftp.session.identity import SessionIdentity
 
 
+class InMemoryPersistence:
+    def __init__(self):
+        self.events = []
+
+    def append_event(self, event):
+        self.events.append(event)
+
+    def load_interaction_events(self, session_id):
+        return list(self.events)
+
+
+def test_coordinator_hydrates_state_and_turn_count_without_emitting_events():
+    persistence = InMemoryPersistence()
+    original = SessionCoordinator("replay-session", persistence=persistence)
+    original.start()
+    original.advance(SessionState.LIVE_CONVERSATION)
+    original.record_parrot_turn("hello", "response")
+    persisted_count = len(persistence.events)
+
+    restored = SessionCoordinator("replay-session", persistence=persistence)
+    restored.hydrate_from_persistence()
+
+    assert restored.state == SessionState.LIVE_CONVERSATION
+    assert restored.turn_count == 1
+    assert len(restored.store) == persisted_count
+    assert len(persistence.events) == persisted_count
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Session identity
 # ─────────────────────────────────────────────────────────────────────────────
