@@ -52,6 +52,44 @@ class NeonSessionPersistence:
                 ),
             )
 
+    def record_consent(self, session_id: str, consent_type: str) -> bool:
+        """Record consent once; repeated submissions are successful no-ops."""
+        consent_key = consent_type.strip().upper()
+        with psycopg.connect(self._database_url) as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO ftp_session_consents (session_id, consent_type, consent_key)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (session_id, consent_key) DO NOTHING
+                RETURNING consent_key
+                """,
+                (session_id, consent_key, consent_key),
+            )
+            return cursor.fetchone() is not None
+
+    def load_events(self, session_id: str) -> list[dict[str, Any]]:
+        with psycopg.connect(self._database_url) as connection:
+            rows = connection.execute(
+                """
+                SELECT sequence_num, event_id, event_type, provenance_level, payload, timestamp
+                FROM ftp_session_events
+                WHERE session_id = %s
+                ORDER BY sequence_num ASC
+                """,
+                (session_id,),
+            ).fetchall()
+        return [
+            {
+                "sequence_num": row[0],
+                "event_id": row[1],
+                "event_type": row[2],
+                "provenance_level": row[3],
+                "payload": row[4],
+                "timestamp": row[5],
+            }
+            for row in rows
+        ]
+
     def update_session_state(self, session_id: str, state: dict[str, Any]) -> None:
         with psycopg.connect(self._database_url) as connection:
             connection.execute(

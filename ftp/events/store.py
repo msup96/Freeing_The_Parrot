@@ -83,6 +83,11 @@ class EventStore:
             self._events.append(stamped)
             return stamped
 
+    def hydrate(self, events: list[InteractionEvent]) -> None:
+        """Load an ordered persisted history without invoking write callbacks."""
+        with self._lock:
+            self._events = list(events)
+
     # ------------------------------------------------------------------
     # Read paths
     # ------------------------------------------------------------------
