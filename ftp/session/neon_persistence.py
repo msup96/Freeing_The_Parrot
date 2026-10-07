@@ -107,6 +107,29 @@ class NeonSessionPersistence:
             for row in self.load_events(session_id)
         ]
 
+    def update_artifact(self, session_id: str, artifact: str, value: Any) -> None:
+        allowed = {"offerings", "multimodal_context", "decks", "selected", "reveals"}
+        if artifact not in allowed:
+            raise ValueError(f"Unsupported FTP session artifact: {artifact}")
+        with psycopg.connect(self._database_url) as connection:
+            connection.execute(
+                f"UPDATE ftp_sessions SET {artifact} = %s::jsonb WHERE session_id = %s",
+                (json.dumps(value), session_id),
+            )
+
+    def load_artifacts(self, session_id: str) -> dict[str, Any] | None:
+        with psycopg.connect(self._database_url) as connection:
+            row = connection.execute(
+                """
+                SELECT offerings, multimodal_context, decks, selected, reveals
+                FROM ftp_sessions WHERE session_id = %s
+                """,
+                (session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return dict(zip(("offerings", "multimodal_context", "decks", "selected", "reveals"), row))
+
     def update_session_state(self, session_id: str, state: dict[str, Any]) -> None:
         with psycopg.connect(self._database_url) as connection:
             connection.execute(
