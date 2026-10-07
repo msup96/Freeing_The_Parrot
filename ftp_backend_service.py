@@ -811,7 +811,9 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     recorded = True
                     if coord._persistence is not None:
-                        recorded = coord._persistence.record_consent(sid, consent_type)
+                        recorded = coord._persistence.record_consent(
+                            sid, consent_type, finalization=True
+                        )
                     if recorded:
                         coord.record(
                             event_type=EventType.CONSENT_RECORDED,
@@ -823,7 +825,8 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 if coord.machine.state == SessionState.DATA_WALL_CONSENT:
                     coord.advance(SessionState.OUTPUT_GENERATION)
 
-            self._send_json({
+                self._send_json({
+
                 "ok": True,
                 "session_id": sid,
                 "lifecycle_state": coord.machine.state.value,

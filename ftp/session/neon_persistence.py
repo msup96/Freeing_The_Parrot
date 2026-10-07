@@ -52,9 +52,10 @@ class NeonSessionPersistence:
                 ),
             )
 
-    def record_consent(self, session_id: str, consent_type: str) -> bool:
-        """Record consent once; repeated submissions are successful no-ops."""
-        consent_key = consent_type.strip().upper()
+    def record_consent(self, session_id: str, consent_type: str, *, finalization: bool = False) -> bool:
+        """Atomically claim a consent/finalization operation exactly once."""
+        normalized_type = consent_type.strip().upper()
+        consent_key = f"FINALIZE:{normalized_type}" if finalization else normalized_type
         with psycopg.connect(self._database_url) as connection:
             cursor = connection.execute(
                 """
@@ -63,7 +64,7 @@ class NeonSessionPersistence:
                 ON CONFLICT (session_id, consent_key) DO NOTHING
                 RETURNING consent_key
                 """,
-                (session_id, consent_key, consent_key),
+                (session_id, normalized_type, consent_key),
             )
             return cursor.fetchone() is not None
 
