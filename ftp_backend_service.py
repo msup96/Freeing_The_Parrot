@@ -816,20 +816,29 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
                 # One participant-level confirmation represents the complete set.
                 # Card identity/order remain in the payload; resonance is not emitted per card.
-                coord.record(
-                    event_type=EventType.CARD_RESONANCE_MARKED,
-                    provenance_level=ProvenanceLevel.VALIDATED,
-                    payload={
-                        "selected_cards": [
-                            {"card_id": card.get("card_id"), "card_index": card.get("card_index"), "selection_order": card.get("selection_order")}
-                            for card in selected_cards
-                        ],
-                        "selected_count": len(selected_cards),
-                        "meaning": "participant_reported_resonance_not_truth",
-                    },
-                )
+                selection_payload = {
+                    "selected_cards": [
+                        {"card_id": card.get("card_id"), "card_index": card.get("card_index"), "selection_order": card.get("selection_order")}
+                        for card in selected_cards
+                    ],
+                    "selected_count": len(selected_cards),
+                    "meaning": "participant_reported_resonance_not_truth",
+                }
+                # A card choice is participant state, so it must remain usable even
+                # when optional persistence is temporarily unavailable.
+                try:
+                    coord.record(
+                        event_type=EventType.CARD_RESONANCE_MARKED,
+                        provenance_level=ProvenanceLevel.VALIDATED,
+                        payload=selection_payload,
+                    )
+                except Exception as exc:
+                    logger.exception("Card resonance persistence failed for %s: %s", sid, exc)
                 SESSION_SELECTED[sid] = selected_cards
-                persist_artifact(coord, sid, "selected", selected_cards)
+                try:
+                    persist_artifact(coord, sid, "selected", selected_cards)
+                except Exception as exc:
+                    logger.exception("Selected-card artifact persistence failed for %s: %s", sid, exc)
                 if coord.machine.state == SessionState.CARD_SELECTION:
                     coord.advance(SessionState.PROFILE_REVEAL)
 
