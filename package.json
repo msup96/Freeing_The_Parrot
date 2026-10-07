@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "npm run build:frontend && tsc && rm -rf kimi_dist && cp -R frontend/kimi/dist kimi_dist",
+    "build": "npm run install:frontend && npm run build:frontend && tsc && rm -rf kimi_dist && cp -R frontend/kimi/dist kimi_dist",
+    "install:frontend": "npm --prefix frontend/kimi ci --no-audit --no-fund",
     "build:frontend": "npm --prefix frontend/kimi run build",
     "lint": "tsc --noEmit",
     "start": "node server.ts"
