@@ -720,7 +720,15 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                             validated_card = validate_card_resonance(deck, card_id=card_id, card_index=card_index)
                         except Exception as exc:
                             logger.warning(f"Card resonance validation fallback: {exc}")
-                            validated_card = next((c for c in deck["cards"] if c["card_index"] == card_index), deck["cards"][0])
+                            # Never pass an unvalidated generated card to the participant
+                            # path: a malformed card may contain analytical provenance.
+                            validated_card = {
+                                "card_id": card_id,
+                                "card_index": card_index,
+                                "title": "The Resonant Card",
+                                "qualitative_reading": "A moment of reflection, held without conclusion.",
+                                "meaning": "participant_reported_resonance_not_truth",
+                            }
                     else:
                         validated_card = {"card_id": card_id, "card_index": card_index, "title": "The Resonant Card", "qualitative_reading": "A card chosen by reflection."}
                     selected_cards.append({**validated_card, "selection_order": order})
