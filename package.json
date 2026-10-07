@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "npm run build:frontend && tsc && rm -rf kimi_dist && cp -R frontend/kimi/dist kimi_dist",
-    "build:frontend": "npm --prefix frontend/kimi run build",
+    "build:frontend": "npm --prefix frontend/kimi install --include=dev && npm --prefix frontend/kimi run build",
     "lint": "tsc --noEmit",
     "start": "node server.ts"
   },
