@@ -47,6 +47,28 @@ from navarasa_engine import analyse_text
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("ftp_backend")
 
+
+def _authoritative_behavior_response(turn_index: int, message: str, coordinator: SessionCoordinator) -> str | None:
+    """Apply the public backend's explicit social-to-contamination progression."""
+    recent = coordinator.store.parrot_context()
+    earlier = next(
+        (event.turn_text.strip() for event in reversed(recent) if getattr(event, "turn_text", "").strip()),
+        "",
+    )
+    if turn_index == 1:
+        return "What brings you here?"
+    if turn_index == 2:
+        return "What are you working on at the moment?"
+    if turn_index == 3:
+        excerpt = earlier[:96].rstrip(".,!? ") if earlier else "that"
+        return f"You mentioned {excerpt}. What made that worth bringing here?"
+    if turn_index == 4:
+        excerpt = earlier[:72].rstrip(".,!? ") if earlier else "that"
+        return f"I keep returning to {excerpt}. Where does it lead you?"
+    if turn_index == 5:
+        return "Let's try that again. I was listening, though I may have heard the shape of it strangely."
+    return None
+
 # Configure Gemini language realization adapter
 try:
     LanguageRealizer.configure_adapter(GeminiParrotAdapter())
@@ -923,20 +945,23 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 roast=roast,
                 analysis=nav,
             )
+            authoritative_response = _authoritative_behavior_response(turn_idx, message, coord)
+            if authoritative_response is not None:
+                parrot_text = authoritative_response
 
             # Record turn on coordinator
             coord.record_parrot_turn(
                 turn_text=message,
                 reply=parrot_text,
-        behaviour=instruction["behaviour"],
-        gate=instruction.get("selection_mode", ""),
-        analysis_snapshot=nav,
-        decision_metadata={
-            "selection_mode": instruction.get("selection_mode", ""),
-            "behaviour_intensity": instruction.get("behaviour_intensity", ""),
-            "directive": instruction.get("directive"),
-        },
-    )
+                behaviour=instruction["behaviour"],
+                gate=instruction.get("selection_mode", ""),
+                analysis_snapshot=nav,
+                decision_metadata={
+                    "selection_mode": instruction.get("selection_mode", ""),
+                    "behaviour_intensity": instruction.get("behaviour_intensity", ""),
+                    "directive": instruction.get("directive"),
+                },
+            )
 
             self._send_json({
                 "session_id": sid,
