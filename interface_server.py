@@ -1753,29 +1753,35 @@ def apply_behaviour(
         )
 
     if behaviour == "mixed":
-
+        # The same character carries both social continuity and the intrusion.
+        # Keep one familiar response beside one peculiar interruption rather than
+        # presenting separate social and parrot modes.
         components = []
 
+        if random.random() < 0.5:
+            components.append(
+                choose_perceived_understanding(
+                    text,
+                    analysis,
+                    session,
+                )
+            )
+        else:
+            components.append(choose_mirroring_line(session))
+
+        intrusion = random.choice(("absurd", "memory_loss", "system_glitch", "banana"))
         components.append(
-            choose_random_line(
-                ABSURD_GLITCHES,
+            apply_behaviour(
+                intrusion,
                 session,
-                "recent_absurdities"
+                roast,
+                text=text,
+                analysis=analysis,
             )
         )
 
-        components.append(
-            choose_random_line(
-                SYSTEM_GLITCH_LINES,
-                session,
-                "recent_system_glitches"
-            )
-        )
-
-        if roast and random.random() < 0.50:
+        if roast and random.random() < 0.35:
             components.insert(0, roast)
-
-        random.shuffle(components)
 
         return "\n\n".join(
             component
