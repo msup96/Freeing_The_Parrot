@@ -118,8 +118,8 @@ _REFLECTIONS = {
     ),
     "understanding": (
         "You are asking for something more useful than a polished answer. You want a way to look at it.",
-        "It sounds like the missing piece is not information so much as a clearer frame for what is already in front of you.",
-        "You seem to want perspective without having the perspective handed to you as a verdict.",
+        "The missing piece is not information so much as a clearer frame for what is already in front of you.",
+        "You want perspective without having it handed to you as a verdict.",
     ),
     "trust": (
         "You are weighing not only what happened, but whether your reading of it deserves to be trusted.",

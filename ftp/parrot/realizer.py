@@ -124,7 +124,7 @@ class LanguageRealizer:
         if validate_realizer_output(candidate, instruction, recent_replies):
             deterministic = candidate
         else:
-            deterministic = base if validate_realizer_output(base, instruction) else base[:MAX_REALIZER_TEXT_CHARS]
+            deterministic = base if validate_realizer_output(base, instruction, recent_replies) else base[:MAX_REALIZER_TEXT_CHARS]
 
         if cls._adapter is None:
             return deterministic
@@ -274,6 +274,8 @@ def _instruction_view(request: Mapping[str, Any]) -> dict[str, Any]:
         "behaviour_intensity": request["behaviour_intensity"],
         "directive": request.get("directive"),
         "directive_basis": list(request.get("directive_basis") or []),
+        "conversation_move": request.get("conversation_move"),
+        "question_hint": request.get("question_hint"),
     }
 
 
