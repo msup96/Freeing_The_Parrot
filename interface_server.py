@@ -1053,8 +1053,21 @@ CURIOSITY_OPENINGS = (
 
 
 def _early_parrot_response(text, session):
-    """Keep the opening social before interpretation or contamination begins."""
+    """Use social openings only for genuinely light opening turns.
+
+    A participant who has already offered substantive emotional material has
+    earned a response, not a canned greeting question.
+    """
     turn = int(session.get("substantive_turns", 0) or 0)
+    words = [
+        token for token in text.split()
+        if token.strip(".,!?;:()[]{}'\"")
+    ]
+    substantive = len(words) >= 6
+
+    if substantive:
+        return None
+
     if turn <= 1:
         return choose_random_line(SOCIAL_OPENINGS, session, "recent_openings")
     if turn == 2:
