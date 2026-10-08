@@ -134,3 +134,55 @@ def test_direct_pattern_question_gets_a_substantive_fallback_answer():
     )
     assert plan["conversation_move"] == "answer"
     assert "sequence" in answer.lower() or "instances" in answer.lower()
+
+
+def test_two_same_theme_questions_create_space():
+    questions = [
+        "What repeats most clearly — what they do, what you do, or what you expect will happen?",
+        "When you call it a pattern, which part keeps happening in almost the same shape?",
+    ]
+    plan = choose_conversation_plan(
+        "I keep thinking about the pattern.",
+        turn_index=7,
+        behaviour="understanding",
+        recent_questions=questions,
+        roll=0.01,
+    )
+    assert plan["conversation_move"] != "ask"
+    assert plan["question_hint"] is None
+
+
+def test_question_does_not_follow_question_move():
+    plan = choose_conversation_plan(
+        "There is more I want to understand about the relationship.",
+        turn_index=6,
+        behaviour="understanding",
+        last_move="ask",
+        roll=0.01,
+    )
+    assert plan["conversation_move"] != "ask"
+
+
+def test_correction_repairs_instead_of_repeating():
+    plan = choose_conversation_plan(
+        "You are repeating yourself. Can we have a real conversation?",
+        turn_index=8,
+        behaviour="banana",
+        roll=0.01,
+    )
+    assert plan["conversation_move"] == "repair"
+    rendered = render_conversation_response(
+        "You are repeating yourself. Can we have a real conversation?",
+        move=plan["conversation_move"],
+        recent_replies=[],
+        roll=0.2,
+    )
+    assert "try that again" in rendered.lower()
+
+
+def test_semantic_repetition_guard_catches_paraphrase():
+    recent = [
+        "You are looking for perspective rather than a dramatic solution.",
+    ]
+    candidate = "You may be looking for perspective rather than a dramatic solution."
+    assert is_response_repetitive(candidate, recent)

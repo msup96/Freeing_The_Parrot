@@ -13,7 +13,8 @@ from typing import Sequence
 DIRECT_MOVE = "answer"
 QUESTION_MOVE = "ask"
 REFLECTION_MOVES = ("reflect", "acknowledge", "clarify", "continue")
-ALL_MOVES = frozenset({DIRECT_MOVE, QUESTION_MOVE, *REFLECTION_MOVES})
+REPAIR_MOVE = "repair"
+ALL_MOVES = frozenset({DIRECT_MOVE, QUESTION_MOVE, REPAIR_MOVE, *REFLECTION_MOVES})
 
 GLITCH_BEHAVIOURS = frozenset({
     "absurd", "memory_loss", "system_glitch", "help_me", "banana",
@@ -207,9 +208,25 @@ def glitch_severity_for_behaviour(behaviour: str | None, intensity: str | None) 
         return "moderate"
     return "low" if response_mode_for_behaviour(behaviour) == "glitch" else "none"
 
+def _content_word_list(text: str) -> list[str]:
+    return [
+        w for w in (
+            re.sub(r"^[^\w'-]+|[^\w'-]+$", "", x.lower())
+            for x in str(text or "").split()
+        )
+        if len(w) >= 4 and w not in _STOPWORDS
+    ]
+
+
 def content_words(text: str) -> set[str]:
-    return {w for w in (re.sub(r"^[^\w'-]+|[^\w'-]+$", "", x.lower()) for x in str(text or "").split())
-            if len(w) >= 4 and w not in _STOPWORDS}
+    return set(_content_word_list(text))
+
+
+def content_ngrams(text: str, size: int = 2) -> set[tuple[str, ...]]:
+    words = _content_word_list(text)
+    if len(words) < size:
+        return set()
+    return {tuple(words[i : i + size]) for i in range(len(words) - size + 1)}
 
 def is_direct_question(text: str) -> bool:
     t = str(text or "").strip()
@@ -235,8 +252,17 @@ def topic_key(text: str) -> str:
             return key
     return "default"
 
+def _recent_question_count_for_topic(text: str, recent_questions: Sequence[str]) -> int:
+    key = topic_key(text)
+    return sum(1 for question in recent_questions if topic_key(question) == key)
+
+
 def select_contextual_question(text: str, *, recent_questions: Sequence[str] = ()) -> str | None:
     used = {str(x).strip() for x in recent_questions}
+    # Two questions on the same theme are enough. Leave room for the participant
+    # to introduce something new instead of turning curiosity into interrogation.
+    if _recent_question_count_for_topic(text, recent_questions) >= 2:
+        return None
     for q in _QUESTIONS.get(topic_key(text), _DEFAULT_QUESTIONS):
         if q not in used:
             return q
@@ -280,7 +306,14 @@ def is_response_repetitive(text: str, recent_replies: Sequence[str] = ()) -> boo
     if len(words) >= 5:
         for reply in recent_replies[-3:]:
             prior = content_words(reply)
-            if prior and len(words & prior) / max(1, len(words | prior)) >= 0.68:
+            if not prior:
+                continue
+            overlap = len(words & prior) / max(1, len(words | prior))
+            if overlap >= 0.58:
+                return True
+            # Shared adjacent content words catch paraphrases that keep the
+            # same underlying sentence shape even when wording changes.
+            if len(content_ngrams(t) & content_ngrams(reply)) >= 2:
                 return True
     return any(t == " ".join(str(r or "").lower().split()) for r in recent_replies[-3:])
 
@@ -292,9 +325,9 @@ def render_conversation_response(text: str, *, move: str,
     idx = lambda n: int(max(0, min(0.999999, roll)) * n)
     if move == "repair":
         options = (
-            "Fair point. I was circling the sentence instead of talking to you.",
-            "Yes. I slipped into pattern-reading instead of staying in the conversation.",
-            "You're right. That stopped sounding like a conversation.",
+            "Fair point. I was circling the sentence instead of talking to you. Let's try that again.",
+            "You're right. I slipped into pattern-reading instead of staying in the conversation. Let's try that again.",
+            "Yes. That stopped sounding like a conversation. Let's try that again.",
         )
         base = options[idx(3)]
     elif move == DIRECT_MOVE:
@@ -315,7 +348,15 @@ def render_conversation_response(text: str, *, move: str,
         refs = _REFLECTIONS.get(key, _DEFAULT_REFLECTIONS)
         base = refs[idx(len(refs))]
     if is_response_repetitive(base, recent_replies):
-        base = "Let me stay with the thing you actually said."
+        fallbacks = (
+            "Let me stay with the thing you actually said.",
+            "I hear the point. I do not need to rename it to keep the conversation moving.",
+            "Right. I will answer the conversation in front of me.",
+        )
+        base = next(
+            (candidate for candidate in fallbacks if not is_response_repetitive(candidate, recent_replies)),
+            fallbacks[0],
+        )
         if move == QUESTION_MOVE and question_hint:
             base = f"{base} {question_hint}"
     return base.strip()

@@ -183,7 +183,8 @@ SOCIAL_RESPONSE_BANK = {
         "I am running well enough. Thanks for asking. How are you?",
         "I am operational. How are you doing?",
         "The machine is awake and answering. How are you?",
-        "I am fine in the only way a machine can honestly be fine: I am working.",
+        "I am fine in the only way a machine can honestly be fine: I am working. How are you?",
+        "System-wise, I am good. Subjectively, I have no mood to report. How are you?",
     ],
     "opening_help": [
         "Sure. Tell me what happened.",
