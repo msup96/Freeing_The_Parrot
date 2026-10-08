@@ -50,6 +50,8 @@ def compose_reading_deck(coordinator: Any, adapter: Any | None = None) -> dict[s
         evaluation=evaluation,
         reader_result=reader_result,
     )
+    from ftp.silent_reader.reading.theme import derive_conversation_theme
+    profile["conversation_theme"] = derive_conversation_theme(coordinator)
     deck = compose_deck(profile)
     validate_deck(deck, profile)
     deck["reading_profile_status"] = profile["reader_status"]
@@ -60,6 +62,13 @@ def compose_reading_deck(coordinator: Any, adapter: Any | None = None) -> dict[s
 def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
     anchors = profile["anchors"]
     cards: list[dict[str, Any]] = []
+    theme = profile.get("conversation_theme") or _fallback_theme()
+    territories = list(theme.get("territories") or [])
+    motifs = list(theme.get("motifs") or [])
+    if len(territories) != CARD_COUNT or len(motifs) != CARD_COUNT:
+        theme = _fallback_theme()
+        territories = theme["territories"]
+        motifs = theme["motifs"]
     used_readings: set[str] = set()
     # Stable session material changes the deterministic composition without adding
     # randomness. The profile remains the source of meaning; this only prevents
@@ -70,9 +79,9 @@ def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
         anchor = anchors[(index * 5 + index // 3 + session_seed) % len(anchors)]
         strategy = COMPOSITION_STRATEGIES[(index - 1 + session_seed) % len(COMPOSITION_STRATEGIES)]
         technique = BARNUM_TECHNIQUES[(index - 1 + session_seed) % len(BARNUM_TECHNIQUES)]
-        semantic_anchor = SEMANTIC_ANCHORS[index - 1]
-        semantic_motif = SEMANTIC_MOTIFS[semantic_anchor]
-        title = _unique_title(index, used_readings)
+        semantic_anchor = territories[index - 1]
+        semantic_motif = motifs[index - 1]
+        title = _unique_title(index, used_readings, theme)
         archetype = ARCHETYPES[(index - 1 + session_seed) % len(ARCHETYPES)]
         fragment = READING_FRAGMENTS[(index * 3 + len(anchor["reading_seed"]) + session_seed) % len(READING_FRAGMENTS)]
         qualitative = _compose_reading(
@@ -110,6 +119,11 @@ def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
         "session_id": profile["session_id"],
         "total_cards": CARD_COUNT,
         "cards": cards,
+        "theme": {
+            "name": theme.get("name"),
+            "phrases": list(theme.get("phrases") or []),
+            "source": theme.get("source"),
+        },
     }
 
 
@@ -178,15 +192,69 @@ def _session_seed(profile: dict[str, Any]) -> int:
     return int(hashlib.sha256(material.encode("utf-8")).hexdigest()[:8], 16)
 
 
-def _unique_title(index: int, used: set[str]) -> str:
-    title = TITLE_FRAGMENTS[index - 1]
+def _unique_title(index: int, used: set[str], theme: dict[str, Any]) -> str:
+    phrases = list(theme.get("phrases") or [])
+    if len(phrases) < 3:
+        return TITLE_FRAGMENTS[index - 1]
+
+    p, q, r = phrases[:3]
+    title_templates = (
+        "The Question Beneath {p}",
+        "The Weight Around {p}",
+        "The Thread Between {p} and {q}",
+        "The Shape of {p}",
+        "The Cost of Carrying {p}",
+        "The Room After {p}",
+        "The Voice Behind {p}",
+        "The Distance Between {p} and {q}",
+        "The Unsaid Around {q}",
+        "The Map Through {p}",
+        "The Mirror of {p}",
+        "The Place Where {p} Changes",
+        "The Pattern Beneath {p}",
+        "The River Between {p} and {q}",
+        "The Pause Before {p}",
+        "The Edge of {p}",
+        "The Door Beyond {p}",
+        "The Light Around {q}",
+        "The Grammar of {p}",
+        "The Small Permission Within {q}",
+        "The Hush Around {r}",
+        "The Reframing of {p}",
+        "The Path After {p}",
+        "The Thread That Keeps {q}",
+        "The Hidden Shape of {r}",
+        "The Tender Weight of {p}",
+        "The Beginning After {p}",
+    )
+    title = title_templates[index - 1].format(p=p, q=q, r=r)
     if title not in used:
         used.add(title)
         return title
-    suffix = hashlib.sha256(str(index).encode()).hexdigest()[:4]
+    suffix = hashlib.sha256(f"{index}:{p}:{q}:{r}".encode("utf-8")).hexdigest()[:4]
     variant = f"{title} ({suffix})"
     used.add(variant)
     return variant
+
+
+def _fallback_theme() -> dict[str, Any]:
+    return {
+        "name": "reflection",
+        "phrases": ["REFLECTION", "ATTENTION", "MEANING"],
+        "territories": [
+            "REFLECTION", "WEIGHT OF REFLECTION", "PRESSURE AROUND REFLECTION",
+            "ATTENTION", "EDGE OF REFLECTION", "LANGUAGE OF REFLECTION",
+            "SPACE AROUND REFLECTION", "MEANING", "SHADOW OF REFLECTION",
+            "PULL OF ATTENTION", "PATTERN OF REFLECTION", "DISTANCE FROM REFLECTION",
+            "PAUSE AROUND ATTENTION", "COST OF REFLECTION", "RETURN TO ATTENTION",
+            "BOUNDARY OF REFLECTION", "OPENING TOWARD MEANING", "FRICTION WITH ATTENTION",
+            "SHAPE OF REFLECTION", "ROOM FOR ATTENTION", "THREAD BETWEEN REFLECTION AND ATTENTION",
+            "WEIGHT OF MEANING", "PATH BEYOND REFLECTION", "ECHO OF ATTENTION",
+            "REPAIR OF MEANING", "BEGINNING AFTER REFLECTION", "NEW LANGUAGE FOR ATTENTION",
+        ],
+        "motifs": [f"theme-{i}" for i in range(1, CARD_COUNT + 1)],
+        "source": "fallback",
+    }
 
 
 def _ensure_unique_reading(text: str, index: int, used: set[str]) -> str:
