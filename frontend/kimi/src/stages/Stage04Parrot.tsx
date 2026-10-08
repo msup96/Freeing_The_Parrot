@@ -92,7 +92,7 @@ export default function Stage04Parrot({
         onTurns([
           {
             role: 'parrot',
-            text: 'I read what you left. Go on.',
+            text: 'What brings you here?',
             behaviour: 'understanding',
           },
         ]);
