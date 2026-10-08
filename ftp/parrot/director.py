@@ -18,7 +18,6 @@ FRACTURE_POOL = frozenset({
     "memory_loss",
     "system_glitch",
     "help_me",
-    "mixed",
     "banana",
     "roast",
 })
@@ -29,7 +28,6 @@ UNSTABLE_POOL = frozenset({
     "system_glitch",
     "help_me",
     "roast",
-    "mixed",
     "mirroring",
     "banana",
 })
