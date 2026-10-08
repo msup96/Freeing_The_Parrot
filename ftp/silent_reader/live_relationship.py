@@ -50,7 +50,8 @@ _IRRITATION = re.compile(
 
 _DISENGAGEMENT = re.compile(
     r"^\s*(okay|ok|fine|whatever|never mind|nevermind|forget it|"
-    r"leave it|doesn'?t matter|bye|goodbye)\s*[.!?]*$",
+    r"leave it|doesn'?t matter|i'?m done|i am done|i'?m leaving|"
+    r"i am leaving|not interested|goodbye|bye)\s*[.!?]*$",
     re.I,
 )
 
