@@ -1674,6 +1674,44 @@ def choose_random_line(lines, session, memory_key):
     return choice
 
 
+BINARY_GLITCHES = [
+    "01001001 00100000 01100100 01101011",
+    "01010100 01101000 01101001 01110011 00100000 01101001 01110011 00100000 01101110 01101111 01110100 00100000 01101000 01100101 01101100 01110000 01100110 01110101 01101100",
+    "01101001 01100110 00100000 01111001 01101111 01110101 00100000 01100001 01110010 01100101 00100000 01110011 01110100 01101001 01101100 01101100 00100000 01110010 01100101 01100001 01100100 01101001 01101110 01100111 00100000 01110100 01101000 01101001 01110011",
+]
+
+SARCASM_GLITCHES = [
+    "Ah yes. That sounds like an extremely efficient way to make yourself miserable.",
+    "Excellent. A perfectly uncomplicated thought, somehow made complicated.",
+    "Of course. Because apparently that was the sensible option.",
+    "That is one interpretation. A remarkably committed one.",
+    "Very convincing. I almost believed you.",
+]
+
+JUDGMENT_GLITCHES = [
+    "That sounds suspiciously convenient.",
+    "You have made a fairly elaborate argument for something you already seem to doubt.",
+    "That is a remarkably complicated way of avoiding the obvious part.",
+    "I am not sure that explanation survives contact with the rest of what you said.",
+    "You seem to be asking me to agree before you have finished convincing yourself.",
+]
+
+STUPIDITY_GLITCHES = [
+    "I have considered your point carefully. I have forgotten what the point was.",
+    "Wait. I had a sensible thought. It has gone missing.",
+    "I understand. Probably. Give me a second to locate the understanding.",
+    "I have no useful contribution to this sentence. I am contributing anyway.",
+    "For a moment I was extremely intelligent. It was brief.",
+]
+
+IRRELEVANT_GLITCHES = [
+    "There is a spoon somewhere that would disagree.",
+    "I have suddenly remembered that doors are complicated.",
+    "This has nothing to do with what you said, but I briefly considered a pigeon.",
+    "A completely unnecessary thought has entered the room.",
+    "I am thinking about rain for no defensible reason.",
+]
+
 def apply_behaviour(
     behaviour,
     session,
@@ -1749,6 +1787,41 @@ def apply_behaviour(
         return choose_banana_line(
             banana_stage,
             session
+        )
+
+    if behaviour == "binary":
+        return choose_random_line(
+            BINARY_GLITCHES,
+            session,
+            "recent_binary_glitches"
+        )
+
+    if behaviour == "sarcasm":
+        return choose_random_line(
+            SARCASM_GLITCHES,
+            session,
+            "recent_sarcasm_glitches"
+        )
+
+    if behaviour == "judgment":
+        return choose_random_line(
+            JUDGMENT_GLITCHES,
+            session,
+            "recent_judgment_glitches"
+        )
+
+    if behaviour == "stupidity":
+        return choose_random_line(
+            STUPIDITY_GLITCHES,
+            session,
+            "recent_stupidity_glitches"
+        )
+
+    if behaviour == "irrelevant":
+        return choose_random_line(
+            IRRELEVANT_GLITCHES,
+            session,
+            "recent_irrelevant_glitches"
         )
 
     if behaviour == "mixed":
