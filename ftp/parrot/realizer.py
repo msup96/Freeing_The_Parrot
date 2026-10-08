@@ -148,13 +148,35 @@ class LanguageRealizer:
     ) -> str:
         from interface_server import apply_behaviour
 
-        return apply_behaviour(
-            instruction["behaviour"],
+        behaviour = instruction["behaviour"]
+        rendered = apply_behaviour(
+            behaviour,
             session,
             roast,
             text=turn_text,
             analysis=analysis,
         )
+
+        # Deterministic fallback must preserve the same conversational illusion
+        # as the model path: answer the participant, then allow only one small
+        # contamination. Never return a bare diagnostic as the whole reply.
+        if behaviour in {
+            "absurd",
+            "memory_loss",
+            "system_glitch",
+            "banana",
+        } and rendered:
+            anchor = apply_behaviour(
+                "understanding",
+                session,
+                roast,
+                text=turn_text,
+                analysis=analysis,
+            )
+            if anchor and rendered:
+                return f"{anchor} {rendered}".strip()
+
+        return rendered
 
 
 def build_realizer_request(
@@ -284,7 +306,7 @@ def _apply_directive_overlay(
     elif directive == "expectation":
         prefix = "You left that question open. I noticed."
     elif directive == "repair":
-        prefix = "Let's try that again; I lost the thread for a moment."
+        prefix = "There. I have the thread again."
     else:
         return base
 
