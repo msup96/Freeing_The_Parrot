@@ -88,7 +88,7 @@ def compose_deck(profile: dict[str, Any]) -> dict[str, Any]:
             title=title,
             archetype=archetype,
             semantic_anchor=semantic_anchor,
-            anchor_term=ANCHOR_TERMS[semantic_anchor],
+            anchor_term=semantic_anchor.lower(),
             seed=anchor["reading_seed"],
             fragment=fragment,
             strategy=strategy,
