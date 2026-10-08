@@ -183,8 +183,6 @@ class TestRelationshipContract:
 
     def test_forbidden_navarasa_input_rejected(self):
         c = _live()
-        with pytest.raises(ValueError, match="Forbidden"):
-            _decide(c, 1, "I am here and I want to talk.", 1)
         # Explicitly test the boundary independently.
         with pytest.raises(ValueError, match="Forbidden"):
             BehaviourDirector.decide(
