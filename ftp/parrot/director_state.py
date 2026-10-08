@@ -88,7 +88,6 @@ class DirectorState:
         self.risk_level = clamp(
             max(self.risk_level, (self.trust_score * 0.70) + rupture_bonus + irritation_bonus)
         )
-        self.last_risk_turn = turn_index
 
     def glitch_probability(self) -> float:
         """Probability that an eligible turn may contain one behavioural risk."""
