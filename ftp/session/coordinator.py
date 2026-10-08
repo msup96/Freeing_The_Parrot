@@ -521,15 +521,24 @@ class SessionCoordinator:
 
         return EngagementSynthesizer(self).synthesize()
 
-    def live_engagement_snapshot(self) -> dict:
-        """Build live engagement evidence/state for the Behaviour Director.
+    def live_engagement_snapshot(
+        self,
+        *,
+        current_turn_text: str = "",
+    ) -> dict:
+        """Build private live interaction signals for the Behaviour Director.
 
-        Available only during ``LIVE_CONVERSATION`` before lock. Never flows
-        into ``build_parrot_context()`` or the event store.
+        Available only during LIVE_CONVERSATION before lock. The current
+        participant message may be supplied for relationship observation, but
+        the resulting Silent Reader signals never flow into Parrot context or
+        the event store.
         """
         from ftp.silent_reader.engagement import build_live_engagement_snapshot
 
-        return build_live_engagement_snapshot(self)
+        return build_live_engagement_snapshot(
+            self,
+            current_turn_text=current_turn_text,
+        )
 
     def build_evidence_bundle(self) -> dict:
         """Curate Phase 3 outputs into an evidence bundle after lock."""
