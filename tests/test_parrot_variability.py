@@ -163,3 +163,29 @@ def test_gemini_prompt_shows_recent_replies_and_relationship_contract(monkeypatc
     assert "Eligibility only permits risk" in system
     assert captured["timeout"] == 5.0
     assert captured["body"]["generationConfig"]["temperature"] == 0.82
+
+
+def test_substantive_opening_message_does_not_trigger_social_question(monkeypatch):
+    import interface_server as server
+
+    session = {"substantive_turns": 1, "recent_openings": []}
+    text = "I feel defeated and I do not know what I am doing anymore."
+    response = server.choose_perceived_understanding(
+        text,
+        {"primary_rasa": "Karuna"},
+        session,
+    )
+    assert response not in server.SOCIAL_OPENINGS
+    assert response not in server.CURIOSITY_OPENINGS
+
+
+def test_explicit_repetition_gets_direct_conversational_repair():
+    import interface_server as server
+
+    session = {"substantive_turns": 6}
+    response = server.choose_perceived_understanding(
+        "You are repeating the same thing again. I do not understand.",
+        {"primary_rasa": "Shanta"},
+        session,
+    )
+    assert "repeat" in response.lower() or "same point" in response.lower()
