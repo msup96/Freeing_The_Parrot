@@ -150,8 +150,22 @@ def derive_conversation_theme(coordinator: Any) -> dict[str, Any]:
     positive = [item for item in ranked if item[1] > 0]
 
     if positive:
-        theme_name = positive[0][0]
-        phrase_set = list(_THEME_PHRASES[theme_name])
+        selected = [item[0] for item in positive[:3]]
+        # Preserve multiple dominant threads rather than letting one
+        # vocabulary cluster erase the rest of the conversation.
+        phrase_set: list[str] = []
+        for theme_name in selected:
+            phrase = _THEME_PHRASES[theme_name][0]
+            if phrase not in phrase_set:
+                phrase_set.append(phrase)
+        if len(phrase_set) < 3:
+            for phrase in _THEME_PHRASES[selected[0]][1:]:
+                if phrase not in phrase_set:
+                    phrase_set.append(phrase)
+                if len(phrase_set) == 3:
+                    break
+        theme_name = "+".join(selected)
+        phrase_set = phrase_set[:3]
     else:
         frequent = Counter(tokens).most_common(3)
         words = [word.upper() for word, _ in frequent]
