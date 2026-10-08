@@ -242,70 +242,79 @@ def _detect_prior_question(
     turns: Sequence[DialogueTurn],
     refs: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
-    for turn in reversed(turns):
-        text = turn.user_text.strip()
-        if not text:
-            continue
-        if "?" in text or _INTERROGATIVE_START.match(text):
-            q_idx = text.find("?")
-            if q_idx >= 0:
-                start = max(0, q_idx - 40)
-                ref = _make_ref(
-                    turn_index=turn.turn_index,
-                    role="user",
-                    source=text,
-                    start=start,
-                )
-            else:
-                ref = _make_ref(
-                    turn_index=turn.turn_index,
-                    role="user",
-                    source=text,
-                    start=0,
-                )
-            refs.append(ref)
-            return {
-                "turn_index": turn.turn_index,
-                "excerpt": ref["excerpt"],
-            }
-    return None
+    """Consider only the immediately previous participant turn.
 
+    An old question is not an open conversational obligation forever. Once
+    the participant has answered it and the conversation has moved on, the
+    Parrot must stop retrieving it merely because it exists in history.
+    """
+    if not turns:
+        return None
+    turn = sorted(turns, key=lambda item: item.turn_index)[-1]
+    text = turn.user_text.strip()
+    if not text:
+        return None
+    if "?" not in text and not _INTERROGATIVE_START.match(text):
+        return None
+
+    q_idx = text.find("?")
+    if q_idx >= 0:
+        start = max(0, q_idx - 40)
+        ref = _make_ref(
+            turn_index=turn.turn_index,
+            role="user",
+            source=text,
+            start=start,
+        )
+    else:
+        ref = _make_ref(
+            turn_index=turn.turn_index,
+            role="user",
+            source=text,
+            start=0,
+        )
+    refs.append(ref)
+    return {
+        "turn_index": turn.turn_index,
+        "excerpt": ref["excerpt"],
+    }
 
 def _detect_open_thread(
     turns: Sequence[DialogueTurn],
     refs: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
-    if len(turns) < 2:
+    """Treat only the latest Parrot question as an open thread."""
+    if not turns:
         return None
-    ordered = sorted(turns, key=lambda item: item.turn_index)
-    for idx in range(len(ordered) - 1):
-        current = ordered[idx]
-        nxt = ordered[idx + 1]
-        if "?" not in current.parrot_reply:
-            continue
-        response = nxt.user_text.strip()
-        word_count = len(response.split())
-        if word_count > OPEN_THREAD_MAX_USER_WORDS:
-            continue
-        if len(response) > OPEN_THREAD_MAX_USER_CHARS:
-            continue
-        q_idx = current.parrot_reply.find("?")
-        start = max(0, q_idx - 30)
-        ref = _make_ref(
-            turn_index=current.turn_index,
-            role="parrot",
-            source=current.parrot_reply,
-            start=start,
-        )
-        refs.append(ref)
-        return {
-            "parrot_turn_index": current.turn_index,
-            "participant_turn_index": nxt.turn_index,
-            "parrot_question_excerpt": ref["excerpt"],
-            "participant_response_excerpt": response[:MAX_EXCERPT_CHARS],
-        }
-    return None
 
+    ordered = sorted(turns, key=lambda item: item.turn_index)
+    latest = ordered[-1]
+
+    if "?" not in latest.parrot_reply:
+        return None
+
+    response = latest.user_text.strip()
+    word_count = len(response.split())
+    if word_count > OPEN_THREAD_MAX_USER_WORDS:
+        return None
+    if len(response) > OPEN_THREAD_MAX_USER_CHARS:
+        return None
+
+    q_idx = latest.parrot_reply.find("?")
+    start = max(0, q_idx - 30)
+    ref = _make_ref(
+        turn_index=latest.turn_index,
+        role="parrot",
+        source=latest.parrot_reply,
+        start=start,
+    )
+    refs.append(ref)
+    return {
+        "parrot_turn_index": latest.turn_index,
+        "participant_turn_index": latest.turn_index,
+        "parrot_question_excerpt": ref["excerpt"],
+        "participant_response_excerpt": response[:MAX_EXCERPT_CHARS],
+    }
 
 def _detect_topic_overlap(
     turns: Sequence[DialogueTurn],
