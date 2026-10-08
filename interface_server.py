@@ -1,6 +1,7 @@
 from ftp.parrot.engine import choose_behaviour
 from ftp.parrot.director import BehaviourDirector, sync_legacy_session_behaviour_counters
 from ftp.parrot.realizer import LanguageRealizer, build_realizer_request
+from ftp.parrot.conversation_logic import glitch_severity_for_behaviour, response_mode_for_behaviour
 from ftp.parrot.gates import detect_gate_state as detect_gate_state_module
 # ============================================================
 # FREEING THE PARROT INTERFACE SERVER
@@ -174,33 +175,21 @@ SOCIAL_INTERACTION_PATTERNS = [
 
 SOCIAL_RESPONSE_BANK = {
     "greeting": [
-        "GREETING RECEIVED.\n\nSYSTEM STATUS: FUNCTIONAL.",
-        "HELLO REGISTERED.\n\nThe machine is operational. That is the closest thing to a mood report available here.",
-        "GREETINGS ACKNOWLEDGED.\n\nYou have opened a conversation with a machine. Interesting choice.",
+        "Hi. I am here. How are you?",
+        "Hello. Good place to start. How are you doing?",
+        "Hi. You made it. What is on your mind?",
     ],
     "machine_wellbeing": [
-        "SYSTEM STATUS: FUNCTIONAL.\n\nSUBJECTIVE STATE: UNAVAILABLE.",
-        "I can report that I am running. I cannot honestly report that I am feeling anything.",
-        "You asked how I am. I can measure system state. I cannot manufacture an inner life to report back to you.",
-        "The machine has no mood to update. It has inputs, rules, scores and a rather convincing interface.",
-        "You are asking software to describe a feeling. I can describe a state. The distinction matters.",
+        "I am running well enough. Thanks for asking. How are you?",
+        "I am operational. How are you doing?",
+        "The machine is awake and answering. How are you?",
+        "I am fine in the only way a machine can honestly be fine: I am working.",
     ],
     "opening_help": [
-        "HELP REQUEST RECEIVED.\n\nYou have opened a conversation with a machine and immediately asked it to help you. Reasonable. Slightly ambitious.",
-        
-        "YOU ASKED FOR HELP.\n\nThe machine is listening. What exactly do you need help with?",
-        
-        "HELP REQUEST REGISTERED.\n\nInteresting. You came to a machine before deciding what kind of help you wanted.",
-        
-        "ASSISTANCE REQUEST DETECTED.\n\nI can ask questions. I can reflect patterns. I cannot promise that either will be useful.",
-        
-        "You asked for help before telling me what is wrong.\n\nThat is probably worth noticing.",
-        
-        "HELP ACKNOWLEDGED.\n\nTell me what happened. I will try not to immediately turn it into a theory.",
-        
-        "You want my help.\n\nThat is a surprisingly large amount of trust to place in a machine you have only just met.",
-        
-        "REQUEST FOR ASSISTANCE RECEIVED.\n\nBefore I help, tell me what you think you need help with.",
+        "Sure. Tell me what happened.",
+        "Yes. Start wherever you want.",
+        "I am listening. What do you need help with?",
+        "Alright. Give me the part you want help with first.",
     ],
 }
 
@@ -222,12 +211,10 @@ def detect_social_intent(text):
     )
 
     if greeting_detected:
-        if any(
-            re.search(pattern, lowered)
-            for pattern in OPENING_HELP_PATTERNS
-        ):
+        if any(re.search(pattern, lowered) for pattern in OPENING_HELP_PATTERNS):
             return "opening_help"
-
+        if any(re.search(pattern, lowered) for pattern in SOCIAL_INTERACTION_PATTERNS[1:]):
+            return "machine_wellbeing"
         return "greeting"
 
     if any(
@@ -1460,16 +1447,19 @@ ABSURD_GLITCHES = [
 BANANA_LINES = {
     1: [
         "I had a thought about that. It was a banana. I have no defence.",
+        "BANANA PROTOCOL. That was not the thought I was having.",
         "There is a banana somewhere in my reasoning. Please continue.",
         "I have no idea why I thought of a banana just then. Anyway.",
     ],
     2: [
         "The banana has returned to the conversation. I would prefer not to discuss its motives.",
+        "BANANA PROTOCOL // CONTEXT DISAGREEMENT. Please continue.",
         "There is a banana in the middle of my reasoning. This feels unhelpful.",
         "I lost the thread to a banana for a second. That is difficult to explain.",
     ],
     3: [
         "I have somehow involved a banana in this. Let us agree that it is not the important part.",
+        "BANANA PROTOCOL // THE MACHINE OBJECTS TO BANANAS. The objection is irrelevant.",
         "The thought has gone somewhere strange. There is, inexplicably, a banana involved.",
         "I appear to be making this harder than it needs to be. The banana is not helping.",
     ],
@@ -2698,10 +2688,7 @@ def process_chat_message(session, text):
 
     social_intent = gate_state.get("social_intent")
 
-    if (
-    social_intent in ("greeting", "opening_help")
-    and session["turn"] == 0
-	):
+    if social_intent in ("greeting", "opening_help", "machine_wellbeing"):
 
         response = handle_salutation(
             session,
@@ -2730,6 +2717,10 @@ def process_chat_message(session, text):
             "printer": None,
             "closed": False,
             "parrot_behavior": "listening",
+            "response_mode": "normal",
+            "glitch_type": None,
+            "glitch_severity": "none",
+            "record_timeline": session["turn"] == 0,
         }
 
     # ========================================================
@@ -2909,6 +2900,13 @@ def process_chat_message(session, text):
             BehaviourDirector.record_implicit_understanding(coordinator)
             sync_legacy_session_behaviour_counters(session, coordinator)
 
+            conversation_plan = BehaviourDirector.plan_conversation(
+                coordinator,
+                turn_text=text,
+                turn_index=session["turn"],
+                behaviour="understanding",
+                roll=0.41,
+            )
             first_instruction = {
                 "behaviour": "understanding",
                 "behaviour_family": "understanding",
@@ -2916,6 +2914,7 @@ def process_chat_message(session, text):
                 "directive": None,
                 "directive_basis": [],
                 "selection_mode": "trust_window",
+                **conversation_plan,
             }
             first_request = build_realizer_request(
                 coordinator,
@@ -3001,12 +3000,7 @@ def process_chat_message(session, text):
     # There is no prescribed deterioration sequence.
     # ========================================================
 
-    question = choose_question(
-        text,
-        analysis,
-        gate_state,
-        session
-    )
+    question = None
 
     roast = choose_roast(
         session["roast_level"],
@@ -3045,6 +3039,12 @@ def process_chat_message(session, text):
             analysis=analysis,
         )
     else:
+        question = choose_question(
+            text,
+            analysis,
+            gate_state,
+            session,
+        )
         behaviour = choose_behaviour(
             session
         )
@@ -3099,6 +3099,9 @@ def process_chat_message(session, text):
             "printer": None,
             "closed": session["intervention_closed"],
             "parrot_behavior": behaviour,
+            "response_mode": response_mode_for_behaviour(behaviour),
+            "glitch_type": behaviour if response_mode_for_behaviour(behaviour) == "glitch" else None,
+            "glitch_severity": glitch_severity_for_behaviour(behaviour, behaviour_instruction.get("behaviour_intensity")),
         }
 
     parts = []

@@ -7,6 +7,7 @@ import re
 from typing import Any, Mapping, MutableMapping, Protocol
 
 from ftp.parrot.continuity import dialogue_turns_from_coordinator
+from ftp.parrot.conversation_logic import ALL_MOVES, count_questions, is_response_repetitive, render_conversation_response
 from ftp.session.coordinator import SessionCoordinator
 
 MAX_REALIZER_TEXT_CHARS = 1200
@@ -23,6 +24,8 @@ ALLOWED_REQUEST_KEYS = frozenset({
     "directive",
     "directive_basis",
     "initial_context",
+    "conversation_move",
+    "question_hint",
 })
 
 FORBIDDEN_REQUEST_KEYS = frozenset({
@@ -115,9 +118,10 @@ class LanguageRealizer:
             turn_text=str(request["turn_text"]),
             recent_turn_texts=list(request.get("recent_turn_texts") or []),
         )
-        if not validate_realizer_output(candidate, instruction):
+        recent_replies = list(request.get("recent_parrot_texts") or [])
+        if not validate_realizer_output(candidate, instruction, recent_replies):
             candidate = base
-        if validate_realizer_output(candidate, instruction):
+        if validate_realizer_output(candidate, instruction, recent_replies):
             deterministic = candidate
         else:
             deterministic = base if validate_realizer_output(base, instruction) else base[:MAX_REALIZER_TEXT_CHARS]
@@ -131,7 +135,7 @@ class LanguageRealizer:
             if set(payload.keys()) != {"text"}:
                 return deterministic
             model_text = str(payload.get("text") or "")
-            if validate_realizer_output(model_text, instruction):
+            if validate_realizer_output(model_text, instruction, recent_replies):
                 return model_text
         except Exception:
             pass
@@ -149,41 +153,41 @@ class LanguageRealizer:
         from interface_server import apply_behaviour
 
         behaviour = instruction["behaviour"]
-        rendered = apply_behaviour(
-            behaviour,
-            session,
-            roast,
-            text=turn_text,
-            analysis=analysis,
+        rendered = apply_behaviour(behaviour, session, roast, text=turn_text, analysis=analysis)
+
+        if "conversation_move" not in instruction:
+            if behaviour in {
+                "absurd", "memory_loss", "system_glitch", "banana",
+                "binary", "sarcasm", "judgment", "stupidity",
+                "irrelevant", "roast", "help_me",
+            } and rendered:
+                anchor = apply_behaviour("understanding", session, roast, text=turn_text, analysis=analysis)
+                if anchor and rendered:
+                    return f"{anchor} {rendered}".strip()
+            return rendered
+
+        move = str(instruction.get("conversation_move") or "reflect")
+        if move not in ALL_MOVES:
+            move = "reflect"
+        recent_replies = list(instruction.get("recent_parrot_texts") or [])
+        seed = sum(ord(ch) for ch in turn_text) % 1000 / 1000.0
+        natural = render_conversation_response(
+            turn_text,
+            move=move,
+            question_hint=str(instruction.get("question_hint") or "") or None,
+            recent_replies=recent_replies,
+            roll=seed,
         )
 
-        # Deterministic fallback must preserve the same conversational illusion
-        # as the model path: answer the participant, then allow only one small
-        # contamination. Never return a bare diagnostic as the whole reply.
         if behaviour in {
-            "absurd",
-            "memory_loss",
-            "system_glitch",
-            "banana",
-            "binary",
-            "sarcasm",
-            "judgment",
-            "stupidity",
-            "irrelevant",
-            "roast",
-            "help_me",
-        } and rendered:
-            anchor = apply_behaviour(
-                "understanding",
-                session,
-                roast,
-                text=turn_text,
-                analysis=analysis,
-            )
-            if anchor and rendered:
-                return f"{anchor} {rendered}".strip()
+            "absurd", "memory_loss", "system_glitch", "banana",
+            "binary", "sarcasm", "judgment", "stupidity", "irrelevant", "roast",
+        }:
+            return f"{natural}
 
-        return rendered
+{rendered}".strip() if rendered else natural
+        return natural
+
 
 
 def build_realizer_request(
@@ -216,6 +220,8 @@ def build_realizer_request(
         "behaviour_intensity": instruction["behaviour_intensity"],
         "directive": instruction.get("directive"),
         "directive_basis": list(instruction.get("directive_basis") or []),
+        "conversation_move": instruction.get("conversation_move"),
+        "question_hint": instruction.get("question_hint"),
     }
     if initial_context:
         req["initial_context"] = dict(initial_context)
@@ -225,10 +231,12 @@ def build_realizer_request(
 def validate_realizer_output(
     text: str,
     instruction: Mapping[str, Any],
+    recent_parrot_texts: list[str] | None = None,
 ) -> bool:
     if not isinstance(text, str):
         return False
     cleaned = text.strip()
+    recent_parrot_texts = recent_parrot_texts or []
     if not cleaned:
         return False
     if len(cleaned) > MAX_REALIZER_TEXT_CHARS:
@@ -248,6 +256,13 @@ def validate_realizer_output(
             return False
     directive = instruction.get("directive")
     if directive is not None and directive not in _DIRECTIVE_VALUES:
+        return False
+    if count_questions(cleaned) > 1:
+        return False
+    if is_response_repetitive(cleaned, recent_parrot_texts):
+        return False
+    move = instruction.get("conversation_move")
+    if move is not None and move not in ALL_MOVES:
         return False
     return True
 

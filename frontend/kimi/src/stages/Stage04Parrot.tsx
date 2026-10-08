@@ -16,10 +16,9 @@ const STATE_GLOW: Record<ParrotState, string> = {
   GLITCHING: 'radial-gradient(circle, rgba(143,134,114,0.75) 0%, rgba(201,162,39,0.12) 45%, transparent 70%)',
 };
 
-function stateForBehaviour(b: string): ParrotState {
-  if (b === 'roast' || b === 'banana') return 'UNCERTAIN';
-  if (b === 'glitch' || b === 'memory-loss' || b === 'mixed') return 'UNCERTAIN';
-  if (b === 'absurd' || b === 'help') return 'UNCERTAIN';
+function stateForBehaviour(b: string, responseMode: ChatTurn['responseMode']): ParrotState {
+  if (responseMode === 'glitch') return 'GLITCHING';
+  if (['roast', 'banana', 'glitch', 'memory-loss', 'mixed', 'absurd', 'help', 'binary', 'sarcasm', 'judgment', 'stupidity', 'irrelevant'].includes(b)) return 'GLITCHING';
   return 'RESPONDING';
 }
 
@@ -29,6 +28,8 @@ function ParrotLine({ turn }: { turn: ChatTurn }) {
   const style: React.CSSProperties = {};
   if (b === 'absurd') style.letterSpacing = '0.06em';
   if (b === 'tender') style.fontStyle = 'italic';
+  const isGlitch = turn.responseMode === 'glitch' || ['glitch', 'banana', 'memory-loss', 'mixed', 'absurd', 'help', 'roast', 'binary', 'sarcasm', 'judgment', 'stupidity', 'irrelevant'].includes(b);
+  if (isGlitch) style.color = '#d64545';
   return (
     <motion.div
       initial={{ opacity: 0, y: 12, filter: 'blur(2px)' }}
@@ -37,10 +38,10 @@ function ParrotLine({ turn }: { turn: ChatTurn }) {
       className="max-w-[92%] md:max-w-[85%]"
     >
       <motion.p
-        className="whitespace-pre-wrap font-serif text-base md:text-lg leading-relaxed text-parchment"
+        className={isGlitch ? 'whitespace-pre-wrap font-serif text-base md:text-lg leading-relaxed parrot-glitch' : 'whitespace-pre-wrap font-serif text-base md:text-lg leading-relaxed text-parchment'}
         style={style}
-        animate={{}}
-        transition={transition('RESPOND')}
+        animate={isGlitch ? { x: [0, -2, 2, -1, 0], skewX: [0, -1, 1, 0], opacity: [1, 0.72, 1, 0.86, 1] } : {}}
+        transition={isGlitch ? { duration: 0.38, ease: 'linear' } : transition('RESPOND')}
       >
         {turn.text}
       </motion.p>
@@ -68,7 +69,7 @@ export default function Stage04Parrot({
 }: {
   turns: ChatTurn[];
   onTurns: (t: ChatTurn[]) => void;
-  onChat: (text: string) => Promise<{ text: string; behaviour: string; closed: boolean }>;
+  onChat: (text: string) => Promise<{ text: string; behaviour: string; closed: boolean; responseMode?: 'normal' | 'glitch'; glitchType?: string; glitchSeverity?: string }>;
   onError?: (message: string) => void;
   onDeck: () => void;
 }) {
@@ -120,8 +121,8 @@ export default function Stage04Parrot({
 
       try {
         const reply = await onChat(text);
-        setState(stateForBehaviour(reply.behaviour));
-        onTurns([...next, { role: 'parrot', text: reply.text, behaviour: reply.behaviour }]);
+        setState(stateForBehaviour(reply.behaviour, reply.responseMode));
+        onTurns([...next, { role: 'parrot', text: reply.text, behaviour: reply.behaviour, responseMode: reply.responseMode, glitchType: reply.glitchType, glitchSeverity: reply.glitchSeverity }]);
         window.setTimeout(() => setState('IDLE'), 2600);
         if (reply.closed) {
           handleDone();
@@ -140,7 +141,9 @@ export default function Stage04Parrot({
         <motion.div
           className="w-[min(52vw,240px)] md:w-[min(34vw,400px)]"
           initial={{ opacity: 0, x: -40, filter: 'brightness(0.2)' }}
-          animate={{ opacity: 1, x: 0, filter: 'brightness(1)' }}
+          animate={state === 'GLITCHING'
+            ? { opacity: [1, 0.8, 1, 0.7, 1], x: [0, -4, 3, -2, 0], rotate: [0, -0.6, 0.6, -0.3, 0] }
+            : { opacity: 1, x: 0, filter: 'brightness(1)' }}
           transition={{ duration: 1.6, ease: [0.45, 0, 0.1, 1] }}
         >
           <div className="relative">
@@ -162,7 +165,9 @@ export default function Stage04Parrot({
           animate={{ opacity: 1, color: '#8F8672' }}
         >
           {emerged
-            ? state === 'THINKING'
+            ? state === 'GLITCHING'
+              ? 'GLITCHING'
+              : state === 'THINKING'
               ? 'THINKING'
               : state === 'LISTENING'
                 ? 'LISTENING'

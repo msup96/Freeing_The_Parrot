@@ -76,6 +76,9 @@ export async function sendChat(sessionId: string, message: string): Promise<{
   response: string;
   parrot_behavior?: string;
   closed?: boolean;
+  response_mode?: 'normal' | 'glitch';
+  glitch_type?: string | null;
+  glitch_severity?: string;
 }> {
   const data = await readJson(await fetch(apiUrl('/api/chat'), {
     method: 'POST',
@@ -86,6 +89,9 @@ export async function sendChat(sessionId: string, message: string): Promise<{
     response: String(data.response ?? ''),
     parrot_behavior: typeof data.parrot_behavior === 'string' ? data.parrot_behavior : undefined,
     closed: Boolean(data.closed),
+    response_mode: data.response_mode === 'glitch' ? 'glitch' : 'normal',
+    glitch_type: typeof data.glitch_type === 'string' ? data.glitch_type : null,
+    glitch_severity: typeof data.glitch_severity === 'string' ? data.glitch_severity : 'none',
   };
 }
 

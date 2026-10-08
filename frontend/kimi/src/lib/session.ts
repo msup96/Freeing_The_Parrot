@@ -16,6 +16,9 @@ export type ChatTurn = {
   role: 'participant' | 'parrot';
   text: string;
   behaviour?: string;
+  responseMode?: 'normal' | 'glitch';
+  glitchType?: string;
+  glitchSeverity?: string;
 };
 
 import type { DeckCard } from './deck';

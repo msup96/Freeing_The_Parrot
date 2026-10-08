@@ -19,6 +19,8 @@ class DirectorState:
     chaos_count: int = 0
     last_behaviour: str | None = None
     behaviour_history: list[str] = field(default_factory=list)
+    conversation_move_history: list[str] = field(default_factory=list)
+    question_history: list[str] = field(default_factory=list)
 
     # Session "temperament". The defaults reproduce the original fixed behaviour exactly;
     # ``randomize_temperament`` gives each live session its own arc so a group of testers
@@ -116,6 +118,8 @@ class DirectorState:
         self.chaos_count = 0
         self.last_behaviour = None
         self.behaviour_history.clear()
+        self.conversation_move_history.clear()
+        self.question_history.clear()
         # Per-session temperament and relationship state return to neutral.
         self.engagement_momentum = 0.0
         self.trust_score = 0.0

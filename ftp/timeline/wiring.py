@@ -39,6 +39,8 @@ def record_chat_timeline_events(
     """
     if coordinator is None:
         return
+    if chat_result.get("record_timeline") is False:
+        return
     if chat_result.get("error"):
         return
 

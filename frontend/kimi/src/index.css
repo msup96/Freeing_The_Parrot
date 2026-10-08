@@ -117,6 +117,24 @@
     background: radial-gradient(circle, rgba(232, 163, 61, 0.9) 0%, rgba(232, 163, 61, 0.25) 35%, transparent 70%);
     mix-blend-mode: screen;
   }
+
+  .parrot-glitch {
+    color: #d64545 !important;
+    text-shadow: 1px 0 #8f2626, -1px 0 rgba(255, 120, 120, 0.65);
+    animation: parrot-glitch 380ms linear both;
+  }
+
+  @keyframes parrot-glitch {
+    0%, 100% { transform: translate(0); }
+    20% { transform: translate(-1px, 1px); }
+    40% { transform: translate(1px, -1px); }
+    60% { transform: translate(-1px, 0); }
+    80% { transform: translate(1px, 1px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .parrot-glitch { animation: none; text-shadow: 1px 0 #8f2626; }
+  }
 }
 
 @layer utilities {

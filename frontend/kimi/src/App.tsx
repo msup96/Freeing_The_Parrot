@@ -101,6 +101,9 @@ export default function App() {
     return {
       text: result.response,
       behaviour: presentationBehaviour(result.parrot_behavior),
+      responseMode: result.response_mode === 'glitch' ? 'glitch' : 'normal',
+      glitchType: result.glitch_type ?? undefined,
+      glitchSeverity: result.glitch_severity ?? undefined,
       closed: Boolean(result.closed),
     };
   }, [sessionId]);

@@ -8,7 +8,8 @@ from __future__ import annotations
 import random
 from typing import Any, Mapping, MutableMapping
 
-from ftp.parrot.continuity import continuity_index_from_coordinator
+from ftp.parrot.continuity import continuity_index_from_coordinator, dialogue_turns_from_coordinator
+from ftp.parrot.conversation_logic import ALL_MOVES, choose_conversation_plan
 from ftp.parrot.director_state import DirectorState
 from ftp.parrot.engine import BEHAVIOUR_NAMES
 from ftp.session.coordinator import SessionCoordinator
@@ -154,6 +155,14 @@ class BehaviourDirector:
                 directive_basis[0].get("excerpt") or ""
             )
 
+        conversation_plan = cls.plan_conversation(
+            coordinator,
+            turn_text=turn_text,
+            turn_index=turn_index,
+            behaviour=behaviour,
+            roll=roll(),
+        )
+
         cls._commit_state(state, behaviour, selection_mode=selection_mode)
 
         instruction = {
@@ -163,9 +172,44 @@ class BehaviourDirector:
             "directive": directive,
             "directive_basis": directive_basis,
             "selection_mode": selection_mode,
+            "conversation_move": conversation_plan["conversation_move"],
+            "question_hint": conversation_plan.get("question_hint"),
         }
         _validate_instruction(instruction)
         return instruction
+
+    @classmethod
+    def plan_conversation(
+        cls,
+        coordinator: SessionCoordinator,
+        *,
+        turn_text: str,
+        turn_index: int,
+        behaviour: str,
+        roll: float = 0.0,
+    ) -> dict[str, Any]:
+        state = coordinator.director_state
+        turns = dialogue_turns_from_coordinator(coordinator)
+        recent_replies = [turn.parrot_reply for turn in turns[-3:] if turn.parrot_reply]
+        plan = choose_conversation_plan(
+            turn_text,
+            turn_index=turn_index,
+            behaviour=behaviour,
+            last_move=state.conversation_move_history[-1] if state.conversation_move_history else None,
+            recent_questions=state.question_history[-8:],
+            recent_replies=recent_replies,
+            roll=roll,
+        )
+        move = str(plan["conversation_move"])
+        if move not in ALL_MOVES:
+            raise ValueError(f"Unknown conversational move {move!r}.")
+        state.conversation_move_history.append(move)
+        state.conversation_move_history = state.conversation_move_history[-8:]
+        hint = plan.get("question_hint")
+        if hint:
+            state.question_history.append(str(hint))
+            state.question_history = state.question_history[-8:]
+        return plan
 
     @classmethod
     def record_implicit_understanding(cls, coordinator: SessionCoordinator) -> None:
@@ -337,6 +381,12 @@ def _validate_instruction(instruction: Mapping[str, Any]) -> None:
     directive = instruction.get("directive")
     if directive is not None and directive not in DIRECTIVE_VALUES:
         raise ValueError(f"Unknown directive {directive!r}.")
+    move = instruction.get("conversation_move")
+    if move not in ALL_MOVES:
+        raise ValueError(f"Unknown conversational move {move!r}.")
+    question_hint = instruction.get("question_hint")
+    if question_hint is not None and (not isinstance(question_hint, str) or len(question_hint) > 260):
+        raise ValueError("Question hint must be short text or None.")
     for key in ("behaviour", "behaviour_family", "behaviour_intensity"):
         value = instruction.get(key)
         if not isinstance(value, str) or not value.strip():
