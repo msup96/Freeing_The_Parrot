@@ -46,29 +46,51 @@ class TestReadingComposer:
         assert len({card["card_id"] for card in deck["cards"]}) == 27
         assert len({card["qualitative_reading"] for card in deck["cards"]}) == 27
 
-    def test_semantic_anchor_system_is_canonical_and_stable(self):
-        deck = _post_session("aa", "bbbb", "cccccccc").compose_post_session_reading()
+    def test_semantic_anchor_system_is_session_specific(self):
+        deck = _post_session(
+            "I am carrying too many expectations.",
+            "I need clarity and guidance.",
+            "The pressure makes it hard to keep going.",
+        ).compose_post_session_reading()
         anchors = [card["semantic_anchor"] for card in deck["cards"]]
         assert len(anchors) == 27
         assert len(set(anchors)) == 27
         assert all(anchors)
-        assert anchors == [
-            "INQUIRY", "GUIDANCE", "RETURN", "SILENCE", "DELAY", "RECONSIDERATION",
-            "ABSENCE", "DOUBT", "OMISSION", "DEPTH", "RECOGNITION", "ATTENTION",
-            "CULTIVATION", "RECURRENCE", "PAUSE", "UNCERTAINTY", "THRESHOLD", "REVELATION",
-            "LANGUAGE", "AGENCY", "DIFFICULTY", "REFRAMING", "ADAPTATION", "DISCERNMENT",
-            "PATTERN", "INCOMPLETION", "BEGINNING",
-        ]
+        assert "EXPECTATIONS" in anchors
+        assert any("CLARITY" in anchor for anchor in anchors)
+        assert deck["theme"]["source"] == "participant_turns_post_session"
+        assert len(deck["theme"]["phrases"]) == 3
         assert len({card["semantic_motif"] for card in deck["cards"]}) == 27
         assert all(card["hidden_provenance"]["semantic_anchor"] == card["semantic_anchor"] for card in deck["cards"])
         assert all(card["hidden_provenance"]["semantic_motif"] == card["semantic_motif"] for card in deck["cards"])
 
-    def test_anchor_grounds_reading_without_becoming_evidence(self):
-        deck = _post_session("aa", "bbbb", "cccccccc").compose_post_session_reading()
-        doubt = deck["cards"][7]
-        assert "DOUBT" not in doubt["qualitative_reading"]
-        assert "questioned certainty" in doubt["qualitative_reading"]
-        assert "semantic_anchor" not in doubt["hidden_provenance"]["evidence_ids"]
+    def test_theme_grounds_reading_without_becoming_evidence(self):
+        deck = _post_session(
+            "Expectations are becoming heavy.",
+            "I want clarity.",
+            "I need guidance.",
+        ).compose_post_session_reading()
+        card = deck["cards"][0]
+        assert "EXPECTATIONS" in card["semantic_anchor"]
+        assert "EXPECTATIONS" not in card["qualitative_reading"]
+        assert "semantic_anchor" not in card["hidden_provenance"]["evidence_ids"]
+
+    def test_different_conversations_produce_different_card_themes(self):
+        pressure = _post_session(
+            "Expectations are exhausting.",
+            "I am carrying pressure from what people expect.",
+            "I need room to stop performing.",
+        ).compose_post_session_reading()
+        transition = _post_session(
+            "I am moving into something new.",
+            "I do not know what the next chapter looks like.",
+            "I am deciding which direction to take.",
+        ).compose_post_session_reading()
+
+        assert pressure["theme"]["phrases"] != transition["theme"]["phrases"]
+        pressure_titles = {card["title"] for card in pressure["cards"]}
+        transition_titles = {card["title"] for card in transition["cards"]}
+        assert pressure_titles != transition_titles
 
     def test_provenance_integrity(self):
         card = _post_session("aa", "bbbb", "cccccccc").compose_post_session_reading()["cards"][0]
