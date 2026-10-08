@@ -12,6 +12,7 @@ from collections import Counter
 from typing import Any
 
 from ftp.events.model import EventType
+from ftp.silent_reader.reading.validate import contains_spoiler
 
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z'-]{2,}")
 
@@ -167,12 +168,23 @@ def derive_conversation_theme(coordinator: Any) -> dict[str, Any]:
         theme_name = "+".join(selected)
         phrase_set = phrase_set[:3]
     else:
-        frequent = Counter(tokens).most_common(3)
-        words = [word.upper() for word, _ in frequent]
-        while len(words) < 3:
-            words.append(("REFLECTION", "ATTENTION", "MEANING")[len(words)])
+        frequent = Counter(tokens).most_common()
+        # Lexical fallback is still participant-derived, but participant
+        # vocabulary must never bypass the same spoiler boundary enforced on
+        # the final card text.
+        safe_words = [
+            word.upper()
+            for word, _ in frequent
+            if not contains_spoiler(word)
+        ][:3]
+        fallback_words = ("REFLECTION", "ATTENTION", "MEANING")
+        for word in fallback_words:
+            if len(safe_words) >= 3:
+                break
+            if word not in safe_words:
+                safe_words.append(word)
         theme_name = "lexical_reflection"
-        phrase_set = words[:3]
+        phrase_set = safe_words[:3]
 
     territories = [
         template.format(p=phrase_set[0], q=phrase_set[1], r=phrase_set[2])
