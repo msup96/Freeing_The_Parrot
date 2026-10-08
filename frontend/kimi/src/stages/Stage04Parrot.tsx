@@ -12,13 +12,13 @@ const STATE_GLOW: Record<ParrotState, string> = {
   THINKING: 'radial-gradient(circle, rgba(201,162,39,0.7) 0%, rgba(201,162,39,0.15) 40%, transparent 70%)',
   RESPONDING: 'radial-gradient(circle, rgba(244,236,216,0.9) 0%, rgba(232,163,61,0.3) 45%, transparent 70%)',
   UNCERTAIN: 'radial-gradient(circle, rgba(143,134,114,0.7) 0%, transparent 60%)',
-  UNSTABLE: 'radial-gradient(circle, rgba(166,58,43,0.75) 0%, rgba(232,163,61,0.25) 45%, transparent 70%)',
-  GLITCHING: 'radial-gradient(circle, rgba(166,58,43,0.95) 0%, rgba(166,58,43,0.3) 40%, transparent 70%)',
+  UNSTABLE: 'radial-gradient(circle, rgba(201,162,39,0.65) 0%, rgba(232,163,61,0.18) 45%, transparent 70%)',
+  GLITCHING: 'radial-gradient(circle, rgba(143,134,114,0.75) 0%, rgba(201,162,39,0.12) 45%, transparent 70%)',
 };
 
 function stateForBehaviour(b: string): ParrotState {
-  if (b === 'roast' || b === 'banana') return 'UNSTABLE';
-  if (b === 'glitch' || b === 'memory-loss' || b === 'mixed') return 'GLITCHING';
+  if (b === 'roast' || b === 'banana') return 'UNCERTAIN';
+  if (b === 'glitch' || b === 'memory-loss' || b === 'mixed') return 'UNCERTAIN';
   if (b === 'absurd' || b === 'help') return 'UNCERTAIN';
   return 'RESPONDING';
 }
@@ -37,16 +37,10 @@ function ParrotLine({ turn }: { turn: ChatTurn }) {
       className="max-w-[92%] md:max-w-[85%]"
     >
       <motion.p
-        className={`whitespace-pre-wrap font-serif text-base md:text-lg leading-relaxed ${
-          b === 'roast' || b === 'banana'
-            ? 'text-parchment'
-            : b === 'glitch' || b === 'memory-loss' || b === 'mixed'
-              ? 'font-mono text-sm text-crimson/90'
-              : 'text-parchment'
-        }`}
+        className="whitespace-pre-wrap font-serif text-base md:text-lg leading-relaxed text-parchment"
         style={style}
-        animate={b === 'glitch' ? { x: [0, -2, 3, -1, 0] } : {}}
-        transition={b === 'glitch' ? { duration: 0.3, repeat: 2 } : {}}
+        animate={{}}
+        transition={transition('RESPOND')}
       >
         {turn.text}
       </motion.p>
@@ -165,10 +159,14 @@ export default function Stage04Parrot({
         <motion.div
           className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-[0.45em]"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1, color: state === 'GLITCHING' || state === 'UNSTABLE' ? '#A63A2B' : '#8F8672' }}
+          animate={{ opacity: 1, color: '#8F8672' }}
         >
           {emerged
-            ? `${state}${turns.some((turn) => turn.role === 'parrot') ? ` · ${turns.filter((turn) => turn.role === 'parrot').at(-1)?.behaviour?.replace(/-/g, ' ').toUpperCase()}` : ''}`
+            ? state === 'THINKING'
+              ? 'THINKING'
+              : state === 'LISTENING'
+                ? 'LISTENING'
+                : 'RESPONDING'
             : 'CAGED'}
         </motion.div>
       </div>

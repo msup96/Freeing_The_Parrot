@@ -18,9 +18,13 @@ FRACTURE_POOL = frozenset({
     "memory_loss",
     "system_glitch",
     "help_me",
-    "mixed",
     "banana",
     "roast",
+    "binary",
+    "sarcasm",
+    "judgment",
+    "stupidity",
+    "irrelevant",
 })
 
 UNSTABLE_POOL = frozenset({
@@ -29,9 +33,13 @@ UNSTABLE_POOL = frozenset({
     "system_glitch",
     "help_me",
     "roast",
-    "mixed",
     "mirroring",
     "banana",
+    "binary",
+    "sarcasm",
+    "judgment",
+    "stupidity",
+    "irrelevant",
 })
 
 COHERENT_POOL = ("understanding", "mirroring")
@@ -69,6 +77,11 @@ BEHAVIOUR_FAMILY = {
     "help_me": "help_me",
     "mixed": "mixed",
     "banana": "banana",
+    "binary": "binary",
+    "sarcasm": "sarcasm",
+    "judgment": "judgment",
+    "stupidity": "stupidity",
+    "irrelevant": "irrelevant",
 }
 
 
@@ -85,38 +98,61 @@ class BehaviourDirector:
         navarasa_result: Mapping[str, Any] | None = None,
         rng: random.Random | None = None,
     ) -> dict[str, Any]:
-        del turn_text  # reserved for future realizer; not used for inference here
         _validate_navarasa_input(navarasa_result or {})
 
-        snapshot = coordinator.live_engagement_snapshot()
-        continuity = continuity_index_from_coordinator(coordinator)
-        eligibility = snapshot["behavioural_eligibility"]
+        snapshot = coordinator.live_engagement_snapshot(
+            current_turn_text=turn_text,
+        )
+        relationship = snapshot.get("relationship") or {}
         state = coordinator.director_state
+        state.observe_relationship(relationship, turn_index=turn_index)
+
+        continuity = continuity_index_from_coordinator(coordinator)
+        roll = rng.random if rng is not None else random.random
         last = state.last_behaviour
 
-        roll = rng.random if rng is not None else random.random
-
-        if state.understanding_turns < state.trust_turns:
-            behaviour = "understanding"
-            intensity = "steady"
-            selection_mode = "trust_window"
-            # An occasional mild echo even inside the trust window (human-plausible, not chaotic).
-            if turn_index >= 2 and state.early_slip_chance > 0 and roll() < state.early_slip_chance:
-                behaviour = "mirroring"
-        else:
-            behaviour, intensity, selection_mode = cls._select_post_trust(
-                substantive_turns=turn_index,
-                last_behaviour=last,
-                eligibility=eligibility,
-                roll=roll,
-                state=state,
+        # The participant's current message always has first right of response.
+        # Correction, confusion, or disengagement can therefore suppress a
+        # behavioural risk even when trust is already high.
+        if relationship.get("disengagement"):
+            behaviour, intensity, selection_mode = "understanding", "steady", "participant_disengaged"
+        elif relationship.get("correction"):
+            behaviour, intensity, selection_mode = "understanding", "steady", "repair_priority"
+        elif relationship.get("previous_fracture"):
+            # A rupture is followed by a clean chance to continue. The
+            # participant's decision to stay is what increases future risk.
+            behaviour = cls._pick_without_repeat(
+                list(COHERENT_POOL), last, roll
             )
+            intensity, selection_mode = "steady", "recovery"
+        elif state.trust_score < 0.62 or turn_index <= state.trust_turns:
+            behaviour, intensity, selection_mode = "understanding", "steady", "trust_building"
+        else:
+            probability = state.glitch_probability()
+            if roll() < probability:
+                intensity = state.glitch_intensity()
+                pool = cls._risk_pool(intensity)
+                behaviour = cls._pick_without_repeat(pool, last, roll)
+                selection_mode = "relationship_risk"
+            else:
+                behaviour, intensity, selection_mode = (
+                    "understanding", "steady", "understanding"
+                )
 
         directive, directive_basis = cls._select_directive(
             continuity,
             behaviour=behaviour,
+            relationship=relationship,
+            current_text=turn_text,
+            state=state,
             roll=roll,
         )
+
+        if directive and directive_basis:
+            state.last_directive = directive
+            state.last_directive_excerpt = str(
+                directive_basis[0].get("excerpt") or ""
+            )
 
         cls._commit_state(state, behaviour, selection_mode=selection_mode)
 
@@ -140,46 +176,23 @@ class BehaviourDirector:
             selection_mode="trust_window",
         )
 
-    @classmethod
-    def _select_post_trust(
-        cls,
-        *,
-        substantive_turns: int,
-        last_behaviour: str | None,
-        eligibility: Mapping[str, Any],
-        roll,
-        state: DirectorState | None = None,
-    ) -> tuple[str, str, str]:
-        if eligibility.get("recovery_eligibility") == "eligible" and roll() < 0.55:
-            behaviour = cls._pick_without_repeat(list(COHERENT_POOL), last_behaviour, roll)
-            return behaviour, "steady", "recovery"
-
-        if (
-            eligibility.get("fracture_eligibility") == "eligible"
-            and roll() < 0.5
-        ):
-            band = eligibility.get("fracture_intensity_band") or "moderate"
-            intensity = "moderate" if band == "moderate" else "low"
-            pool = sorted(FRACTURE_POOL)
-            behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
-            return behaviour, intensity, "fracture"
-
-        base = state.instability_base if state else 0.35
-        ramp = state.instability_ramp if state else 0.08
-        cap = state.instability_cap if state else 0.75
-        jitter = state.instability_jitter if state else 0.0
-        trust = state.trust_turns if state else 3
-        instability = base + (max(0, substantive_turns - (trust + 1)) * ramp)
-        if jitter > 0:
-            # Not monotonic: the machine can settle again, or slip early.
-            instability += (roll() * 2 - 1) * jitter
-        instability = min(cap, max(0.05, instability))
-        if roll() >= instability:
-            return "understanding", "steady", "understanding"
-
-        pool = sorted(UNSTABLE_POOL)
-        behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
-        return behaviour, "moderate", "unstable"
+    @staticmethod
+    def _risk_pool(intensity: str) -> list[str]:
+        low = [
+            "absurd",
+            "memory_loss",
+            "system_glitch",
+            "help_me",
+            "irrelevant",
+            "binary",
+        ]
+        moderate = low + ["banana", "sarcasm", "stupidity"]
+        high = moderate + ["roast", "judgment"]
+        if intensity == "high":
+            return high
+        if intensity == "moderate":
+            return moderate
+        return low
 
     @staticmethod
     def _pick_without_repeat(
@@ -206,7 +219,7 @@ class BehaviourDirector:
             raise ValueError(f"Unknown behaviour {behaviour!r}.")
         if state.understanding_turns < state.trust_turns and behaviour == "understanding":
             state.understanding_turns += 1
-        if selection_mode in {"unstable", "fracture"}:
+        if selection_mode in {"unstable", "fracture", "relationship_risk"}:
             state.chaos_count += 1
         state.last_behaviour = behaviour
         state.behaviour_history.append(behaviour)
@@ -217,28 +230,74 @@ class BehaviourDirector:
         continuity: Mapping[str, Any],
         *,
         behaviour: str,
+        relationship: Mapping[str, Any],
+        current_text: str,
+        state: DirectorState,
         roll,
     ) -> tuple[str | None, list[dict[str, Any]]]:
-        del behaviour
         refs = list(continuity.get("continuity_refs") or [])
 
-        if continuity.get("previous_fracture") and refs:
-            return "repair", refs[:2]
+        if behaviour in FRACTURE_POOL:
+            return None, []
 
-        if continuity.get("open_thread") and refs:
+        # Current-message correction/disengagement always outranks continuity.
+        if relationship.get("correction") or relationship.get("disengagement"):
+            return None, []
+
+        # Very short acknowledgements are not invitations to retrieve an old
+        # conversational thread. Respond to the acknowledgement itself.
+        current_words = {
+            word.lower()
+            for word in current_text.split()
+            if len(word.strip(".,!?;:()[]{}'\"")) >= 5
+        }
+        if len(current_words) < 3:
+            return None, []
+
+        # A continuity reference must have a concrete lexical foothold in the
+        # current turn. This prevents a stale question from becoming the topic
+        # merely because it exists somewhere in the session history.
+        relevant: list[dict[str, Any]] = []
+        for ref in refs:
+            excerpt_words = {
+                word.lower().strip(".,!?;:()[]{}'\"")
+                for word in str(ref.get("excerpt") or "").split()
+                if len(word.strip(".,!?;:()[]{}'\"")) >= 5
+            }
+            if current_words & excerpt_words:
+                relevant.append(ref)
+
+        if not relevant:
+            return None, []
+
+        if state.last_directive and state.last_directive_excerpt:
+            relevant = [
+                ref for ref in relevant
+                if not (
+                    state.last_directive == "familiarity"
+                    and str(ref.get("excerpt") or "") == state.last_directive_excerpt
+                )
+            ]
+            if not relevant:
+                return None, []
+
+        if continuity.get("previous_fracture") and relevant:
+            return "repair", relevant[:1]
+
+        if continuity.get("open_thread") and relevant:
             choice = "expectation" if roll() < 0.5 else "curiosity"
-            return choice, refs[:2]
+            return choice, relevant[:1]
 
-        if continuity.get("prior_question") and refs:
+        if continuity.get("prior_question") and relevant:
             choice = "curiosity" if roll() < 0.5 else "expectation"
-            return choice, refs[:1]
+            return choice, relevant[:1]
 
-        if continuity.get("repeated_phrase") and refs:
+        if continuity.get("repeated_phrase") and relevant:
             choice = "reciprocity" if roll() < 0.5 else "familiarity"
-            return choice, refs[:2]
+            return choice, relevant[:1]
 
-        if continuity.get("topic_overlap") and refs:
-            return "familiarity", refs[:1]
+        if continuity.get("topic_overlap") and relevant:
+            return "familiarity", relevant[:1]
 
         return None, []
 

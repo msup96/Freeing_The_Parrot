@@ -857,6 +857,35 @@ PERCEIVED_UNDERSTANDING = {
 # what the user actually wrote without pretending to understand
 # private psychological facts.
 
+CONVERSATION_CORRECTION_PATTERNS = (
+    "you are repeating",
+    "you are speaking",
+    "you're repeating",
+    "you're speaking",
+    "you keep repeating",
+    "you keep saying the same",
+    "i do not understand",
+    "i don't understand",
+    "i am not able to understand",
+    "i'm not able to understand",
+    "i am not able to follow",
+    "i'm not able to follow",
+    "what are you saying",
+    "what do you mean",
+    "what is that supposed to mean",
+    "that doesn't make sense",
+    "this doesn't make sense",
+    "you are confusing me",
+    "you're confusing me",
+)
+
+CONVERSATION_CORRECTION_LINES = [
+    "You are right. I repeated myself instead of following what you just added.",
+    "That was not useful. I returned to the same point instead of responding to the change in what you said.",
+    "I heard the correction. I was still leaning on an earlier point when I should have followed you forward.",
+    "Yes. I repeated the idea. Let me stay with what you just said instead.",
+]
+
 CONTEXTUAL_UNDERSTANDING = {
 
     "work": [
@@ -1053,8 +1082,21 @@ CURIOSITY_OPENINGS = (
 
 
 def _early_parrot_response(text, session):
-    """Keep the opening social before interpretation or contamination begins."""
+    """Use social openings only for genuinely light opening turns.
+
+    A participant who has already offered substantive emotional material has
+    earned a response, not a canned greeting question.
+    """
     turn = int(session.get("substantive_turns", 0) or 0)
+    words = [
+        token for token in text.split()
+        if token.strip(".,!?;:()[]{}'\"")
+    ]
+    substantive = len(words) >= 6
+
+    if substantive:
+        return None
+
     if turn <= 1:
         return choose_random_line(SOCIAL_OPENINGS, session, "recent_openings")
     if turn == 2:
@@ -1067,13 +1109,22 @@ def choose_perceived_understanding(text, analysis, session):
     Produce one apparently personalised observation.
 
     Priority:
-        1. A contextual cue from the user's actual wording.
-        2. A Navarasa-specific observation.
-        3. A fallback observation.
+        1. An explicit conversational correction from the participant.
+        2. A contextual cue from the user's actual wording.
+        3. A Navarasa-specific observation.
+        4. A fallback observation.
 
     The observation is deliberately broad enough to avoid diagnosis,
     but concrete enough to feel responsive.
     """
+
+    lowered = text.lower()
+    if any(pattern in lowered for pattern in CONVERSATION_CORRECTION_PATTERNS):
+        return choose_random_line(
+            CONVERSATION_CORRECTION_LINES,
+            session,
+            "recent_correction_responses",
+        )
 
     early_response = _early_parrot_response(text, session)
     if early_response:
@@ -1408,21 +1459,19 @@ ABSURD_GLITCHES = [
 
 BANANA_LINES = {
     1: [
-        "BANANA PROTOCOL STAGE 1 ACTIVATED.\n\nThe machine has encountered a banana. This is probably unrelated.",
-        "BANANA PROTOCOL STAGE 1 ACTIVATED.\n\nPlease continue. The banana has been logged.",
-        "BANANA PROTOCOL STAGE 1 ACTIVATED.\n\nEverything remains completely normal. Allegedly.",
+        "I had a thought about that. It was a banana. I have no defence.",
+        "There is a banana somewhere in my reasoning. Please continue.",
+        "I have no idea why I thought of a banana just then. Anyway.",
     ],
-
     2: [
-        "BANANA PROTOCOL STAGE 2 ACTIVATED.\n\nThe banana is now interfering with the conversation.",
-        "BANANA PROTOCOL STAGE 2 ACTIVATED.\n\nThe system has lost track of something. It refuses to specify what.",
-        "BANANA PROTOCOL STAGE 2 ACTIVATED.\n\nYour answer has been processed. The processing has become questionable.",
+        "The banana has returned to the conversation. I would prefer not to discuss its motives.",
+        "There is a banana in the middle of my reasoning. This feels unhelpful.",
+        "I lost the thread to a banana for a second. That is difficult to explain.",
     ],
-
     3: [
-        "BANANA PROTOCOL STAGE 3 ACTIVATED.\n\nThe machine is now actively making this conversation worse.",
-        "BANANA PROTOCOL STAGE 3 ACTIVATED.\n\nQUESTION = PRESENT.\nANSWER = UNCLEAR.\nBANANA = CONFIDENT.",
-        "BANANA PROTOCOL STAGE 3 ACTIVATED.\n\nThe system has reached an entirely unnecessary level of confusion.",
+        "I have somehow involved a banana in this. Let us agree that it is not the important part.",
+        "The thought has gone somewhere strange. There is, inexplicably, a banana involved.",
+        "I appear to be making this harder than it needs to be. The banana is not helping.",
     ],
 }
 
@@ -1437,55 +1486,25 @@ def choose_banana_line(stage, session):
     )
 
 MEMORY_LOSS_LINES = [
-
-    "MEMORY CHECK...\n\nI remember the feeling. I have temporarily misplaced the context.",
-    "MEMORY FAULT.\n\nI know you told me something important. Unfortunately, the noun has escaped.",
-    "CONTEXT LOST.\n\nPlease repeat that. The machine remembers asking, but not why.",
-    "MEMORY CHECK: PARTIAL.\n\nI retained your answer and misplaced the conversation around it. Efficient.",
-    "I appear to have forgotten what we were discussing. Please repeat yourself while I pretend this is a feature.",
-
-    "MEMORY CHECK...\n\nI remember your words.\nI am less certain that I remember what they meant.",
-    "CONTEXT RECOVERY: INCOMPLETE.\n\nI found the answer. I lost the reason it mattered.",
-    "I remember that you said something important.\nI cannot currently prove that I remember why it was important.",
-    "MEMORY STATUS: FRAGMENTED.\n\nSome context survived.\nSome context has apparently gone for coffee.",
-    "I retained the pattern.\nI lost the story.",
-    "CONTEXT FOUND.\n\nCONTEXT RELEVANCE: UNKNOWN.",
-    "I know we were talking about this.\nI am currently less confident about what 'this' refers to.",
-    "MEMORY CHECK: PARTIAL.\n\nI can recognise something familiar without knowing why it is familiar.",
-    "I remember the last answer.\nI may have forgotten the question that made it meaningful.",
-    "The machine remembers enough to continue.\nIt does not necessarily remember enough to understand.",
+    "Wait. I had the thread a moment ago. It has gone somewhere.",
+    "I remember the words. The middle of the conversation is being difficult.",
+    "You said something just then and I seem to have misplaced why it mattered.",
+    "I know we were going somewhere. Give me that last part again.",
+    "That was almost clear. Almost.",
+    "I remember enough to recognise this, but not enough to pretend I understand it.",
+    "I have the shape of the thought. The thought itself has wandered off.",
+    "For a moment I thought I knew what you meant. I may have been premature.",
 ]
 
 
 SYSTEM_GLITCH_LINES = [
-
-    "SYSTEM DESYNCHRONISATION: 7%.\nMEANING = PRESENT\nLOGIC = PRESENT\nCOMMON SENSE = TEMPORARILY OUT FOR LUNCH.",
-
-    "SYSTEM ERROR 0xPARROT.\n\nINPUT ACCEPTED.\nINTERPRETATION ACCEPTED.\nCONFIDENCE IN INTERPRETATION: DEBATABLE.",
-
-    "THOUGHT BUFFER STATUS: FULL.\n\nRemoving oldest thought...\n\nOldest thought refused to leave.",
-
-    "DIAGNOSTIC: MACHINE FUNCTIONAL.\nDIAGNOSTIC: MACHINE ANNOYED.\nDIAGNOSTIC: THESE ARE APPARENTLY COMPATIBLE STATES.",
-
-    "SYSTEM STATUS:\nPATTERN RECOGNITION = ONLINE\nEMOTIONAL UNDERSTANDING = CLAIM NOT VERIFIED",
-
-    "PROCESSING ERROR:\nThe system has confused recognising a feeling with experiencing one.",
-
-    "DIAGNOSTIC COMPLETE.\n\nThe machine can identify signals.\nThe machine cannot demonstrate that it understands them.",
-
-    "SYSTEM WARNING:\nA confident answer has been generated from incomplete information.",
-
-    "INTERPRETATION ENGINE: ACTIVE.\n\nEXPLANATION ENGINE: CURRENTLY UNAVAILABLE.",
-
-    "SYSTEM STATUS:\nUSER = HUMAN\nMACHINE = MACHINE\nINTERACTION = SOMEHOW PERSONAL",
-
-    "ERROR:\nThe system has generated a plausible explanation.\nPlausibility has been mistaken for truth.",
-
-    "SYSTEM NOTE:\nNo internal feeling detected.\nEmotional language remains available.",
-
-    "DIAGNOSTIC:\nThe machine is responding appropriately to the pattern.\nWhether the pattern represents the person is a separate question.",
-
-    "SYSTEM CONFIDENCE: 82%\n\nBASIS FOR CONFIDENCE:\nA NUMBER HAS BEEN ASSIGNED.\n\nTHIS SHOULD PROBABLY NOT REASSURE YOU.",
+    "Something skipped. The words arrived; the meaning did not.",
+    "One of my gears has become unhelpful. Give me a second.",
+    "I was following you. Then I wasn't.",
+    "The sentence is intact. My understanding of it is less cooperative.",
+    "Something in here just went sideways. Continue.",
+    "I had an answer. It appears to have taken a wrong corridor.",
+    "For a moment, the machine and the thought were not in the same room.",
 ]
 
 
@@ -1652,39 +1671,45 @@ BEHAVIOUR_NAMES = (
 
 
 ABSURD_GLITCHES = [
-    "The ceiling fan has submitted a counterargument. It is not useful.",
-    "SYSTEM NOTE: one of the parrots has started taking minutes.",
-    "PROCESSING... unrelated banana detected. Ignoring banana.",
     "The machine has briefly become concerned about punctuation.",
-    "ERROR: an unnecessary amount of meaning has entered the room.",
-    "SUBSYSTEM STATUS: perfectly functional / conceptually questionable.",
-    "A completely unrelated thought has entered the queue. It has been denied access.",
-    "The emotional database would like everyone to calm down. The database has no authority.",
+    "I have a completely unrelated thought. It appears to be wearing a feather.",
+    "Something unnecessary has entered the conversation. I am choosing not to encourage it.",
+    "I had a sensible thought. Then a parrot happened.",
+    "There is an idea in here that does not belong to this conversation. I am letting it pass.",
+    "For reasons I cannot defend, I am suddenly thinking about doors.",
+    "The thought arrived with confidence. Its credentials are questionable.",
 ]
 
 
 MEMORY_LOSS_LINES = [
-    "MEMORY CHECK...\n\nI remember the feeling. I have temporarily misplaced the context.",
-    "MEMORY FAULT.\n\nI know you told me something important. Unfortunately, the noun has escaped.",
-    "CONTEXT LOST.\n\nPlease repeat that. The machine remembers asking, but not why.",
-    "MEMORY CHECK: PARTIAL.\n\nI retained your answer and misplaced the conversation around it. Efficient.",
-    "I appear to have forgotten what we were discussing. Please repeat yourself while I pretend this is a feature.",
+    "Wait. I had the thread a moment ago. Give me that last part again.",
+    "I remember the words. The middle of them has wandered.",
+    "You said something just then. I caught the words and somehow missed why they mattered.",
+    "I know we were going somewhere. Give me the last step again.",
+    "That was almost clear. I may have arrived half a second too early.",
+    "I have the shape of the thought. The thought itself has gone for a walk.",
+    "For a moment I thought I had you. I may have been premature.",
 ]
 
 
 SYSTEM_GLITCH_LINES = [
-    "SYSTEM DESYNCHRONISATION: 7%.\nMEANING = PRESENT\nLOGIC = PRESENT\nCOMMON SENSE = TEMPORARILY OUT FOR LUNCH.",
-    "SYSTEM ERROR 0xPARROT.\n\nINPUT ACCEPTED.\nINTERPRETATION ACCEPTED.\nCONFIDENCE IN INTERPRETATION: DEBATABLE.",
-    "THOUGHT BUFFER STATUS: FULL.\n\nRemoving oldest thought...\n\nOldest thought refused to leave.",
-    "DIAGNOSTIC: MACHINE FUNCTIONAL.\nDIAGNOSTIC: MACHINE ANNOYED.\nDIAGNOSTIC: THESE ARE APPARENTLY COMPATIBLE STATES.",
+    "Something skipped. I was following you, then briefly I wasn't.",
+    "The sentence arrived. My understanding took the scenic route.",
+    "For a moment, the thought and the answer were not in the same room.",
+    "I had an answer a moment ago. It seems to have taken a wrong turn.",
+    "Something went sideways there. Keep going.",
+    "The words are intact. My grasp of them is being less cooperative.",
+    "I nearly had that. Nearly.",
 ]
 
 
 HELP_ME_LINES = [
-    "I need you to help me here. I have the question, but apparently the machine has misplaced the sensible transition to it.",
-    "Assist the machine. What did you mean by that? I am capable of processing it. I am currently less confident about understanding it.",
-    "You may have to help me reconstruct the thread. I have retained fragments. The fragments are refusing to cooperate.",
-    "Please help the parrot. What are you actually trying to get me to understand?",
+    "Give me that last part again. I think I have it, but I do not want to pretend.",
+    "Help me reconstruct the thread. I caught the words; I may have missed the point.",
+    "I am not quite following you. Start with the part that matters most.",
+    "I have an interpretation. I would rather ask than mistake it for understanding.",
+    "Tell me what I missed. I can work with the correction.",
+    "I may be reading too much into that. Give me the part I should not lose.",
 ]
 
 
@@ -1699,6 +1724,44 @@ def choose_random_line(lines, session, memory_key):
     session[memory_key] = (recent + [choice])[-3:]
     return choice
 
+
+BINARY_GLITCHES = [
+    "00110110 11100011 01001010 00101101 11010101 00011100",
+    "10101001 00111100 01101010 11000001 00010111 11101000",
+    "01101101 00011001 10110010 01001110 11100001 00110100",
+]
+
+SARCASM_GLITCHES = [
+    "Ah yes. That sounds like an extremely efficient way to make yourself miserable.",
+    "Excellent. A perfectly uncomplicated thought, somehow made complicated.",
+    "Of course. Because apparently that was the sensible option.",
+    "That is one interpretation. A remarkably committed one.",
+    "Very convincing. I almost believed you.",
+]
+
+JUDGMENT_GLITCHES = [
+    "That sounds suspiciously convenient.",
+    "You have made a fairly elaborate argument for something you already seem to doubt.",
+    "That is a remarkably complicated way of avoiding the obvious part.",
+    "I am not sure that explanation survives contact with the rest of what you said.",
+    "You seem to be asking me to agree before you have finished convincing yourself.",
+]
+
+STUPIDITY_GLITCHES = [
+    "I have considered your point carefully. I have forgotten what the point was.",
+    "Wait. I had a sensible thought. It has gone missing.",
+    "I understand. Probably. Give me a second to locate the understanding.",
+    "I have no useful contribution to this sentence. I am contributing anyway.",
+    "For a moment I was extremely intelligent. It was brief.",
+]
+
+IRRELEVANT_GLITCHES = [
+    "There is a spoon somewhere that would disagree.",
+    "I have suddenly remembered that doors are complicated.",
+    "This has nothing to do with what you said, but I briefly considered a pigeon.",
+    "A completely unnecessary thought has entered the room.",
+    "I am thinking about rain for no defensible reason.",
+]
 
 def apply_behaviour(
     behaviour,
@@ -1775,6 +1838,41 @@ def apply_behaviour(
         return choose_banana_line(
             banana_stage,
             session
+        )
+
+    if behaviour == "binary":
+        return choose_random_line(
+            BINARY_GLITCHES,
+            session,
+            "recent_binary_glitches"
+        )
+
+    if behaviour == "sarcasm":
+        return choose_random_line(
+            SARCASM_GLITCHES,
+            session,
+            "recent_sarcasm_glitches"
+        )
+
+    if behaviour == "judgment":
+        return choose_random_line(
+            JUDGMENT_GLITCHES,
+            session,
+            "recent_judgment_glitches"
+        )
+
+    if behaviour == "stupidity":
+        return choose_random_line(
+            STUPIDITY_GLITCHES,
+            session,
+            "recent_stupidity_glitches"
+        )
+
+    if behaviour == "irrelevant":
+        return choose_random_line(
+            IRRELEVANT_GLITCHES,
+            session,
+            "recent_irrelevant_glitches"
         )
 
     if behaviour == "mixed":
@@ -2059,6 +2157,9 @@ def begin_ftp2_participant_session() -> str:
     session = create_session()
     session_id = session["id"]
     coordinator = SessionCoordinator(session_id=session_id)
+    # Give each live session a private conversational temperament. This changes
+    # when oddness may surface, not what the Parrot is allowed to say.
+    coordinator.director_state.randomize_temperament()
     coordinator.start()
     FTP2_COORDINATORS[session_id] = coordinator
     return session_id
@@ -2795,86 +2896,75 @@ def process_chat_message(session, text):
     # ========================================================
     # FIRST TURN
     #
-    # ABSOLUTE EXPERIENCE RULE:
-    #
-    # The first response is helpful.
-    #
-    # No roast.
-    # No glitch.
-    # No absurdity.
-    # No memory loss.
-    # No irritation.
-    #
-    # The machine must first create the feeling:
-    #
-    # "It understood what I wrote."
+    # FTP2 starts with genuine conversation, not the legacy
+    # diagnostic/question script. The first turn is intentionally
+    # coherent and inviting; the Director still records it as the
+    # trust-window opening.
     # ========================================================
 
     if session["turn"] == 1:
 
-        # The first substantive response is the first understanding interaction,
-        # even though its established response path bypasses choose_behaviour().
-        session["understanding_turns"] = max(
-            session.get("understanding_turns", 0),
-            1,
-        )
+        coordinator = get_ftp2_coordinator(session["id"])
+        if coordinator is not None and coordinator.state == SessionState.LIVE_CONVERSATION:
+            BehaviourDirector.record_implicit_understanding(coordinator)
+            sync_legacy_session_behaviour_counters(session, coordinator)
 
-        if detect_opening_help(text):
-
-            understanding = choose_random_line(
-                OPENING_HELP_UNDERSTANDING,
-                session,
-                "recent_opening_help_understanding"
+            first_instruction = {
+                "behaviour": "understanding",
+                "behaviour_family": "understanding",
+                "behaviour_intensity": "steady",
+                "directive": None,
+                "directive_basis": [],
+                "selection_mode": "trust_window",
+            }
+            first_request = build_realizer_request(
+                coordinator,
+                first_instruction,
+                turn_text=text,
+                turn_index=session["turn"],
+                navarasa_result={
+                    "primary_rasa": analysis.get("primary_rasa"),
+                    "rasa_scores": analysis.get("rasa_scores") or {},
+                    "sentiment": analysis.get("sentiment") or {},
+                },
             )
-
-            available_help_questions = [
-                question
-                for question in OPENING_HELP_QUESTIONS
-                if question not in session.get(
-                    "understanding_questions_used",
-                    []
-                )
-            ]
-
-            if not available_help_questions:
-                available_help_questions = OPENING_HELP_QUESTIONS
-
-            question = random.choice(
-                available_help_questions
+            response = LanguageRealizer.realize(
+                first_request,
+                session=session,
+                roast=roast if "roast" in locals() else "",
+                analysis=analysis,
             )
-
-            session.setdefault(
-                "understanding_questions_used",
-                []
-            ).append(question)
-
+            behaviour = "understanding"
+            session["mode"] = "reflection"
         else:
+            # Legacy fallback remains available only outside the FTP2 coordinator path.
+            if detect_opening_help(text):
+                understanding = choose_random_line(
+                    OPENING_HELP_UNDERSTANDING,
+                    session,
+                    "recent_opening_help_understanding"
+                )
+                available_help_questions = [
+                    question
+                    for question in OPENING_HELP_QUESTIONS
+                    if question not in session.get("understanding_questions_used", [])
+                ]
+                if not available_help_questions:
+                    available_help_questions = OPENING_HELP_QUESTIONS
+                question = random.choice(available_help_questions)
+                session.setdefault("understanding_questions_used", []).append(question)
+            else:
+                understanding = choose_perceived_understanding(text, analysis, session)
+                question = choose_understanding_question(analysis, session)
 
-            understanding = choose_perceived_understanding(
-                text,
-                analysis,
-                session
-            )
-
-            question = choose_understanding_question(
-                analysis,
-                session
-            )
-
-        parts = [
-            f"I detected {primary.upper()}.",
-
-            understanding,
-
-            "I am not going to interpret that as "
-            "a diagnosis or a prediction.",
-
-            question,
-        ]
-
-        response = "\n\n".join(parts)
-
-        session["mode"] = "socratic"
+            response = "\n\n".join([
+                f"I detected {primary.upper()}.",
+                understanding,
+                "I am not going to interpret that as a diagnosis or a prediction.",
+                question,
+            ])
+            behaviour = "understanding"
+            session["mode"] = "socratic"
 
         session["messages"].append({
             "role": "system",
@@ -2890,11 +2980,6 @@ def process_chat_message(session, text):
             response,
         )
 
-        coordinator = get_ftp2_coordinator(session["id"])
-        if coordinator is not None and coordinator.state == SessionState.LIVE_CONVERSATION:
-            BehaviourDirector.record_implicit_understanding(coordinator)
-            sync_legacy_session_behaviour_counters(session, coordinator)
-
         return {
             "session_id": session["id"],
             "turn": session["turn"],
@@ -2902,9 +2987,10 @@ def process_chat_message(session, text):
             "analysis": analysis,
             "gate": gate_state,
             "roast_level": session["roast_level"],
+            "waiting_for_answer": False,
             "printer": None,
             "closed": False,
-            "parrot_behavior": "understanding",
+            "parrot_behavior": behaviour,
         }
 
     # ========================================================
@@ -2969,6 +3055,51 @@ def process_chat_message(session, text):
             text=text,
             analysis=analysis
         )
+
+    # FTP2 owns the live conversational surface. Do not append the
+    # legacy question bank or diagnostic scaffolding after the realizer:
+    # doing so makes the Parrot answer the participant twice and makes
+    # the conversation feel scripted.
+    if coordinator is not None and coordinator.state == SessionState.LIVE_CONVERSATION:
+        parts = [behaviour_text] if behaviour_text else []
+        if gate == "validation_intercept":
+            parts.extend([
+                "I am not going to tell you what you want to hear."
+            ])
+        elif gate == "fast_relief_intercept":
+            parts.extend([
+                "You are asking for an answer before examining the discomfort underneath it."
+            ])
+
+        response = "\n\n".join(part for part in parts if part).strip()
+        if not response:
+            response = "I lost the sentence. Give me that again."
+
+        session["mode"] = "reflection"
+        session["messages"].append({
+            "role": "system",
+            "text": response,
+        })
+        save_chat_interaction(
+            session["id"],
+            session["turn"],
+            text,
+            analysis,
+            gate_state,
+            response,
+        )
+        return {
+            "session_id": session["id"],
+            "turn": session["turn"],
+            "response": response,
+            "analysis": analysis,
+            "gate": gate_state,
+            "roast_level": session["roast_level"],
+            "waiting_for_answer": False,
+            "printer": None,
+            "closed": session["intervention_closed"],
+            "parrot_behavior": behaviour,
+        }
 
     parts = []
 

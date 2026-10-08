@@ -30,22 +30,101 @@ class DirectorState:
     instability_jitter: float = 0.0
     early_slip_chance: float = 0.0
 
+    # Hidden relationship state used only by the Behaviour Director. These
+    # values are derived from live interactional signals; they never enter
+    # Parrot context or participant-facing output.
+    engagement_momentum: float = 0.0
+    trust_score: float = 0.0
+    irritation: float = 0.0
+    suspicion: float = 0.0
+    tolerated_ruptures: int = 0
+    risk_level: float = 0.0
+    last_directive: str | None = None
+    last_directive_excerpt: str | None = None
+
     def randomize_temperament(self, rng: random.Random | None = None) -> None:
         """Give this session its own trust-window length and instability curve."""
         roll = rng or random.SystemRandom()
         self.trust_turns = roll.choice((2, 3, 3, 4))
-        self.instability_base = roll.uniform(0.25, 0.5)
-        self.instability_ramp = roll.uniform(0.03, 0.11)
-        self.instability_cap = roll.uniform(0.55, 0.8)
-        self.instability_jitter = roll.uniform(0.1, 0.25)
-        self.early_slip_chance = roll.uniform(0.0, 0.2)
+        self.instability_base = roll.uniform(0.14, 0.26)
+        self.instability_ramp = roll.uniform(0.02, 0.055)
+        self.instability_cap = roll.uniform(0.42, 0.58)
+        self.instability_jitter = roll.uniform(0.04, 0.12)
+        self.early_slip_chance = roll.uniform(0.0, 0.08)
+
+    def observe_relationship(self, signals: dict, *, turn_index: int) -> None:
+        """Update the hidden relationship state from one live interaction."""
+        clamp = lambda value: max(0.0, min(1.0, float(value)))
+
+        delta = float(signals.get("engagement_delta") or 0.0)
+        trust_delta = float(signals.get("trust_delta") or 0.0)
+        disengagement = bool(signals.get("disengagement"))
+        irritation = bool(signals.get("irritation"))
+        continued = bool(signals.get("continued_after_fracture"))
+
+        if disengagement:
+            self.engagement_momentum = clamp(self.engagement_momentum * 0.55 + delta)
+            self.trust_score = clamp(self.trust_score * 0.72 + trust_delta)
+            self.risk_level = clamp(self.risk_level * 0.55)
+        else:
+            self.engagement_momentum = clamp(self.engagement_momentum + delta)
+            self.trust_score = clamp(self.trust_score + trust_delta)
+
+        if irritation and not disengagement:
+            self.irritation = clamp(self.irritation + 0.12)
+        else:
+            self.irritation = clamp(self.irritation * 0.94)
+
+        if continued:
+            self.tolerated_ruptures += 1
+            self.suspicion = clamp(self.suspicion + 0.10)
+
+        # Suspicion grows when the participant notices oddness, but never
+        # becomes a reason to force another oddity.
+        if bool(signals.get("parrot_directed")) and bool(signals.get("previous_fracture")):
+            self.suspicion = clamp(self.suspicion + 0.08)
+
+        # Risk is a consequence of trust that has survived disruption.
+        rupture_bonus = min(0.30, self.tolerated_ruptures * 0.075)
+        irritation_bonus = min(0.15, self.irritation * 0.20)
+        self.risk_level = clamp(
+            max(self.risk_level, (self.trust_score * 0.70) + rupture_bonus + irritation_bonus)
+        )
+
+    def glitch_probability(self) -> float:
+        """Probability that an eligible turn may contain one behavioural risk."""
+        if self.trust_score < 0.62:
+            return 0.0
+        pressure = max(0.0, self.trust_score - 0.62)
+        probability = 0.06 + (pressure * 1.10)
+        probability += min(0.18, self.tolerated_ruptures * 0.045)
+        probability += min(0.10, self.irritation * 0.10)
+        return max(0.0, min(0.68, probability))
+
+    def glitch_intensity(self) -> str:
+        """Translate relationship pressure into a bounded behavioural band."""
+        if self.trust_score >= 0.90 and (
+            self.tolerated_ruptures >= 2 or self.irritation >= 0.25
+        ):
+            return "high"
+        if self.trust_score >= 0.78 or self.tolerated_ruptures >= 1:
+            return "moderate"
+        return "low"
 
     def clear(self) -> None:
         self.understanding_turns = 0
         self.chaos_count = 0
         self.last_behaviour = None
         self.behaviour_history.clear()
-        # Per-session temperament also returns to the neutral defaults.
+        # Per-session temperament and relationship state return to neutral.
+        self.engagement_momentum = 0.0
+        self.trust_score = 0.0
+        self.irritation = 0.0
+        self.suspicion = 0.0
+        self.tolerated_ruptures = 0
+        self.risk_level = 0.0
+        self.last_directive = None
+        self.last_directive_excerpt = None
         neutral = DirectorState()
         for name in (
             "trust_turns",

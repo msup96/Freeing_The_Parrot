@@ -148,13 +148,42 @@ class LanguageRealizer:
     ) -> str:
         from interface_server import apply_behaviour
 
-        return apply_behaviour(
-            instruction["behaviour"],
+        behaviour = instruction["behaviour"]
+        rendered = apply_behaviour(
+            behaviour,
             session,
             roast,
             text=turn_text,
             analysis=analysis,
         )
+
+        # Deterministic fallback must preserve the same conversational illusion
+        # as the model path: answer the participant, then allow only one small
+        # contamination. Never return a bare diagnostic as the whole reply.
+        if behaviour in {
+            "absurd",
+            "memory_loss",
+            "system_glitch",
+            "banana",
+            "binary",
+            "sarcasm",
+            "judgment",
+            "stupidity",
+            "irrelevant",
+            "roast",
+            "help_me",
+        } and rendered:
+            anchor = apply_behaviour(
+                "understanding",
+                session,
+                roast,
+                text=turn_text,
+                analysis=analysis,
+            )
+            if anchor and rendered:
+                return f"{anchor} {rendered}".strip()
+
+        return rendered
 
 
 def build_realizer_request(
@@ -255,24 +284,40 @@ def _apply_directive_overlay(
     turn_text: str,
     recent_turn_texts: list[str],
 ) -> str:
+    """Add only a small continuity cue when it genuinely helps.
+
+    The deterministic fallback must never let a continuity directive replace
+    the answer to the current participant turn. Model-backed realization gets
+    the directive as context; the fallback therefore keeps only the safest
+    natural cues.
+    """
     del turn_text, recent_turn_texts
+
     if not directive or directive not in _DIRECTIVE_VALUES or not directive_basis:
         return base
+
     excerpt = str(directive_basis[0].get("excerpt") or "").strip()
     if not excerpt:
         return base
 
+    role = str(directive_basis[0].get("role") or "").strip().lower()
+
     if directive == "familiarity":
-        prefix = f"You mentioned {excerpt} earlier. I kept that in mind."
+        if role == "parrot":
+            prefix = "I remember leaving that thread there."
+        else:
+            prefix = f"You mentioned {excerpt} earlier. I kept that in mind."
     elif directive == "reciprocity":
-        prefix = f'You called it "{excerpt}". I am still curious about that.'
-    elif directive == "curiosity":
-        prefix = f"You brought up {excerpt}. What made that the part worth mentioning?"
-    elif directive == "expectation":
-        prefix = "You left that question open. I noticed."
+        if role == "parrot":
+            prefix = f'I said "{excerpt}" earlier. I am still curious about it.'
+        else:
+            prefix = f'You called it "{excerpt}". I am still curious about that.'
     elif directive == "repair":
-        prefix = "Let's try that again; I lost the thread for a moment."
+        prefix = "There. I have the thread again."
     else:
+        # Curiosity and expectation are semantic instructions for the model
+        # realizer. A deterministic fallback should answer the participant
+        # normally rather than manufacturing a mechanical question.
         return base
 
     combined = f"{prefix} {base}".strip()

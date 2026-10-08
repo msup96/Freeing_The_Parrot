@@ -48,35 +48,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("ftp_backend")
 
 
-def _authoritative_behavior_response(turn_index: int, message: str, coordinator: SessionCoordinator) -> str | None:
-    """Apply the public backend's explicit social-to-contamination progression."""
-    recent = coordinator.store.parrot_context()
-    earlier = next(
-        (event.turn_text.strip() for event in reversed(recent) if getattr(event, "turn_text", "").strip()),
-        "",
-    )
-    greeting = re.fullmatch(
-        r"(?:hi|hello|hey|greetings|good\s+(?:morning|afternoon|evening|day))(?:[!.?]*)",
-        message.strip(),
-        re.IGNORECASE,
-    )
-    if greeting:
-        return f"{message.strip().rstrip('!.?')} .".replace(" .", ".")
-    if turn_index == 1:
-        return "What brings you here?"
-    if turn_index == 2:
-        return "What are you working on at the moment?"
-    if turn_index == 3:
-        excerpt = earlier[:96].rstrip(".,!? ") if earlier else "that"
-        return f"You mentioned {excerpt}. What made that worth bringing here?"
-    if turn_index == 4:
-        excerpt = earlier[:72].rstrip(".,!? ") if earlier else "that"
-        return f"I keep returning to {excerpt}. Where does it lead you?"
-    if turn_index == 5:
-        current = message.strip().rstrip(".,!? ") or "that"
-        return f"Ah yes, where were we? I heard you mention {current}. What made you say so?"
-    return None
-
 # Configure Gemini language realization adapter
 try:
     LanguageRealizer.configure_adapter(GeminiParrotAdapter())
@@ -955,10 +926,6 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 roast=roast,
                 analysis=nav,
             )
-            authoritative_response = _authoritative_behavior_response(turn_idx, message, coord)
-            if authoritative_response is not None:
-                parrot_text = authoritative_response
-
             # Record turn on coordinator
             coord.record_parrot_turn(
                 turn_text=message,

@@ -75,10 +75,10 @@ class TestEngagementLabelsAndEligibility:
         [
             ("insufficient", "ineligible", "none", "ineligible"),
             ("emerging", "ineligible", "none", "ineligible"),
-            ("fluctuating", "eligible", "moderate", "ineligible"),
-            ("declining", "eligible", "low", "ineligible"),
-            ("sustained", "ineligible", "none", "eligible"),
-            ("high", "ineligible", "none", "eligible"),
+            ("fluctuating", "ineligible", "none", "eligible"),
+            ("declining", "ineligible", "none", "eligible"),
+            ("sustained", "eligible", "low", "eligible"),
+            ("high", "eligible", "moderate", "eligible"),
         ],
     )
     def test_derive_behavioural_eligibility_unchanged(
@@ -96,13 +96,23 @@ class TestEngagementLabelsAndEligibility:
         assert coordinator.live_engagement_snapshot()["engagement_state"]["state"] == "insufficient"
         assert eligibility["fracture_eligibility"] == "ineligible"
 
-    def test_fluctuating_live_snapshot_fracture_moderate(self):
+    def test_sustained_live_snapshot_fracture_eligible(self):
         coordinator = _live()
-        _fluctuating_turns(coordinator)
+        coordinator.record_parrot_turn("I am staying with this conversation.", "Reply.")
+        coordinator.record_parrot_turn("I want to understand what you mean.", "Reply.")
+        coordinator.record_parrot_turn("I am still here and I want to keep talking.", "Reply.")
         snapshot = coordinator.live_engagement_snapshot()
-        assert snapshot["engagement_state"]["state"] == "fluctuating"
+        assert snapshot["engagement_state"]["state"] in {"sustained", "high"}
         assert snapshot["behavioural_eligibility"]["fracture_eligibility"] == "eligible"
-        assert snapshot["behavioural_eligibility"]["fracture_intensity_band"] == "moderate"
+
+    def test_current_turn_relationship_signal_is_private(self):
+        coordinator = _live()
+        snapshot = coordinator.live_engagement_snapshot(
+            current_turn_text="Why did you say that? I am still trying to understand you."
+        )
+        assert snapshot["relationship"]["parrot_directed"] is True
+        assert snapshot["relationship"]["disengagement"] is False
+        assert snapshot["relationship"]["trust_delta"] > 0
 
     def test_emerging_live_snapshot_fracture_ineligible(self):
         coordinator = _live()

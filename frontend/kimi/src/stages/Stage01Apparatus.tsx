@@ -125,13 +125,13 @@ export default function Stage01Apparatus({ onEnter }: { onEnter: () => void }) {
 
       {/* ENTER — a physical control */}
       <motion.div
-        className="mt-6 md:mt-10 pb-10 md:pb-24"
+        className="mt-6 md:mt-10 w-full flex flex-col items-center pb-10 md:pb-24"
         initial={{ opacity: 0 }}
         animate={phase >= 5 ? { opacity: 1 } : {}}
         transition={transition('SETTLE')}
       >
         <motion.button
-          className="brass-button px-10 md:px-14 py-4 min-h-[44px]"
+          className="brass-button self-center px-10 md:px-14 py-4 min-h-[44px]"
           onClick={handleEnter}
           whileHover={{ y: -1 }}
           whileTap={{ y: 2 }}
@@ -140,7 +140,7 @@ export default function Stage01Apparatus({ onEnter }: { onEnter: () => void }) {
           ENTER
         </motion.button>
 
-        <p className="mx-auto mt-8 max-w-[21rem] md:max-w-md text-center font-serif italic text-xs md:text-sm leading-relaxed text-parchment-dim">
+        <p className="mx-auto mt-8 w-full max-w-[72ch] px-7 md:px-10 text-center font-serif italic text-[0.78rem] md:text-sm leading-[1.8] text-parchment-dim text-pretty">
           Freeing the Parrot is an installation about the feeling of being understood by a machine. It borrows Kili
           Josiyam, where a parrot picks a card to tell a fortune, and replaces the parrot with software. We made it to
           ask how much of that meaning comes from the system, and how much we bring ourselves.
