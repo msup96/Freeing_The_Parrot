@@ -143,8 +143,16 @@ class BehaviourDirector:
             continuity,
             behaviour=behaviour,
             relationship=relationship,
+            current_text=turn_text,
+            state=state,
             roll=roll,
         )
+
+        if directive and directive_basis:
+            state.last_directive = directive
+            state.last_directive_excerpt = str(
+                directive_basis[0].get("excerpt") or ""
+            )
 
         cls._commit_state(state, behaviour, selection_mode=selection_mode)
 
@@ -223,6 +231,8 @@ class BehaviourDirector:
         *,
         behaviour: str,
         relationship: Mapping[str, Any],
+        current_text: str,
+        state: DirectorState,
         roll,
     ) -> tuple[str | None, list[dict[str, Any]]]:
         refs = list(continuity.get("continuity_refs") or [])
@@ -230,9 +240,46 @@ class BehaviourDirector:
         if behaviour in FRACTURE_POOL:
             return None, []
 
-        # Current-message correction always outranks continuity overlays.
+        # Current-message correction/disengagement always outranks continuity.
         if relationship.get("correction") or relationship.get("disengagement"):
             return None, []
+
+        # Very short acknowledgements are not invitations to retrieve an old
+        # conversational thread. Respond to the acknowledgement itself.
+        current_words = {
+            word.lower()
+            for word in current_text.split()
+            if len(word.strip(".,!?;:()[]{}'\"")) >= 5
+        }
+        if len(current_words) < 3:
+            return None, []
+
+        # A continuity reference must have a concrete lexical foothold in the
+        # current turn. This prevents a stale question from becoming the topic
+        # merely because it exists somewhere in the session history.
+        relevant: list[dict[str, Any]] = []
+        for ref in refs:
+            excerpt_words = {
+                word.lower().strip(".,!?;:()[]{}'\"")
+                for word in str(ref.get("excerpt") or "").split()
+                if len(word.strip(".,!?;:()[]{}'\"")) >= 5
+            }
+            if current_words & excerpt_words:
+                relevant.append(ref)
+
+        if not relevant:
+            return None, []
+
+        if state.last_directive and state.last_directive_excerpt:
+            relevant = [
+                ref for ref in relevant
+                if not (
+                    state.last_directive == "familiarity"
+                    and str(ref.get("excerpt") or "") == state.last_directive_excerpt
+                )
+            ]
+            if not relevant:
+                return None, []
 
         if continuity.get("previous_fracture") and refs:
             return "repair", refs[:1]
