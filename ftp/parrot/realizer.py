@@ -262,12 +262,25 @@ def _apply_directive_overlay(
     if not excerpt:
         return base
 
+    role = str(directive_basis[0].get("role") or "").strip().lower()
+
+    # Continuity references are typed. Never attribute a Parrot utterance to the
+    # participant; that leaks the mechanism and breaks the conversational illusion.
     if directive == "familiarity":
-        prefix = f"You mentioned {excerpt} earlier. I kept that in mind."
+        if role == "parrot":
+            prefix = "I remember leaving that thread there."
+        else:
+            prefix = f"You mentioned {excerpt} earlier. I kept that in mind."
     elif directive == "reciprocity":
-        prefix = f'You called it "{excerpt}". I am still curious about that.'
+        if role == "parrot":
+            prefix = f'I said "{excerpt}" earlier. I am still curious about it.'
+        else:
+            prefix = f'You called it "{excerpt}". I am still curious about that.'
     elif directive == "curiosity":
-        prefix = f"You brought up {excerpt}. What made that the part worth mentioning?"
+        if role == "parrot":
+            prefix = "I asked you about that earlier. You left it hanging."
+        else:
+            prefix = f"You brought up {excerpt}. What made that the part worth mentioning?"
     elif directive == "expectation":
         prefix = "You left that question open. I noticed."
     elif directive == "repair":
