@@ -18,6 +18,11 @@ BEHAVIOUR_NAMES = (
     "mixed",
     "mirroring",
     "banana",
+    "binary",
+    "sarcasm",
+    "judgment",
+    "stupidity",
+    "irrelevant",
 )
 
 
