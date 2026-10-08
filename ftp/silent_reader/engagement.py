@@ -79,18 +79,16 @@ def derive_engagement_state(signals: dict[str, Any]) -> dict[str, Any]:
 
 def derive_behavioural_eligibility(engagement_state: str) -> dict[str, Any]:
     """Eligibility for a future Behaviour Director. Not a participant profile."""
-    if engagement_state in {"fluctuating", "declining"}:
+    # Sustained/high interaction is what earns behavioural freedom. A
+    # fluctuation is not evidence that the participant trusts the Parrot.
+    if engagement_state in {"sustained", "high"}:
         fracture = "eligible"
-        band = "moderate" if engagement_state == "fluctuating" else "low"
-        recovery = "ineligible"
-    elif engagement_state in {"sustained", "high"}:
-        fracture = "ineligible"
-        band = "none"
+        band = "moderate" if engagement_state == "high" else "low"
         recovery = "eligible"
     else:
         fracture = "ineligible"
         band = "none"
-        recovery = "ineligible"
+        recovery = "eligible" if engagement_state == "fluctuating" else "ineligible"
     return {
         "provenance_level": ProvenanceLevel.INTERPRETED.value,
         "fracture_eligibility": fracture,
@@ -211,7 +209,11 @@ class EngagementSynthesizer:
         }
 
 
-def build_live_engagement_snapshot(coordinator: SessionCoordinator) -> dict[str, Any]:
+def build_live_engagement_snapshot(
+    coordinator: SessionCoordinator,
+    *,
+    current_turn_text: str = "",
+) -> dict[str, Any]:
     """Coordinator-private engagement view during ``LIVE_CONVERSATION``.
 
     Uses the same synthesis path as post-lock ``synthesize_engagement()``,
@@ -228,7 +230,18 @@ def build_live_engagement_snapshot(coordinator: SessionCoordinator) -> dict[str,
             "Live engagement snapshot is only available during LIVE_CONVERSATION."
         )
     payload = EngagementSynthesizer(coordinator).synthesize()
+    from ftp.parrot.continuity import dialogue_turns_from_coordinator
+    from ftp.silent_reader.live_relationship import derive_live_relationship_signals
+
+    turns = dialogue_turns_from_coordinator(coordinator)
+    relationship = derive_live_relationship_signals(
+        turns,
+        current_text=current_turn_text,
+    )
+    # Live relationship signals are an internal Director input. They remain
+    # outside Parrot context and are never recorded as a participant profile.
     return {
         **payload,
         "observation_kind": "live_engagement_snapshot",
+        "relationship": relationship,
     }
