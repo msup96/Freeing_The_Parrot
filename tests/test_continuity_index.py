@@ -99,6 +99,30 @@ class TestFractureAndSelfReference:
         assert index["explicit_self_reference"] is not None
         assert index["explicit_self_reference"]["excerpt"] in turns[0].user_text
 
+    def test_prior_question_expires_when_not_the_latest_user_turn(self):
+        turns = [
+            DialogueTurn(1, "Why did you say that?", "What do you mean?"),
+            DialogueTurn(2, "I want to talk about expectations.", "I understand."),
+        ]
+        index = build_session_continuity_index(turns)
+        assert index["prior_question"] is None
+
+    def test_open_thread_only_uses_latest_parrot_question(self):
+        turns = [
+            DialogueTurn(1, "hello", "What do you mean?"),
+            DialogueTurn(2, "I mean the expectations.", "That makes sense."),
+        ]
+        index = build_session_continuity_index(turns)
+        assert index["open_thread"] is None
+
+    def test_latest_parrot_question_can_remain_open(self):
+        turns = [
+            DialogueTurn(1, "hello", "What do you mean?"),
+            DialogueTurn(2, "yes", "Where would you like to begin?"),
+        ]
+        index = build_session_continuity_index(turns)
+        assert index["open_thread"] is not None
+
 
 class TestExcerptBounds:
     def test_excerpts_are_literal_substrings(self):
