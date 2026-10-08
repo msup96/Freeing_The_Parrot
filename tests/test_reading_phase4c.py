@@ -92,6 +92,19 @@ class TestReadingComposer:
         transition_titles = {card["title"] for card in transition["cards"]}
         assert pressure_titles != transition_titles
 
+    def test_lexical_theme_fallback_filters_participant_spoilers(self):
+        deck = _post_session(
+            "confidence telemetry gemini",
+            "confidence telemetry gemini",
+        ).compose_post_session_reading()
+        assert all(
+            word not in deck["theme"]["phrases"]
+            for word in ("CONFIDENCE", "TELEMETRY", "GEMINI")
+        )
+        for card in deck["cards"]:
+            text = f"{card['title']} {card['qualitative_reading']}"
+            assert not contains_spoiler(text)
+
     def test_provenance_integrity(self):
         card = _post_session("aa", "bbbb", "cccccccc").compose_post_session_reading()["cards"][0]
         assert card["provenance_level"] == ProvenanceLevel.INFERRED.value
