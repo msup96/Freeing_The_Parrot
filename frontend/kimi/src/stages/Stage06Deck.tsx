@@ -18,8 +18,10 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
       <div className={`font-mono ${large ? 'text-[11px]' : 'text-[7px] md:text-[8px]'} tracking-[0.3em] text-gold/80 pt-3`}>
         № {String(card.id).padStart(2, '0')}
       </div>
-      <div className={large ? 'px-6 max-h-[72%] overflow-y-auto' : 'px-2'}>
-        <div className={`${large ? 'text-3xl md:text-4xl' : 'text-[14px] leading-[1em]'} text-gold/90 mb-1`}>{card.glyph}</div>
+      <div className={`${large ? 'px-6 max-h-[72%] overflow-y-auto' : 'px-2 py-2'} flex flex-col items-center justify-center gap-2`}>
+        <div className={`${large ? 'text-3xl md:text-4xl' : 'text-[14px] leading-[1em]'} text-gold/90`}>
+          {card.glyph}
+        </div>
         <div
           className={`${large ? 'text-lg md:text-xl' : 'text-[8px] leading-[1em]'} tracking-[0.14em] text-parchment`}
           style={{ fontFamily: 'inherit' }}
@@ -27,13 +29,13 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
           {card.title}
         </div>
         <div
-          className={`mt-1 ${large ? 'text-[9px]' : 'text-[8px]'} tracking-[0.22em] text-gold/70 uppercase leading-[1em]`}
+          className={`${large ? 'text-[9px]' : 'text-[8px]'} tracking-[0.22em] text-gold/70 uppercase leading-[1em] opacity-65`}
           style={{ fontFamily: 'inherit' }}
         >
           TERRITORY · {card.semanticAnchor}
         </div>
         {card.archetype && (
-          <div className={`mt-1 font-mono ${large ? 'text-[10px]' : 'text-[6px]'} tracking-[0.25em] text-gold/60 uppercase`}>
+          <div className={`font-mono ${large ? 'text-[10px]' : 'text-[6px]'} tracking-[0.25em] text-gold/60 uppercase leading-[1em] opacity-65`}>
             {card.archetype}
           </div>
         )}
@@ -46,7 +48,7 @@ function CardFace({ card, large }: { card: DeckCard; large?: boolean }) {
           </>
         )}
       </div>
-      <div className={`pb-3 font-mono ${large ? 'text-[9px]' : 'text-[8px] md:text-[9px]'} tracking-[0.35em] text-parchment-faint/60`}>
+      <div className={`pb-3 font-serif italic ${large ? 'text-[9px]' : 'text-[7px]'} leading-[1em] tracking-[0.28em] text-parchment-faint/45`}>
         THE TWENTY-SEVEN
       </div>
       {/* registration marks */}
