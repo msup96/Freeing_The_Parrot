@@ -96,16 +96,20 @@ class BehaviourDirector:
 
         roll = rng.random if rng is not None else random.random
 
-        if state.understanding_turns < 3:
+        if state.understanding_turns < state.trust_turns:
             behaviour = "understanding"
             intensity = "steady"
             selection_mode = "trust_window"
+            # An occasional mild echo even inside the trust window (human-plausible, not chaotic).
+            if turn_index >= 2 and state.early_slip_chance > 0 and roll() < state.early_slip_chance:
+                behaviour = "mirroring"
         else:
             behaviour, intensity, selection_mode = cls._select_post_trust(
                 substantive_turns=turn_index,
                 last_behaviour=last,
                 eligibility=eligibility,
                 roll=roll,
+                state=state,
             )
 
         directive, directive_basis = cls._select_directive(
@@ -144,6 +148,7 @@ class BehaviourDirector:
         last_behaviour: str | None,
         eligibility: Mapping[str, Any],
         roll,
+        state: DirectorState | None = None,
     ) -> tuple[str, str, str]:
         if eligibility.get("recovery_eligibility") == "eligible" and roll() < 0.55:
             behaviour = cls._pick_without_repeat(list(COHERENT_POOL), last_behaviour, roll)
@@ -159,10 +164,16 @@ class BehaviourDirector:
             behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
             return behaviour, intensity, "fracture"
 
-        instability = min(
-            0.75,
-            0.35 + (max(0, substantive_turns - 4) * 0.08),
-        )
+        base = state.instability_base if state else 0.35
+        ramp = state.instability_ramp if state else 0.08
+        cap = state.instability_cap if state else 0.75
+        jitter = state.instability_jitter if state else 0.0
+        trust = state.trust_turns if state else 3
+        instability = base + (max(0, substantive_turns - (trust + 1)) * ramp)
+        if jitter > 0:
+            # Not monotonic: the machine can settle again, or slip early.
+            instability += (roll() * 2 - 1) * jitter
+        instability = min(cap, max(0.05, instability))
         if roll() >= instability:
             return "understanding", "steady", "understanding"
 
@@ -193,7 +204,7 @@ class BehaviourDirector:
     ) -> None:
         if behaviour not in BEHAVIOUR_NAMES:
             raise ValueError(f"Unknown behaviour {behaviour!r}.")
-        if state.understanding_turns < 3 and behaviour == "understanding":
+        if state.understanding_turns < state.trust_turns and behaviour == "understanding":
             state.understanding_turns += 1
         if selection_mode in {"unstable", "fracture"}:
             state.chaos_count += 1

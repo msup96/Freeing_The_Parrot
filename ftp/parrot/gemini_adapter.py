@@ -45,6 +45,11 @@ CRITICAL CONSTRAINTS:
    - roast: playful, dry, slightly biting observational wit.
    - banana: unexpected surreal intrusion.
 
+VARIATION (critical):
+- You are shown your_recent_replies. Never reuse their wording, openings or sentence shape.
+- Vary length (a few words up to about 40) and rhythm. Do not end every reply with a question.
+- Sound like someone answering in the moment, not a template. Stay in character; every constraint above still applies.
+
 OUTPUT FORMAT:
 You MUST respond with a single valid JSON object containing exactly one key "text":
 {"text": "<your response>"}
@@ -84,6 +89,7 @@ class GeminiParrotAdapter:
             "relational_directive": directive,
             "directive_excerpts": [b.get("excerpt") for b in directive_basis if isinstance(b, dict) and b.get("excerpt")],
             "recent_exchanges": recent[-3:] if recent else [],
+            "your_recent_replies": (request.get("recent_parrot_texts") or [])[-3:],
             "navarasa_primary": nav.get("primary_rasa", "Shanta") if isinstance(nav, dict) else "Shanta",
         }
         if initial_ctx and isinstance(initial_ctx, dict):
@@ -107,7 +113,7 @@ class GeminiParrotAdapter:
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "maxOutputTokens": 300,
-                "temperature": 0.7,
+                "temperature": float(os.environ.get("GEMINI_PARROT_TEMPERATURE", "0.95")),
             },
         }
 
@@ -121,7 +127,7 @@ class GeminiParrotAdapter:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
+            with urllib.request.urlopen(req, timeout=float(os.environ.get("GEMINI_PARROT_TIMEOUT", "5.0"))) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
                 candidates = res.get("candidates") or []
                 if candidates:

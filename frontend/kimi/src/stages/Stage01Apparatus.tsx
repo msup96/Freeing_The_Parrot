@@ -89,10 +89,10 @@ export default function Stage01Apparatus({ onEnter }: { onEnter: () => void }) {
   };
 
   return (
-    <div className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-6">
+    <div className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-6 pt-8 md:pt-0">
       {/* faint silhouette → emergence */}
       <motion.div
-        className="w-[min(78vw,340px)] md:w-[min(38vw,430px)]"
+        className="w-[min(62vw,280px,30dvh)] md:w-[min(38vw,430px)]"
         initial={{ opacity: 0, y: 30, filter: 'brightness(0) blur(6px)' }}
         animate={
           phase >= 2
@@ -125,7 +125,7 @@ export default function Stage01Apparatus({ onEnter }: { onEnter: () => void }) {
 
       {/* ENTER — a physical control */}
       <motion.div
-        className="mt-8 md:mt-10 pb-24"
+        className="mt-6 md:mt-10 pb-10 md:pb-24"
         initial={{ opacity: 0 }}
         animate={phase >= 5 ? { opacity: 1 } : {}}
         transition={transition('SETTLE')}
@@ -139,6 +139,12 @@ export default function Stage01Apparatus({ onEnter }: { onEnter: () => void }) {
         >
           ENTER
         </motion.button>
+
+        <p className="mx-auto mt-8 max-w-[21rem] md:max-w-md text-center font-serif italic text-xs md:text-sm leading-relaxed text-parchment-dim">
+          Freeing the Parrot is an installation about the feeling of being understood by a machine. It borrows Kili
+          Josiyam, where a parrot picks a card to tell a fortune, and replaces the parrot with software. We made it to
+          ask how much of that meaning comes from the system, and how much we bring ourselves.
+        </p>
       </motion.div>
 
       {/* lens flash on press */}
