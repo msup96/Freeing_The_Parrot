@@ -95,7 +95,7 @@ def derive_live_relationship_signals(
 
     trust_delta = 0.0
     if substantive:
-        trust_delta += 0.05
+        trust_delta += 0.09
     if parrot_directed:
         trust_delta += 0.10
     if repair:
