@@ -197,7 +197,7 @@ def _unique_title(index: int, used: set[str], theme: dict[str, Any]) -> str:
     if len(phrases) < 3:
         return TITLE_FRAGMENTS[index - 1]
 
-    p, q, r = phrases[:3]
+    p, q, r = (phrase.title() for phrase in phrases[:3])
     title_templates = (
         "The Question Beneath {p}",
         "The Weight Around {p}",
