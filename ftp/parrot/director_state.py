@@ -34,11 +34,11 @@ class DirectorState:
         """Give this session its own trust-window length and instability curve."""
         roll = rng or random.SystemRandom()
         self.trust_turns = roll.choice((2, 3, 3, 4))
-        self.instability_base = roll.uniform(0.25, 0.5)
-        self.instability_ramp = roll.uniform(0.03, 0.11)
-        self.instability_cap = roll.uniform(0.55, 0.8)
-        self.instability_jitter = roll.uniform(0.1, 0.25)
-        self.early_slip_chance = roll.uniform(0.0, 0.2)
+        self.instability_base = roll.uniform(0.14, 0.26)
+        self.instability_ramp = roll.uniform(0.02, 0.055)
+        self.instability_cap = roll.uniform(0.42, 0.58)
+        self.instability_jitter = roll.uniform(0.04, 0.12)
+        self.early_slip_chance = roll.uniform(0.0, 0.08)
 
     def clear(self) -> None:
         self.understanding_turns = 0
