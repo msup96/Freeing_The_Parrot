@@ -857,6 +857,35 @@ PERCEIVED_UNDERSTANDING = {
 # what the user actually wrote without pretending to understand
 # private psychological facts.
 
+CONVERSATION_CORRECTION_PATTERNS = (
+    "you are repeating",
+    "you are speaking",
+    "you're repeating",
+    "you're speaking",
+    "you keep repeating",
+    "you keep saying the same",
+    "i do not understand",
+    "i don't understand",
+    "i am not able to understand",
+    "i'm not able to understand",
+    "i am not able to follow",
+    "i'm not able to follow",
+    "what are you saying",
+    "what do you mean",
+    "what is that supposed to mean",
+    "that doesn't make sense",
+    "this doesn't make sense",
+    "you are confusing me",
+    "you're confusing me",
+)
+
+CONVERSATION_CORRECTION_LINES = [
+    "You are right. I repeated myself instead of following what you just added.",
+    "That was not useful. I returned to the same point instead of responding to the change in what you said.",
+    "I heard the correction. I was still leaning on an earlier point when I should have followed you forward.",
+    "Yes. I repeated the idea. Let me stay with what you just said instead.",
+]
+
 CONTEXTUAL_UNDERSTANDING = {
 
     "work": [
@@ -1080,13 +1109,22 @@ def choose_perceived_understanding(text, analysis, session):
     Produce one apparently personalised observation.
 
     Priority:
-        1. A contextual cue from the user's actual wording.
-        2. A Navarasa-specific observation.
-        3. A fallback observation.
+        1. An explicit conversational correction from the participant.
+        2. A contextual cue from the user's actual wording.
+        3. A Navarasa-specific observation.
+        4. A fallback observation.
 
     The observation is deliberately broad enough to avoid diagnosis,
     but concrete enough to feel responsive.
     """
+
+    lowered = text.lower()
+    if any(pattern in lowered for pattern in CONVERSATION_CORRECTION_PATTERNS):
+        return choose_random_line(
+            CONVERSATION_CORRECTION_LINES,
+            session,
+            "recent_correction_responses",
+        )
 
     early_response = _early_parrot_response(text, session)
     if early_response:
