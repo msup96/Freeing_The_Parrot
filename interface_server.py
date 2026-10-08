@@ -2033,6 +2033,9 @@ def begin_ftp2_participant_session() -> str:
     session = create_session()
     session_id = session["id"]
     coordinator = SessionCoordinator(session_id=session_id)
+    # Give each live session a private conversational temperament. This changes
+    # when oddness may surface, not what the Parrot is allowed to say.
+    coordinator.director_state.randomize_temperament()
     coordinator.start()
     FTP2_COORDINATORS[session_id] = coordinator
     return session_id
