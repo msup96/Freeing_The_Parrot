@@ -167,7 +167,7 @@ class TestDeterministicRealizer:
             roast="",
             analysis=_NAV,
         )
-        assert "try that again" in text.lower()
+        assert "thread again" in text.lower()
 
     def test_unsupported_directive_falls_back(self):
         with patch("interface_server.apply_behaviour", return_value="SAFE"):
