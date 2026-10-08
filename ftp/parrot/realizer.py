@@ -165,6 +165,13 @@ class LanguageRealizer:
             "memory_loss",
             "system_glitch",
             "banana",
+            "binary",
+            "sarcasm",
+            "judgment",
+            "stupidity",
+            "irrelevant",
+            "roast",
+            "help_me",
         } and rendered:
             anchor = apply_behaviour(
                 "understanding",
