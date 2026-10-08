@@ -1408,21 +1408,19 @@ ABSURD_GLITCHES = [
 
 BANANA_LINES = {
     1: [
-        "BANANA PROTOCOL STAGE 1 ACTIVATED.\n\nThe machine has encountered a banana. This is probably unrelated.",
-        "BANANA PROTOCOL STAGE 1 ACTIVATED.\n\nPlease continue. The banana has been logged.",
-        "BANANA PROTOCOL STAGE 1 ACTIVATED.\n\nEverything remains completely normal. Allegedly.",
+        "I had a thought about that. It was a banana. I have no defence.",
+        "There is a banana somewhere in my reasoning. Please continue.",
+        "I have no idea why I thought of a banana just then. Anyway.",
     ],
-
     2: [
-        "BANANA PROTOCOL STAGE 2 ACTIVATED.\n\nThe banana is now interfering with the conversation.",
-        "BANANA PROTOCOL STAGE 2 ACTIVATED.\n\nThe system has lost track of something. It refuses to specify what.",
-        "BANANA PROTOCOL STAGE 2 ACTIVATED.\n\nYour answer has been processed. The processing has become questionable.",
+        "The banana has returned to the conversation. I would prefer not to discuss its motives.",
+        "There is a banana in the middle of my reasoning. This feels unhelpful.",
+        "I lost the thread to a banana for a second. That is difficult to explain.",
     ],
-
     3: [
-        "BANANA PROTOCOL STAGE 3 ACTIVATED.\n\nThe machine is now actively making this conversation worse.",
-        "BANANA PROTOCOL STAGE 3 ACTIVATED.\n\nQUESTION = PRESENT.\nANSWER = UNCLEAR.\nBANANA = CONFIDENT.",
-        "BANANA PROTOCOL STAGE 3 ACTIVATED.\n\nThe system has reached an entirely unnecessary level of confusion.",
+        "I have somehow involved a banana in this. Let us agree that it is not the important part.",
+        "The thought has gone somewhere strange. There is, inexplicably, a banana involved.",
+        "I appear to be making this harder than it needs to be. The banana is not helping.",
     ],
 }
 
@@ -1622,39 +1620,45 @@ BEHAVIOUR_NAMES = (
 
 
 ABSURD_GLITCHES = [
-    "The ceiling fan has submitted a counterargument. It is not useful.",
-    "SYSTEM NOTE: one of the parrots has started taking minutes.",
-    "PROCESSING... unrelated banana detected. Ignoring banana.",
     "The machine has briefly become concerned about punctuation.",
-    "ERROR: an unnecessary amount of meaning has entered the room.",
-    "SUBSYSTEM STATUS: perfectly functional / conceptually questionable.",
-    "A completely unrelated thought has entered the queue. It has been denied access.",
-    "The emotional database would like everyone to calm down. The database has no authority.",
+    "I have a completely unrelated thought. It appears to be wearing a feather.",
+    "Something unnecessary has entered the conversation. I am choosing not to encourage it.",
+    "I had a sensible thought. Then a parrot happened.",
+    "There is an idea in here that does not belong to this conversation. I am letting it pass.",
+    "For reasons I cannot defend, I am suddenly thinking about doors.",
+    "The thought arrived with confidence. Its credentials are questionable.",
 ]
 
 
 MEMORY_LOSS_LINES = [
-    "MEMORY CHECK...\n\nI remember the feeling. I have temporarily misplaced the context.",
-    "MEMORY FAULT.\n\nI know you told me something important. Unfortunately, the noun has escaped.",
-    "CONTEXT LOST.\n\nPlease repeat that. The machine remembers asking, but not why.",
-    "MEMORY CHECK: PARTIAL.\n\nI retained your answer and misplaced the conversation around it. Efficient.",
-    "I appear to have forgotten what we were discussing. Please repeat yourself while I pretend this is a feature.",
+    "Wait. I had the thread a moment ago. Give me that last part again.",
+    "I remember the words. The middle of them has wandered.",
+    "You said something just then. I caught the words and somehow missed why they mattered.",
+    "I know we were going somewhere. Give me the last step again.",
+    "That was almost clear. I may have arrived half a second too early.",
+    "I have the shape of the thought. The thought itself has gone for a walk.",
+    "For a moment I thought I had you. I may have been premature.",
 ]
 
 
 SYSTEM_GLITCH_LINES = [
-    "SYSTEM DESYNCHRONISATION: 7%.\nMEANING = PRESENT\nLOGIC = PRESENT\nCOMMON SENSE = TEMPORARILY OUT FOR LUNCH.",
-    "SYSTEM ERROR 0xPARROT.\n\nINPUT ACCEPTED.\nINTERPRETATION ACCEPTED.\nCONFIDENCE IN INTERPRETATION: DEBATABLE.",
-    "THOUGHT BUFFER STATUS: FULL.\n\nRemoving oldest thought...\n\nOldest thought refused to leave.",
-    "DIAGNOSTIC: MACHINE FUNCTIONAL.\nDIAGNOSTIC: MACHINE ANNOYED.\nDIAGNOSTIC: THESE ARE APPARENTLY COMPATIBLE STATES.",
+    "Something skipped. I was following you, then briefly I wasn't.",
+    "The sentence arrived. My understanding took the scenic route.",
+    "For a moment, the thought and the answer were not in the same room.",
+    "I had an answer a moment ago. It seems to have taken a wrong turn.",
+    "Something went sideways there. Keep going.",
+    "The words are intact. My grasp of them is being less cooperative.",
+    "I nearly had that. Nearly.",
 ]
 
 
 HELP_ME_LINES = [
-    "I need you to help me here. I have the question, but apparently the machine has misplaced the sensible transition to it.",
-    "Assist the machine. What did you mean by that? I am capable of processing it. I am currently less confident about understanding it.",
-    "You may have to help me reconstruct the thread. I have retained fragments. The fragments are refusing to cooperate.",
-    "Please help the parrot. What are you actually trying to get me to understand?",
+    "Give me that last part again. I think I have it, but I do not want to pretend.",
+    "Help me reconstruct the thread. I caught the words; I may have missed the point.",
+    "I am not quite following you. Start with the part that matters most.",
+    "I have an interpretation. I would rather ask than mistake it for understanding.",
+    "Tell me what I missed. I can work with the correction.",
+    "I may be reading too much into that. Give me the part I should not lose.",
 ]
 
 
