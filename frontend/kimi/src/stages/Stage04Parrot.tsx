@@ -13,7 +13,7 @@ const STATE_GLOW: Record<ParrotState, string> = {
   RESPONDING: 'radial-gradient(circle, rgba(244,236,216,0.9) 0%, rgba(232,163,61,0.3) 45%, transparent 70%)',
   UNCERTAIN: 'radial-gradient(circle, rgba(143,134,114,0.7) 0%, transparent 60%)',
   UNSTABLE: 'radial-gradient(circle, rgba(201,162,39,0.65) 0%, rgba(232,163,61,0.18) 45%, transparent 70%)',
-  GLITCHING: 'radial-gradient(circle, rgba(143,134,114,0.75) 0%, rgba(201,162,39,0.12) 45%, transparent 70%)',
+  GLITCHING: 'radial-gradient(circle, rgba(214,69,69,0.9) 0%, rgba(143,38,38,0.28) 45%, transparent 72%)',
 };
 
 function stateForBehaviour(b: string, responseMode: ChatTurn['responseMode']): ParrotState {

@@ -18,7 +18,7 @@ def test_contextual_question_tracks_topic_and_avoids_exact_reuse():
         roll=0.10,
     )
     assert p1["conversation_move"] == "ask"
-    assert "pattern" in str(p1["question_hint"]).lower()
+    assert "repeats" in str(p1["question_hint"]).lower()
     p2 = choose_conversation_plan(
         "I keep trying to understand the pattern in the other person's behaviour.",
         turn_index=5,
