@@ -976,6 +976,8 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                     "card_id": c["card_id"],
                     "card_index": c["card_index"],
                     "title": c["title"],
+                    "semantic_anchor": c.get("semantic_anchor"),
+                    "semantic_motif": c.get("semantic_motif"),
                     "archetype": c["archetype"],
                     "qualitative_reading": c["qualitative_reading"],
                 }
