@@ -118,8 +118,6 @@ class BehaviourDirector:
             behaviour, intensity, selection_mode = "understanding", "steady", "participant_disengaged"
         elif relationship.get("correction"):
             behaviour, intensity, selection_mode = "understanding", "steady", "repair_priority"
-        elif state.trust_score < 0.62 or turn_index <= state.trust_turns:
-            behaviour, intensity, selection_mode = "understanding", "steady", "trust_building"
         elif relationship.get("previous_fracture"):
             # A rupture is followed by a clean chance to continue. The
             # participant's decision to stay is what increases future risk.
@@ -127,6 +125,8 @@ class BehaviourDirector:
                 list(COHERENT_POOL), last, roll
             )
             intensity, selection_mode = "steady", "recovery"
+        elif state.trust_score < 0.62 or turn_index <= state.trust_turns:
+            behaviour, intensity, selection_mode = "understanding", "steady", "trust_building"
         else:
             probability = state.glitch_probability()
             if roll() < probability:
