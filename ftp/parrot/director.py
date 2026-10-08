@@ -281,23 +281,23 @@ class BehaviourDirector:
             if not relevant:
                 return None, []
 
-        if continuity.get("previous_fracture") and refs:
-            return "repair", refs[:1]
+        if continuity.get("previous_fracture") and relevant:
+            return "repair", relevant[:1]
 
-        if continuity.get("open_thread") and refs:
+        if continuity.get("open_thread") and relevant:
             choice = "expectation" if roll() < 0.5 else "curiosity"
-            return choice, refs[:1]
+            return choice, relevant[:1]
 
-        if continuity.get("prior_question") and refs:
+        if continuity.get("prior_question") and relevant:
             choice = "curiosity" if roll() < 0.5 else "expectation"
-            return choice, refs[:1]
+            return choice, relevant[:1]
 
-        if continuity.get("repeated_phrase") and refs:
+        if continuity.get("repeated_phrase") and relevant:
             choice = "reciprocity" if roll() < 0.5 else "familiarity"
-            return choice, refs[:1]
+            return choice, relevant[:1]
 
-        if continuity.get("topic_overlap") and refs:
-            return "familiarity", refs[:1]
+        if continuity.get("topic_overlap") and relevant:
+            return "familiarity", relevant[:1]
 
         return None, []
 
