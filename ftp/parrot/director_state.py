@@ -39,6 +39,8 @@ class DirectorState:
     suspicion: float = 0.0
     tolerated_ruptures: int = 0
     risk_level: float = 0.0
+    last_directive: str | None = None
+    last_directive_excerpt: str | None = None
 
     def randomize_temperament(self, rng: random.Random | None = None) -> None:
         """Give this session its own trust-window length and instability curve."""
@@ -121,6 +123,8 @@ class DirectorState:
         self.suspicion = 0.0
         self.tolerated_ruptures = 0
         self.risk_level = 0.0
+        self.last_directive = None
+        self.last_directive_excerpt = None
         neutral = DirectorState()
         for name in (
             "trust_turns",
