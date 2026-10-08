@@ -191,3 +191,60 @@ class TestRelationshipContract:
                 turn_text="I am still here.",
                 navarasa_result={**_NAV, "engagement_state": "high"},
             )
+
+
+class TestContinuityPriority:
+    def test_unrelated_current_turn_does_not_retrieve_stale_thread(self):
+        c = _live()
+        c.record_parrot_turn(
+            "I keep thinking about expectations.",
+            "I remember leaving that thread there.",
+        )
+        c.director_state.trust_score = 0.80
+        instruction = _decide(
+            c,
+            2,
+            "Yeah. I am looking for clarity and I came here for guidance.",
+            2,
+        )
+        assert instruction["directive"] is None
+
+    def test_same_familiarity_reference_is_not_repeated_immediately(self):
+        c = _live()
+        c.record_parrot_turn(
+            "I feel defeated and tired.",
+            "You mentioned defeated earlier. I kept that in mind.",
+        )
+        c.director_state.trust_score = 0.80
+
+        first = _decide(
+            c,
+            2,
+            "I still feel defeated by what keeps happening.",
+            2,
+        )
+        second = _decide(
+            c,
+            3,
+            "I still feel defeated by what keeps happening.",
+            3,
+        )
+
+        if first["directive"] == "familiarity":
+            assert second["directive"] != "familiarity"
+
+    def test_current_correction_suppresses_continuity_even_when_overlap_exists(self):
+        c = _live()
+        c.record_parrot_turn(
+            "I feel defeated.",
+            "You mentioned defeated earlier. I kept that in mind.",
+        )
+        c.director_state.trust_score = 0.95
+        instruction = _decide(
+            c,
+            2,
+            "I said defeated already. You are repeating yourself and I do not understand.",
+            4,
+        )
+        assert instruction["directive"] is None
+        assert instruction["behaviour"] == "understanding"
