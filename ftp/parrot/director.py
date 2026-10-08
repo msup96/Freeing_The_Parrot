@@ -130,10 +130,9 @@ class BehaviourDirector:
         else:
             probability = state.glitch_probability()
             if roll() < probability:
-                behaviour = cls._pick_without_repeat(
-                    sorted(UNSTABLE_POOL), last, roll
-                )
                 intensity = state.glitch_intensity()
+                pool = cls._risk_pool(intensity)
+                behaviour = cls._pick_without_repeat(pool, last, roll)
                 selection_mode = "relationship_risk"
             else:
                 behaviour, intensity, selection_mode = (
@@ -214,6 +213,24 @@ class BehaviourDirector:
         pool = sorted(UNSTABLE_POOL)
         behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
         return behaviour, "low", "unstable"
+
+    @staticmethod
+    def _risk_pool(intensity: str) -> list[str]:
+        low = [
+            "absurd",
+            "memory_loss",
+            "system_glitch",
+            "help_me",
+            "irrelevant",
+            "binary",
+        ]
+        moderate = low + ["banana", "sarcasm", "stupidity"]
+        high = moderate + ["roast", "judgment"]
+        if intensity == "high":
+            return high
+        if intensity == "moderate":
+            return moderate
+        return low
 
     @staticmethod
     def _pick_without_repeat(
