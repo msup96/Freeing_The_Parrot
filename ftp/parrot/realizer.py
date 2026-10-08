@@ -284,17 +284,24 @@ def _apply_directive_overlay(
     turn_text: str,
     recent_turn_texts: list[str],
 ) -> str:
+    """Add only a small continuity cue when it genuinely helps.
+
+    The deterministic fallback must never let a continuity directive replace
+    the answer to the current participant turn. Model-backed realization gets
+    the directive as context; the fallback therefore keeps only the safest
+    natural cues.
+    """
     del turn_text, recent_turn_texts
+
     if not directive or directive not in _DIRECTIVE_VALUES or not directive_basis:
         return base
+
     excerpt = str(directive_basis[0].get("excerpt") or "").strip()
     if not excerpt:
         return base
 
     role = str(directive_basis[0].get("role") or "").strip().lower()
 
-    # Continuity references are typed. Never attribute a Parrot utterance to the
-    # participant; that leaks the mechanism and breaks the conversational illusion.
     if directive == "familiarity":
         if role == "parrot":
             prefix = "I remember leaving that thread there."
@@ -305,16 +312,12 @@ def _apply_directive_overlay(
             prefix = f'I said "{excerpt}" earlier. I am still curious about it.'
         else:
             prefix = f'You called it "{excerpt}". I am still curious about that.'
-    elif directive == "curiosity":
-        if role == "parrot":
-            prefix = "I asked you about that earlier. You left it hanging."
-        else:
-            prefix = f"You brought up {excerpt}. What made that the part worth mentioning?"
-    elif directive == "expectation":
-        prefix = "You left that question open. I noticed."
     elif directive == "repair":
         prefix = "There. I have the thread again."
     else:
+        # Curiosity and expectation are semantic instructions for the model
+        # realizer. A deterministic fallback should answer the participant
+        # normally rather than manufacturing a mechanical question.
         return base
 
     combined = f"{prefix} {base}".strip()
