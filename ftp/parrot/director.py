@@ -150,13 +150,17 @@ class BehaviourDirector:
         roll,
         state: DirectorState | None = None,
     ) -> tuple[str, str, str]:
-        if eligibility.get("recovery_eligibility") == "eligible" and roll() < 0.55:
+        # Recovery is deliberately strong. A strange turn should make the
+        # participant want to continue, not teach them to expect another glitch.
+        if eligibility.get("recovery_eligibility") == "eligible" and roll() < 0.88:
             behaviour = cls._pick_without_repeat(list(COHERENT_POOL), last_behaviour, roll)
             return behaviour, "steady", "recovery"
 
+        # Fractures are sparse and never repeat back-to-back.
         if (
             eligibility.get("fracture_eligibility") == "eligible"
-            and roll() < 0.5
+            and last_behaviour not in FRACTURE_POOL
+            and roll() < 0.24
         ):
             band = eligibility.get("fracture_intensity_band") or "moderate"
             intensity = "moderate" if band == "moderate" else "low"
@@ -164,14 +168,15 @@ class BehaviourDirector:
             behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
             return behaviour, intensity, "fracture"
 
-        base = state.instability_base if state else 0.35
-        ramp = state.instability_ramp if state else 0.08
-        cap = state.instability_cap if state else 0.75
+        # Coherence remains the dominant state. Instability is seasoning,
+        # never the conversation's main mode.
+        base = state.instability_base if state else 0.18
+        ramp = state.instability_ramp if state else 0.035
+        cap = state.instability_cap if state else 0.55
         jitter = state.instability_jitter if state else 0.0
         trust = state.trust_turns if state else 3
         instability = base + (max(0, substantive_turns - (trust + 1)) * ramp)
         if jitter > 0:
-            # Not monotonic: the machine can settle again, or slip early.
             instability += (roll() * 2 - 1) * jitter
         instability = min(cap, max(0.05, instability))
         if roll() >= instability:
@@ -179,7 +184,7 @@ class BehaviourDirector:
 
         pool = sorted(UNSTABLE_POOL)
         behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
-        return behaviour, "moderate", "unstable"
+        return behaviour, "low", "unstable"
 
     @staticmethod
     def _pick_without_repeat(
@@ -219,8 +224,12 @@ class BehaviourDirector:
         behaviour: str,
         roll,
     ) -> tuple[str | None, list[dict[str, Any]]]:
-        del behaviour
         refs = list(continuity.get("continuity_refs") or [])
+
+        # A fracture already carries its own interruption. Never stack a
+        # relational directive on top of it.
+        if behaviour in FRACTURE_POOL:
+            return None, []
 
         if continuity.get("previous_fracture") and refs:
             return "repair", refs[:2]
