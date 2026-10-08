@@ -24,7 +24,7 @@ function stateForBehaviour(b: string, responseMode: ChatTurn['responseMode']): P
 
 /** A parrot utterance — text emerges from the machine; behaviour bends the typography */
 function ParrotLine({ turn }: { turn: ChatTurn }) {
-  const b = turn.behaviour;
+  const b = turn.behaviour ?? '';
   const style: React.CSSProperties = {};
   if (b === 'absurd') style.letterSpacing = '0.06em';
   if (b === 'tender') style.fontStyle = 'italic';
