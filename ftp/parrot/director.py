@@ -168,52 +168,6 @@ class BehaviourDirector:
             selection_mode="trust_window",
         )
 
-    @classmethod
-    def _select_post_trust(
-        cls,
-        *,
-        substantive_turns: int,
-        last_behaviour: str | None,
-        eligibility: Mapping[str, Any],
-        roll,
-        state: DirectorState | None = None,
-    ) -> tuple[str, str, str]:
-        # Recovery is deliberately strong. A strange turn should make the
-        # participant want to continue, not teach them to expect another glitch.
-        if eligibility.get("recovery_eligibility") == "eligible" and roll() < 0.88:
-            behaviour = cls._pick_without_repeat(list(COHERENT_POOL), last_behaviour, roll)
-            return behaviour, "steady", "recovery"
-
-        # Fractures are sparse and never repeat back-to-back.
-        if (
-            eligibility.get("fracture_eligibility") == "eligible"
-            and last_behaviour not in FRACTURE_POOL
-            and roll() < 0.24
-        ):
-            band = eligibility.get("fracture_intensity_band") or "moderate"
-            intensity = "moderate" if band == "moderate" else "low"
-            pool = sorted(FRACTURE_POOL)
-            behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
-            return behaviour, intensity, "fracture"
-
-        # Coherence remains the dominant state. Instability is seasoning,
-        # never the conversation's main mode.
-        base = state.instability_base if state else 0.18
-        ramp = state.instability_ramp if state else 0.035
-        cap = state.instability_cap if state else 0.55
-        jitter = state.instability_jitter if state else 0.0
-        trust = state.trust_turns if state else 3
-        instability = base + (max(0, substantive_turns - (trust + 1)) * ramp)
-        if jitter > 0:
-            instability += (roll() * 2 - 1) * jitter
-        instability = min(cap, max(0.05, instability))
-        if roll() >= instability:
-            return "understanding", "steady", "understanding"
-
-        pool = sorted(UNSTABLE_POOL)
-        behaviour = cls._pick_without_repeat(pool, last_behaviour, roll)
-        return behaviour, "low", "unstable"
-
     @staticmethod
     def _risk_pool(intensity: str) -> list[str]:
         low = [
