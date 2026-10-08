@@ -38,7 +38,7 @@ export function Chrome({ stage, broken }: { stage: number; broken?: boolean }) {
     <>
       <MeasurementMarks />
       <motion.header
-        className="fixed top-0 inset-x-0 z-40 flex items-start justify-between px-5 md:px-12 pt-5 md:pt-7 pointer-events-none"
+        className={`fixed top-0 inset-x-0 z-40 ${stage === 1 ? 'hidden md:flex' : 'flex'} items-start justify-between px-5 md:px-12 pt-5 md:pt-7 pointer-events-none`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={transition('REVEAL', 0.4)}
@@ -51,7 +51,7 @@ export function Chrome({ stage, broken }: { stage: number; broken?: boolean }) {
         </div>
       </motion.header>
       <motion.footer
-        className="fixed bottom-0 inset-x-0 z-40 flex items-end justify-between px-5 md:px-12 pb-5 md:pb-7 pointer-events-none"
+        className={`fixed bottom-0 inset-x-0 z-40 ${stage === 1 ? 'hidden md:flex' : 'flex'} items-end justify-between px-5 md:px-12 pb-5 md:pb-7 pointer-events-none`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={transition('REVEAL', 0.6)}

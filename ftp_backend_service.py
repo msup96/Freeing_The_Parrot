@@ -124,6 +124,8 @@ def create_session() -> SessionCoordinator:
             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + SESSION_TTL_SECONDS)),
         )
     coord.start()
+    if os.environ.get("FTP_PARROT_VARIABILITY", "on").strip().lower() != "off":
+        coord.director_state.randomize_temperament()
     SESSIONS[sid] = coord
     SESSION_CREATED_AT[sid] = time.time()
     logger.info("Created new session coordinator: %s", sid)

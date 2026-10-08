@@ -16,6 +16,7 @@ ALLOWED_REQUEST_KEYS = frozenset({
     "turn_index",
     "navarasa_result",
     "recent_turn_texts",
+    "recent_parrot_texts",
     "behaviour",
     "behaviour_family",
     "behaviour_intensity",
@@ -168,6 +169,8 @@ def build_realizer_request(
     """Assemble the bounded realizer input for one live turn."""
     turns = dialogue_turns_from_coordinator(coordinator)
     recent_turn_texts = [turn.user_text for turn in turns[-3:]]
+    # The Parrot's own earlier lines (not Silent Reader data): lets the model avoid repeating itself.
+    recent_parrot_texts = [turn.parrot_reply for turn in turns[-3:] if turn.parrot_reply]
     nav = {
         "primary_rasa": navarasa_result.get("primary_rasa"),
         "rasa_scores": navarasa_result.get("rasa_scores") or {},
@@ -178,6 +181,7 @@ def build_realizer_request(
         "turn_index": turn_index,
         "navarasa_result": nav,
         "recent_turn_texts": recent_turn_texts,
+        "recent_parrot_texts": recent_parrot_texts,
         "behaviour": instruction["behaviour"],
         "behaviour_family": instruction["behaviour_family"],
         "behaviour_intensity": instruction["behaviour_intensity"],

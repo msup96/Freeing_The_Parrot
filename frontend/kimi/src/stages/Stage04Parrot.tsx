@@ -55,6 +55,16 @@ function ParrotLine({ turn }: { turn: ChatTurn }) {
 }
 
 /** Stage 04 + 05 — The Parrot steps out, then becomes strange */
+// The first line varies between sessions so a group of testers does not hear the same opening.
+const OPENING_LINES = [
+  'I read what you left. Go on.',
+  'Right. I have it. Where would you like to start?',
+  'That is a lot to hand over. Tell me more.',
+  'Okay. I am listening. What is the part you keep coming back to?',
+  'I have what you left. Start wherever you like.',
+  'So. That is what you brought. Say more.',
+];
+
 export default function Stage04Parrot({
   turns,
   onTurns,
@@ -92,7 +102,7 @@ export default function Stage04Parrot({
         onTurns([
           {
             role: 'parrot',
-            text: 'I read what you left. Go on.',
+            text: OPENING_LINES[Math.floor(Math.random() * OPENING_LINES.length)],
             behaviour: 'understanding',
           },
         ]);
