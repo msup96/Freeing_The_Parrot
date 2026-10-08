@@ -39,8 +39,8 @@ function ParrotLine({ turn }: { turn: ChatTurn }) {
       <motion.p
         className="whitespace-pre-wrap font-serif text-base md:text-lg leading-relaxed text-parchment"
         style={style}
-        animate={b === 'glitch' ? { x: [0, -2, 3, -1, 0] } : {}}
-        transition={b === 'glitch' ? { duration: 0.3, repeat: 2 } : {}}
+        animate={{}}
+        transition={transition('RESPOND')}
       >
         {turn.text}
       </motion.p>
