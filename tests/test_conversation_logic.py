@@ -98,3 +98,39 @@ def test_deterministic_questioned_response_has_one_question():
         roll=0.21,
     )
     assert count_questions(text) == 1
+
+
+def test_questions_do_not_fire_on_consecutive_turns():
+    first = choose_conversation_plan(
+        "I keep noticing the same pattern.",
+        turn_index=4,
+        behaviour="understanding",
+        last_move="reflect",
+        roll=0.10,
+    )
+    second = choose_conversation_plan(
+        "Yes.",
+        turn_index=5,
+        behaviour="understanding",
+        last_move=first["conversation_move"],
+        recent_questions=[str(first["question_hint"])],
+        roll=0.10,
+    )
+    assert first["conversation_move"] == "ask"
+    assert second["conversation_move"] != "ask"
+
+
+def test_direct_pattern_question_gets_a_substantive_fallback_answer():
+    plan = choose_conversation_plan(
+        "How do I understand a pattern?",
+        turn_index=4,
+        behaviour="understanding",
+    )
+    answer = render_conversation_response(
+        "How do I understand a pattern?",
+        move=plan["conversation_move"],
+        question_hint=plan["question_hint"],
+        roll=0.12,
+    )
+    assert plan["conversation_move"] == "answer"
+    assert "sequence" in answer.lower() or "instances" in answer.lower()

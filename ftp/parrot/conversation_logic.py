@@ -152,12 +152,48 @@ _DEFAULT_REFLECTIONS = (
     "You have given me something concrete to work with. Let us stay with that instead of rushing to a verdict.",
     "That gives the conversation somewhere real to go.",
 )
-_DIRECT_QUESTION_OPENERS = (
-    "Yes. That is something we can actually unpack.",
-    "I can help you work through that, but I do not want to pretend I know the answer before we look at the specifics.",
-    "That deserves a direct answer rather than another prediction.",
-    "Good question. Let us keep it concrete.",
-)
+_DIRECT_QUESTION_ANSWERS = {
+    "pattern": (
+        "Look for a sequence, not a label: what happened, what you did, what followed, and what keeps recurring.",
+        "Write down a few instances side by side. The useful pattern is usually in what stays constant.",
+    ),
+    "relationship": (
+        "Start with one concrete interaction. Separate what they did from what you inferred and what you did next.",
+        "Take one moment at a time. We can distinguish their behaviour from the story your mind built around it.",
+    ),
+    "reaction": (
+        "Catch the few seconds before the reaction: what happened, what you noticed, and the first thing you did.",
+        "Track the sequence before judging the reaction. The gap between trigger and response is useful information.",
+    ),
+    "understanding": (
+        "Separate what you know happened from the story you are building around it. Then we can test each part.",
+        "Start with the concrete facts, then add your interpretation. Mixing the two makes the problem harder to see.",
+    ),
+    "trust": (
+        "Ask what evidence would make you trust that interpretation more — and what would make you change it.",
+        "Give the belief a test: what supports it, what weakens it, and what would count as enough evidence?",
+    ),
+    "choice": (
+        "Name the actual options and what each one costs. Uncertainty becomes easier to hold when it has edges.",
+        "Put the choices on the table without deciding yet. The trade-offs usually become clearer once they are visible.",
+    ),
+    "weight": (
+        "Separate what needs action from what simply needs to be carried for a while.",
+        "Start by deciding which part is actionable today. The rest can stay unresolved for a moment.",
+    ),
+    "change": (
+        "Put the old version and the current version side by side. The gap tells us where to look.",
+        "Name what changed and what did not. That usually tells us more than trying to explain the whole transition at once.",
+    ),
+    "work": (
+        "Pick the concrete problem first; we can leave the larger meaning until after the immediate part is clearer.",
+        "Name the next useful outcome, not the entire mountain. Then we can see what the real obstacle is.",
+    ),
+    "default": (
+        "Start with the specific thing that happened. We can build the larger picture from there.",
+        "Let us keep it concrete first. One example is usually more useful than a theory about all of them.",
+    ),
+}
 
 def response_mode_for_behaviour(behaviour: str | None) -> str:
     return "glitch" if str(behaviour or "") in GLITCH_BEHAVIOURS else "normal"
@@ -219,7 +255,7 @@ def choose_conversation_plan(text: str, *, turn_index: int, behaviour: str,
         move, hint = "repair", None
     elif is_direct_question(text):
         move, hint = DIRECT_MOVE, None
-    elif turn_index >= 3 and roll < 0.55:
+    elif turn_index >= 3 and last_move != QUESTION_MOVE and roll < 0.55:
         hint = select_contextual_question(text, recent_questions=recent_questions)
         move = QUESTION_MOVE if hint else "reflect"
     elif last_move:
@@ -262,7 +298,8 @@ def render_conversation_response(text: str, *, move: str,
         )
         base = options[idx(3)]
     elif move == DIRECT_MOVE:
-        base = _DIRECT_QUESTION_OPENERS[idx(4)]
+        answers = _DIRECT_QUESTION_ANSWERS.get(key, _DIRECT_QUESTION_ANSWERS["default"])
+        base = answers[idx(len(answers))]
     elif move == QUESTION_MOVE:
         refs = _REFLECTIONS.get(key, _DEFAULT_REFLECTIONS)
         base = refs[idx(len(refs))]
