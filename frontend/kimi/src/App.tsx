@@ -98,10 +98,12 @@ export default function App() {
     if (!result.response.trim()) {
       throw new Error('The machine returned an empty reply.');
     }
+    const responseMode: ChatTurn['responseMode'] =
+      result.response_mode === 'glitch' ? 'glitch' : 'normal';
     return {
       text: result.response,
       behaviour: presentationBehaviour(result.parrot_behavior),
-      responseMode: result.response_mode === 'glitch' ? 'glitch' : 'normal',
+      responseMode,
       glitchType: result.glitch_type ?? undefined,
       glitchSeverity: result.glitch_severity ?? undefined,
       closed: Boolean(result.closed),
