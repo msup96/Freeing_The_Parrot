@@ -129,9 +129,24 @@ class BehaviourDirector:
         elif state.trust_score < 0.62 or turn_index <= state.trust_turns:
             behaviour, intensity, selection_mode = "understanding", "steady", "trust_building"
         else:
-            probability = state.glitch_probability()
-            if roll() < probability:
+            # Restore the original FTP experience contract: after the first
+            # three apparent-understanding turns, chaos is genuinely possible
+            # even when the newer relationship estimator remains conservative.
+            # Corrections, disengagement, and one-turn recovery still take priority.
+            instability = min(
+                state.instability_cap,
+                state.instability_base
+                + max(0, turn_index - state.trust_turns - 1) * state.instability_ramp,
+            )
+            if roll() < instability:
                 intensity = state.glitch_intensity()
+                # The older trust score may never cross its threshold in a
+                # normal session. Turn progression therefore also escalates
+                # the available vocabulary without exposing relationship data.
+                if turn_index >= 9 or state.chaos_count >= 2:
+                    intensity = "high"
+                elif turn_index >= 5:
+                    intensity = "moderate"
                 pool = cls._risk_pool(intensity)
                 behaviour = cls._pick_without_repeat(pool, last, roll)
                 selection_mode = "relationship_risk"
@@ -229,9 +244,11 @@ class BehaviourDirector:
             "help_me",
             "irrelevant",
             "binary",
+            "banana",
+            "sarcasm",
         ]
-        moderate = low + ["banana", "sarcasm", "stupidity"]
-        high = moderate + ["roast", "judgment"]
+        moderate = low + ["stupidity", "roast"]
+        high = moderate + ["judgment"]
         if intensity == "high":
             return high
         if intensity == "moderate":

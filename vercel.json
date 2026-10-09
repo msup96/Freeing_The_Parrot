@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ftp2-backend.onrender.com/api/:path*"
+      "destination": "https://freeing-the-parrot-1.onrender.com/api/:path*"
     }
   ]
 }
