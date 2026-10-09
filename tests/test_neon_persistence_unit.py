@@ -220,3 +220,32 @@ def test_hydrated_event_store_continues_after_highest_archived_sequence():
     ))
 
     assert appended.sequence_num == 8
+
+
+def test_approved_archive_removes_raw_text_fields_from_reveal(monkeypatch):
+    connection = FakeConnection([])
+    monkeypatch.setattr(neon_persistence.psycopg, "connect", lambda _url: connection)
+    adapter = neon_persistence.NeonSessionPersistence("postgresql://test")
+
+    adapter.persist_approved_archive(
+        "session-1",
+        "2026-10-09T11:00:00Z",
+        [],
+        {
+            "reveals": {
+                "what_you_gave": "private offering text",
+                "turn_texts": ["private conversation"],
+                "analytical_artifacts": {"evidence_bundle": {"raw": "private"}},
+                "what_was_recorded": "Observed 3 turns",
+                "session_archetype": {"name": "The Quiet Observer"},
+            }
+        },
+        consent_type="SHARE",
+    )
+
+    session_params = connection.statements[0][1]
+    archived_reveal = __import__("json").loads(session_params[6])
+    assert "what_you_gave" not in archived_reveal
+    assert "turn_texts" not in archived_reveal
+    assert "analytical_artifacts" not in archived_reveal
+    assert archived_reveal["what_was_recorded"] == "Observed 3 turns"
