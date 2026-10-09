@@ -38,6 +38,7 @@ _STOPWORDS = frozenset({
 })
 
 _TOPIC_PATTERNS = (
+    ("help", ("how do i deal with this", "how do i handle this", "what should i do", "what do i do", "help me", "practical help", "i need help")),
     ("pattern", ("pattern", "patterns", "behaviour", "behavior", "repeats", "repeat")),
     ("relationship", ("relationship", "relationships", "partner", "person", "people", "used", "loved")),
     ("reaction", ("reaction", "reactions", "respond", "response", "anger", "angry", "withdraw")),
@@ -154,6 +155,10 @@ _DEFAULT_REFLECTIONS = (
     "That gives the conversation somewhere real to go.",
 )
 _DIRECT_QUESTION_ANSWERS = {
+    "help": (
+        "Separate what needs action from what you fear others might think. Choose one concrete next step you can take today; leave the rest until that is done.",
+        "Start with the part you can influence, not the whole situation. Pick one small, useful action for today and let that be enough for now.",
+    ),
     "pattern": (
         "Look for a sequence, not a label: what happened, what you did, what followed, and what keeps recurring.",
         "Write down a few instances side by side. The useful pattern is usually in what stays constant.",
