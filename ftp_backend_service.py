@@ -101,13 +101,9 @@ def purge_expired_sessions(now: float | None = None) -> list[str]:
 def create_session() -> SessionCoordinator:
     purge_expired_sessions()
     sid = f"ftp2_{int(time.time()*1000)}_{os.urandom(8).hex()}"
-    persistence = build_neon_persistence()
-    coord = SessionCoordinator(sid, persistence=persistence)
-    if persistence is not None:
-        persistence.create_session(
-            sid,
-            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + SESSION_TTL_SECONDS)),
-        )
+    # New sessions remain memory-only until the participant explicitly
+    # chooses Memory Chest. Durable persistence is attached after consent.
+    coord = SessionCoordinator(sid, persistence=None)
     coord.start()
     if os.environ.get("FTP_PARROT_VARIABILITY", "on").strip().lower() != "off":
         coord.director_state.randomize_temperament()
@@ -861,26 +857,68 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             elif action == "consent":
-                consent_type = str(body.get("consent_type", "KEEP_PRIVATE")).strip().upper()
-                # Fail closed: do not advance or report success if durable consent
-                # recording fails. A duplicate durable record is idempotent; in
-                # that case the original consent event may already exist.
-                if coord._persistence is not None:
-                    recorded = coord._persistence.record_consent(
-                        sid, consent_type, finalization=True
-                    )
-                    if recorded:
+                requested = str(body.get("consent_type", "KEEP_PRIVATE")).strip().upper()
+                if requested in {"SHARE", "WALL", "MEMORY_CHEST"}:
+                    consent_type = "SHARE"
+                elif requested in {"PRIVATE", "KEEP_PRIVATE"}:
+                    consent_type = "KEEP_PRIVATE"
+                else:
+                    self._send_json({"error": "Unsupported consent choice"}, 400)
+                    return
+
+                persistence = build_neon_persistence()
+                existing_consent = any(
+                    event.event_type == EventType.CONSENT_RECORDED
+                    and str(event.payload.get("consent_type", "")).upper() == consent_type
+                    for event in coord.store.all_events()
+                )
+
+                if consent_type == "KEEP_PRIVATE":
+                    # Remove any legacy durable record before recording the
+                    # private choice; do not persist the private consent event.
+                    if coord._persistence is not None:
+                        coord._persistence.delete_session(sid)
+                        coord.deactivate_persistence()
+                    elif persistence is not None:
+                        # Also erase a durable row if this session was written by
+                        # an older version of the backend before this consent.
+                        persistence.delete_session(sid)
+                    if not existing_consent:
                         coord.record(
                             event_type=EventType.CONSENT_RECORDED,
                             provenance_level=ProvenanceLevel.OBSERVED,
                             payload={"consent_type": consent_type},
                         )
                 else:
-                    coord.record(
-                        event_type=EventType.CONSENT_RECORDED,
-                        provenance_level=ProvenanceLevel.OBSERVED,
-                        payload={"consent_type": consent_type},
-                    )
+                    # Stage the consent event in memory first so the archive
+                    # transaction includes the decision that authorized it.
+                    if not existing_consent:
+                        coord.record(
+                            event_type=EventType.CONSENT_RECORDED,
+                            provenance_level=ProvenanceLevel.OBSERVED,
+                            payload={"consent_type": consent_type},
+                        )
+                    if persistence is not None and coord._persistence is None:
+                        expires_at = time.strftime(
+                            "%Y-%m-%dT%H:%M:%SZ",
+                            time.gmtime(SESSION_CREATED_AT.get(sid, time.time()) + SESSION_TTL_SECONDS),
+                        )
+                        artifacts = {
+                            "offerings": SESSION_OFFERINGS.get(sid),
+                            "multimodal_context": SESSION_MULTIMODAL_CONTEXT.get(sid),
+                            "decks": SESSION_DECKS.get(sid),
+                            "selected": SESSION_SELECTED.get(sid),
+                            "reveals": SESSION_REVEALS.get(sid),
+                            "state": {"lifecycle_state": coord.machine.state.value},
+                        }
+                        persistence.persist_approved_archive(
+                            sid,
+                            expires_at,
+                            list(coord.store.all_events()),
+                            artifacts,
+                            consent_type="SHARE",
+                        )
+                        coord.activate_persistence(persistence)
 
                 if coord.machine.state == SessionState.DATA_WALL_CONSENT:
                     coord.advance(SessionState.OUTPUT_GENERATION)
@@ -889,6 +927,7 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                     "ok": True,
                     "session_id": sid,
                     "lifecycle_state": coord.machine.state.value,
+                    "archived": consent_type == "SHARE" and persistence is not None,
                 })
                 return
 
