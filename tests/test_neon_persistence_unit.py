@@ -168,3 +168,22 @@ def test_event_store_can_remain_memory_only_until_persistence_is_activated():
     assert len(store.all_events()) == 2
     assert len(written) == 1
     assert written[0].payload == {"consent_type": "SHARE"}
+
+
+def test_append_event_never_persists_raw_parrot_turns(monkeypatch):
+    connection = FakeConnection([])
+    monkeypatch.setattr(neon_persistence.psycopg, "connect", lambda _url: connection)
+    adapter = neon_persistence.NeonSessionPersistence("postgresql://test")
+    raw_turn = InteractionEvent(
+        session_id="session-1",
+        event_type=EventType.PARROT_TURN_GENERATED,
+        provenance_level=ProvenanceLevel.OBSERVED,
+        payload={"user_text": "private raw transcript", "parrot_reply": "reply"},
+        sequence_num=2,
+        event_id="event-raw-turn",
+        timestamp="2026-10-09T09:59:00+00:00",
+    )
+
+    adapter.append_event(raw_turn)
+
+    assert connection.statements == []
