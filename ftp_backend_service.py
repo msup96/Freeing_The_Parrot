@@ -1027,12 +1027,25 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
         # 8. POST /api/session-output-reset
         if path == "/api/session-output-reset":
             sid = body.get("session_id")
+            if not sid:
+                self._send_json({"error": "session_id required"}, 400)
+                return
+
+            # A reset is an erasure operation when durable persistence is enabled.
+            # Delete the durable parent first; FK cascades remove events/consents.
+            # If deletion fails, keep in-memory state and return an error rather
+            # than claiming that participant data has been erased.
+            persistence = build_neon_persistence()
+            if persistence is not None:
+                persistence.delete_session(str(sid))
+
             for store in (SESSIONS, SESSION_OFFERINGS, SESSION_MULTIMODAL_CONTEXT,
                           SESSION_DECKS, SESSION_SELECTED, SESSION_REVEALS, SESSION_CREATED_AT):
                 store.pop(sid, None)
             self._send_json({
                 "ok": True,
                 "lifecycle_state": "IDLE_STANDBY",
+                "session_data_deleted": persistence is not None,
             })
             return
 
