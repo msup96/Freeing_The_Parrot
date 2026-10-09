@@ -126,6 +126,18 @@ class LanguageRealizer:
         else:
             deterministic = base if validate_realizer_output(base, instruction, recent_replies) else base[:MAX_REALIZER_TEXT_CHARS]
 
+        # Conversational safety rail: deterministic policy wins for explicit
+        # answer requests and rupture-repair turns. A fluent model response that
+        # ignores the request is still a failed response, so do not let Gemini
+        # override these high-priority moves.
+        move = instruction.get("conversation_move")
+        turn_text = str(request.get("turn_text") or "")
+        from ftp.parrot.conversation_logic import is_correction_or_complaint, is_explicit_help_request
+        if move == "repair" or is_explicit_help_request(turn_text) or (
+            is_correction_or_complaint(turn_text) and move != "answer"
+        ):
+            return deterministic
+
         if cls._adapter is None:
             return deterministic
 
