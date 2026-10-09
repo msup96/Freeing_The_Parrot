@@ -16,9 +16,17 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        ref:
+          - FTP_2.0
+          - test_neon
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -29,6 +37,7 @@ jobs:
       - name: Compile backend and persistence adapter
         run: python -m py_compile ftp_backend_service.py ftp/session/neon_persistence.py ftp/session/coordinator.py ftp/events/store.py
       - name: Run Neon persistence unit tests
+        if: matrix.ref == 'test_neon'
         run: python -m pytest -q tests/test_neon_persistence_unit.py
       - name: Run full test suite
         run: python -m pytest -q
