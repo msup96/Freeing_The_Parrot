@@ -904,8 +904,10 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                             time.gmtime(SESSION_CREATED_AT.get(sid, time.time()) + SESSION_TTL_SECONDS),
                         )
                         artifacts = {
-                            "offerings": SESSION_OFFERINGS.get(sid),
-                            "multimodal_context": SESSION_MULTIMODAL_CONTEXT.get(sid),
+                            # The reveal is the participant-facing Data Showdown
+                            # snapshot. Do not archive raw offerings or multimodal inputs.
+                            "offerings": None,
+                            "multimodal_context": None,
                             "decks": SESSION_DECKS.get(sid),
                             "selected": SESSION_SELECTED.get(sid),
                             "reveals": SESSION_REVEALS.get(sid),
