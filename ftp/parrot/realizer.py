@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 from typing import Any, Mapping, MutableMapping, Protocol
 
@@ -187,7 +188,9 @@ class LanguageRealizer:
         if move not in ALL_MOVES:
             move = "reflect"
         recent_replies = list(instruction.get("recent_parrot_texts") or [])
-        seed = sum(ord(ch) for ch in turn_text) % 1000 / 1000.0
+        # The same topic should not deterministically summon the same line.
+        # Session-local recent-reply validation below remains the anti-repeat guard.
+        seed = random.random()
         natural = render_conversation_response(
             turn_text,
             move=move,
