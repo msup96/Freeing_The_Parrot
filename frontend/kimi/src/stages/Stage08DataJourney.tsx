@@ -681,7 +681,7 @@ export default function Stage08DataJourney({
             transition={transition('REVEAL')}
             className="max-w-4xl mx-auto mt-20 md:mt-28"
           >
-            <div className="font-mono text-[10px] tracking-[0.45em] text-crimson mb-2 uppercase">THE WALL OF FAME</div>
+            <div className="font-mono text-[10px] tracking-[0.45em] text-crimson mb-2 uppercase">THE MEMORY CHEST</div>
             <p className="font-mono text-[11px] text-parchment-faint tracking-[0.15em] mb-8">
               Session materials available for consent. No cross-session specimens are loaded here.
             </p>
@@ -724,7 +724,7 @@ export default function Stage08DataJourney({
             <p className="mt-16 font-mono text-sm md:text-lg tracking-[0.25em] text-parchment leading-relaxed text-balance">
               DO YOU CONSENT YOUR DATA
               <br />
-              TO BE ADDED TO THE WALL OF FAME?
+              TO BE ADDED TO THE MEMORY CHEST?
             </p>
             <p className="mt-5 font-mono text-[11px] tracking-[0.2em] text-parchment-faint leading-loose max-w-xl mx-auto">
               You now know what happened behind the conversation. Therefore this consent has meaning.
@@ -735,7 +735,7 @@ export default function Stage08DataJourney({
                 KEEP PRIVATE
               </button>
               <button className="brass-button px-8 py-4 min-h-[44px] min-w-[220px]" onClick={() => onConsent('wall')}>
-                ADD TO WALL OF FAME
+                ADD TO MEMORY CHEST
               </button>
             </div>
           </motion.div>
