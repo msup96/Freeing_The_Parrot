@@ -236,13 +236,33 @@ def is_direct_question(text: str) -> bool:
     ))
 
 def is_correction_or_complaint(text: str) -> bool:
-    t = str(text or "").lower()
-    return any(x in t for x in (
+    """Detect conversational rupture and explicit requests to stop a failed pattern."""
+    t = " ".join(str(text or "").lower().split())
+    markers = (
         "you are repeating", "you're repeating", "you keep repeating",
         "i do not understand", "i don't understand", "that is not what i said",
         "that's not what i said", "what are you doing", "what is going on",
         "what's going on", "stop doing that", "can we actually talk",
         "real conversation", "you sound like a machine",
+        "i am still waiting for your answer", "i'm still waiting for your answer",
+        "still waiting for your answer", "you keep giving predictions",
+        "you keep giving readings", "without giving me any further readings",
+        "stop giving me readings", "i am beginning to lose my trust",
+        "i'm beginning to lose my trust", "i am losing my trust",
+        "i'm losing my trust", "you are not answering", "you're not answering",
+        "please answer me", "answer the question",
+    )
+    return any(marker in t for marker in markers)
+
+
+def is_explicit_help_request(text: str) -> bool:
+    """Recognise direct requests for practical help, even when phrased as a correction."""
+    t = " ".join(str(text or "").lower().split())
+    return is_direct_question(t) or any(marker in t for marker in (
+        "please answer", "how do i deal with this", "how do i handle this",
+        "what should i do", "what do i do", "i need practical help",
+        "i came to you", "i came here for help", "give me an answer",
+        "still waiting for your answer", "waiting for your answer",
     ))
 
 def topic_key(text: str) -> str:
@@ -277,7 +297,11 @@ def choose_conversation_plan(text: str, *, turn_index: int, behaviour: str,
                              recent_replies: Sequence[str] = (),
                              roll: float = 0.0) -> dict[str, object]:
     del recent_replies
-    if is_correction_or_complaint(text):
+    # A request for an answer must not be swallowed by the repair reflex. The
+    # answer itself repairs the rupture; apology-only replies would repeat it.
+    if is_explicit_help_request(text):
+        move, hint = DIRECT_MOVE, None
+    elif is_correction_or_complaint(text):
         move, hint = "repair", None
     elif is_direct_question(text):
         move, hint = DIRECT_MOVE, None
