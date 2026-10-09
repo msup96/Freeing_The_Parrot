@@ -129,6 +129,16 @@ class SessionCoordinator:
         self._silent_reader = SilentReaderObserver(self)
         self._director_state = DirectorState()
 
+    def activate_persistence(self, persistence) -> None:
+        """Attach durable writes after explicit participant consent."""
+        self._persistence = persistence
+        self._store.set_on_append(persistence.append_event)
+
+    def deactivate_persistence(self) -> None:
+        """Detach durable writes after a private choice or erasure."""
+        self._store.set_on_append(None)
+        self._persistence = None
+
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
