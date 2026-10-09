@@ -41,6 +41,83 @@ class NeonSessionPersistence:
             )
             return cursor.fetchone() is not None
 
+    def persist_approved_archive(
+        self,
+        session_id: str,
+        expires_at: str,
+        events: list[InteractionEvent],
+        artifacts: dict[str, Any],
+        consent_type: str = "SHARE",
+    ) -> None:
+        """Atomically archive a session only after explicit participant consent."""
+        normalized_type = consent_type.strip().upper()
+        if normalized_type not in {"SHARE", "MEMORY_CHEST"}:
+            raise ValueError("Only an explicit SHARE consent can create an archive")
+
+        artifact_columns = {
+            "offerings": artifacts.get("offerings"),
+            "multimodal_context": artifacts.get("multimodal_context"),
+            "decks": artifacts.get("decks"),
+            "selected": artifacts.get("selected"),
+            "reveals": artifacts.get("reveals"),
+            "state": artifacts.get("state"),
+        }
+        with psycopg.connect(self._database_url) as connection:
+            connection.execute(
+                """
+                INSERT INTO ftp_sessions
+                    (session_id, expires_at, offerings, multimodal_context,
+                     decks, selected, reveals, state)
+                VALUES (%s, %s, %s::jsonb, %s::jsonb, %s::jsonb,
+                        %s::jsonb, %s::jsonb, %s::jsonb)
+                ON CONFLICT (session_id) DO UPDATE SET
+                    expires_at = EXCLUDED.expires_at,
+                    offerings = EXCLUDED.offerings,
+                    multimodal_context = EXCLUDED.multimodal_context,
+                    decks = EXCLUDED.decks,
+                    selected = EXCLUDED.selected,
+                    reveals = EXCLUDED.reveals,
+                    state = EXCLUDED.state
+                """,
+                (
+                    session_id,
+                    expires_at,
+                    json.dumps(artifact_columns["offerings"]),
+                    json.dumps(artifact_columns["multimodal_context"]),
+                    json.dumps(artifact_columns["decks"]),
+                    json.dumps(artifact_columns["selected"]),
+                    json.dumps(artifact_columns["reveals"]),
+                    json.dumps(artifact_columns["state"]),
+                ),
+            )
+            for event in events:
+                connection.execute(
+                    """
+                    INSERT INTO ftp_session_events
+                        (session_id, sequence_num, event_id, event_type,
+                         provenance_level, payload, timestamp)
+                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s)
+                    ON CONFLICT DO NOTHING
+                    """,
+                    (
+                        event.session_id,
+                        event.sequence_num,
+                        event.event_id,
+                        event.event_type.value,
+                        event.provenance_level.value,
+                        json.dumps(event.payload),
+                        event.timestamp,
+                    ),
+                )
+            connection.execute(
+                """
+                INSERT INTO ftp_session_consents (session_id, consent_type, consent_key)
+                VALUES (%s, %s, 'FINALIZE:SHARE')
+                ON CONFLICT (session_id, consent_key) DO NOTHING
+                """,
+                (session_id, normalized_type),
+            )
+
     def create_session(self, session_id: str, expires_at: str) -> None:
         with psycopg.connect(self._database_url) as connection:
             connection.execute(
