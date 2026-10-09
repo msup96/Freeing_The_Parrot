@@ -73,7 +73,10 @@ class EventStore:
             )
 
         with self._lock:
-            seq = len(self._events) + 1
+            # After hydration, archived events may intentionally have gaps because raw
+            # events are excluded from durable storage. Continue after the highest
+            # persisted sequence rather than colliding with an existing sequence.
+            seq = max((item.sequence_num for item in self._events), default=0) + 1
             # Frozen dataclass: use object.__setattr__ to stamp sequence.
             # We create a new instance rather than mutate to preserve the
             # immutability contract of the *returned* event object.
