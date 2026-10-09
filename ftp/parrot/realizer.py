@@ -111,7 +111,13 @@ class LanguageRealizer:
             turn_text=str(request["turn_text"]),
             analysis=analysis or {},
         )
-        candidate = _apply_directive_overlay(
+        from ftp.parrot.conversation_logic import is_correction_or_complaint, is_explicit_help_request
+        priority_turn = (
+            is_explicit_help_request(str(request.get("turn_text") or ""))
+            or is_correction_or_complaint(str(request.get("turn_text") or ""))
+        )
+        # Do not prepend stale continuity excerpts to a help request or rupture.
+        candidate = base if priority_turn else _apply_directive_overlay(
             base,
             directive=instruction.get("directive"),
             directive_basis=list(instruction.get("directive_basis") or []),
@@ -132,7 +138,6 @@ class LanguageRealizer:
         # override these high-priority moves.
         move = instruction.get("conversation_move")
         turn_text = str(request.get("turn_text") or "")
-        from ftp.parrot.conversation_logic import is_correction_or_complaint, is_explicit_help_request
         if move == "repair" or is_explicit_help_request(turn_text) or (
             is_correction_or_complaint(turn_text) and move != "answer"
         ):
