@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://ftp2-prof-feedback.onrender.com/api/:path*"
+    }
+  ]
+}
