@@ -20,6 +20,27 @@ class NeonSessionPersistence:
         if not self._database_url:
             raise RuntimeError("DATABASE_URL is required for Neon persistence")
 
+    def purge_expired_sessions(self) -> list[str]:
+        """Delete expired durable sessions and cascade their child records."""
+        with psycopg.connect(self._database_url) as connection:
+            rows = connection.execute(
+                """
+                DELETE FROM ftp_sessions
+                WHERE expires_at <= CURRENT_TIMESTAMP
+                RETURNING session_id
+                """
+            ).fetchall()
+        return [str(row[0]) for row in rows]
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete one durable session; child records are removed by FK cascade."""
+        with psycopg.connect(self._database_url) as connection:
+            cursor = connection.execute(
+                "DELETE FROM ftp_sessions WHERE session_id = %s RETURNING session_id",
+                (session_id,),
+            )
+            return cursor.fetchone() is not None
+
     def create_session(self, session_id: str, expires_at: str) -> None:
         with psycopg.connect(self._database_url) as connection:
             connection.execute(
