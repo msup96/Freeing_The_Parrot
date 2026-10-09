@@ -126,12 +126,12 @@ class BehaviourDirector:
                 list(COHERENT_POOL), last, roll
             )
             intensity, selection_mode = "steady", "recovery"
-        elif state.trust_score < 0.62 or turn_index <= state.trust_turns:
+        elif turn_index <= state.trust_turns:
             behaviour, intensity, selection_mode = "understanding", "steady", "trust_building"
         else:
-            # Restore the original FTP experience contract: after the first
-            # three apparent-understanding turns, chaos is genuinely possible
-            # even when the newer relationship estimator remains conservative.
+            # The trust window is the minimum period of apparent understanding,
+            # not a permanent veto on glitches. After it expires, eligible turns
+            # may fracture even when the conservative relationship score stays low.
             # Corrections, disengagement, and one-turn recovery still take priority.
             instability = min(
                 state.instability_cap,
