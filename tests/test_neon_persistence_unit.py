@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ftp.events.model import EventType, InteractionEvent, ProvenanceLevel
+from ftp.events.store import EventStore
 from ftp.session import neon_persistence
 
 
@@ -140,3 +141,30 @@ def test_approved_archive_rejects_private_consent_before_any_database_write(monk
         )
 
     assert connection.statements == []
+
+
+
+def test_event_store_can_remain_memory_only_until_persistence_is_activated():
+    written = []
+    store = EventStore("session-1")
+    first = InteractionEvent(
+        session_id="session-1",
+        event_type=EventType.SESSION_STARTED,
+        provenance_level=ProvenanceLevel.OBSERVED,
+        payload={"stage": "live"},
+    )
+    store.append(first)
+    assert written == []
+
+    store.set_on_append(written.append)
+    second = InteractionEvent(
+        session_id="session-1",
+        event_type=EventType.CONSENT_RECORDED,
+        provenance_level=ProvenanceLevel.OBSERVED,
+        payload={"consent_type": "SHARE"},
+    )
+    store.append(second)
+
+    assert len(store.all_events()) == 2
+    assert len(written) == 1
+    assert written[0].payload == {"consent_type": "SHARE"}
