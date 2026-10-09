@@ -135,7 +135,7 @@ class GeminiParrotAdapter:
 
         user_content = (
             f"DIRECTOR INSTRUCTION:\n{json.dumps(prompt_payload, indent=2)}\n\n"
-            f"Generate the Parrot's response following the assigned behaviour '{behaviour}'. Answer the participant's current message first, then make only the assigned conversational move. If a question is supplied, use it only when naturally relevant. Output JSON {\"text\": \"...\"} only."
+            f"Generate the Parrot's response following the assigned behaviour '{behaviour}'. Answer the participant's current message first, then make only the assigned conversational move. If a question is supplied, use it only when naturally relevant. Output JSON {{\"text\": \"...\"}} only."
         )
 
         request_body = {
