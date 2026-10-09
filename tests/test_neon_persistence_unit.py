@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from ftp.events.model import EventType, InteractionEvent, ProvenanceLevel
 from ftp.session import neon_persistence
 
 
@@ -77,3 +78,54 @@ def test_build_neon_persistence_requires_database_url_when_enabled(monkeypatch):
 
     with pytest.raises(RuntimeError, match="DATABASE_URL is required"):
         neon_persistence.build_neon_persistence()
+
+
+
+def test_approved_archive_writes_session_events_and_consent_in_one_transaction(monkeypatch):
+    connection = FakeConnection([])
+    monkeypatch.setattr(neon_persistence.psycopg, "connect", lambda _url: connection)
+    adapter = neon_persistence.NeonSessionPersistence("postgresql://test")
+    event = InteractionEvent(
+        session_id="session-1",
+        event_type=EventType.CONSENT_RECORDED,
+        provenance_level=ProvenanceLevel.OBSERVED,
+        payload={"consent_type": "SHARE"},
+        sequence_num=3,
+        event_id="event-consent",
+        timestamp="2026-10-09T10:00:00+00:00",
+    )
+
+    adapter.persist_approved_archive(
+        "session-1",
+        "2026-10-09T11:00:00Z",
+        [event],
+        {"reveals": {"snapshot": "shown-to-participant"}},
+        consent_type="SHARE",
+    )
+
+    assert len(connection.statements) == 3
+    session_sql, session_params = connection.statements[0]
+    event_sql, event_params = connection.statements[1]
+    consent_sql, consent_params = connection.statements[2]
+    assert "INSERT INTO ftp_sessions" in session_sql
+    assert "INSERT INTO ftp_session_events" in event_sql
+    assert "ON CONFLICT DO NOTHING" in event_sql
+    assert "INSERT INTO ftp_session_consents" in consent_sql
+    assert session_params[0] == "session-1"
+    assert event_params[0:5] == (
+        "session-1", 3, "event-consent", "CONSENT_RECORDED", "OBSERVED"
+    )
+    assert consent_params == ("session-1", "SHARE")
+
+
+def test_approved_archive_rejects_private_consent_before_any_database_write(monkeypatch):
+    connection = FakeConnection([])
+    monkeypatch.setattr(neon_persistence.psycopg, "connect", lambda _url: connection)
+    adapter = neon_persistence.NeonSessionPersistence("postgresql://test")
+
+    with pytest.raises(ValueError, match="explicit SHARE consent"):
+        adapter.persist_approved_archive(
+            "session-1", "2026-10-09T11:00:00Z", [], {}, consent_type="KEEP_PRIVATE"
+        )
+
+    assert connection.statements == []
