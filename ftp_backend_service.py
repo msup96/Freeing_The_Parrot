@@ -867,6 +867,13 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                     return
 
                 persistence = build_neon_persistence()
+                if consent_type == "SHARE" and persistence is None:
+                    self._send_json({
+                        "error": "Memory Chest storage is not configured; no data was archived.",
+                        "code": "MEMORY_CHEST_UNAVAILABLE",
+                    }, 503)
+                    return
+
                 existing_consent = any(
                     event.event_type == EventType.CONSENT_RECORDED
                     and str(event.payload.get("consent_type", "")).upper() == consent_type
@@ -898,7 +905,19 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                             provenance_level=ProvenanceLevel.OBSERVED,
                             payload={"consent_type": consent_type},
                         )
-                    if persistence is not None and coord._persistence is None:
+                    if coord._persistence is not None:
+                        # Compatibility for a session hydrated from an older
+                        # durable archive: record the final choice idempotently.
+                        recorded = coord._persistence.record_consent(
+                            sid, "SHARE", finalization=True
+                        )
+                        if recorded and not existing_consent:
+                            coord.record(
+                                event_type=EventType.CONSENT_RECORDED,
+                                provenance_level=ProvenanceLevel.OBSERVED,
+                                payload={"consent_type": "SHARE"},
+                            )
+                    elif persistence is not None:
                         expires_at = time.strftime(
                             "%Y-%m-%dT%H:%M:%SZ",
                             time.gmtime(SESSION_CREATED_AT.get(sid, time.time()) + SESSION_TTL_SECONDS),
