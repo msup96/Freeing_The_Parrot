@@ -14,6 +14,14 @@ import psycopg
 from ftp.events.model import EventType, InteractionEvent, ProvenanceLevel
 
 
+def _safe_reveal_snapshot(reveal: Any) -> Any:
+    """Remove direct input/transcript fields from the durable reveal snapshot."""
+    if not isinstance(reveal, dict):
+        return reveal
+    excluded = {"what_you_gave", "turn_texts", "analytical_artifacts"}
+    return {key: value for key, value in reveal.items() if key not in excluded}
+
+
 class NeonSessionPersistence:
     def __init__(self, database_url: str | None = None) -> None:
         self._database_url = database_url or os.environ.get("DATABASE_URL")
@@ -59,7 +67,7 @@ class NeonSessionPersistence:
             "multimodal_context": artifacts.get("multimodal_context"),
             "decks": artifacts.get("decks"),
             "selected": artifacts.get("selected"),
-            "reveals": artifacts.get("reveals"),
+            "reveals": _safe_reveal_snapshot(artifacts.get("reveals")),
             "state": artifacts.get("state"),
         }
         with psycopg.connect(self._database_url) as connection:
