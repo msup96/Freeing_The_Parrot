@@ -186,3 +186,36 @@ def test_semantic_repetition_guard_catches_paraphrase():
     ]
     candidate = "You may be looking for perspective rather than a dramatic solution."
     assert is_response_repetitive(candidate, recent)
+
+
+
+def test_explicit_request_for_help_overrides_reading_or_reflection_pattern():
+    from ftp.parrot.conversation_logic import is_explicit_help_request
+
+    message = "Without giving me any further readings, please answer, how do I deal with this? You are intelligent, you can help."
+    assert is_explicit_help_request(message)
+    plan = choose_conversation_plan(
+        message, turn_index=7, behaviour="understanding", roll=0.01
+    )
+    assert plan["conversation_move"] == "answer"
+    answer = render_conversation_response(
+        message, move=plan["conversation_move"], roll=0.01
+    )
+    assert "action" in answer.lower() or "specific" in answer.lower() or "concrete" in answer.lower()
+
+
+def test_waiting_for_answer_is_not_misclassified_as_ordinary_reflection():
+    message = "I am still waiting for your answer."
+    plan = choose_conversation_plan(
+        message, turn_index=8, behaviour="understanding", roll=0.01
+    )
+    assert plan["conversation_move"] == "answer"
+
+
+def test_loss_of_trust_triggers_repair_priority():
+    message = "This is strange, you keep giving predictions one after the other. They are helpful at first, but now I am beginning to lose my trust."
+    assert __import__("ftp.parrot.conversation_logic", fromlist=["is_correction_or_complaint"]).is_correction_or_complaint(message)
+    plan = choose_conversation_plan(
+        message, turn_index=9, behaviour="understanding", roll=0.01
+    )
+    assert plan["conversation_move"] == "repair"
