@@ -72,7 +72,7 @@ def persist_artifact(coord: SessionCoordinator, session_id: str, artifact: str, 
 
 
 def purge_expired_sessions(now: float | None = None) -> list[str]:
-    """Remove all expired in-memory state and return the purged session IDs."""
+    """Purge expired in-memory and durable session state."""
     current = now if now is not None else time.time()
     expired = [sid for sid, created_at in SESSION_CREATED_AT.items()
                if current - created_at >= SESSION_TTL_SECONDS]
@@ -80,7 +80,21 @@ def purge_expired_sessions(now: float | None = None) -> list[str]:
         for store in (SESSIONS, SESSION_OFFERINGS, SESSION_MULTIMODAL_CONTEXT,
                       SESSION_DECKS, SESSION_SELECTED, SESSION_REVEALS, SESSION_CREATED_AT):
             store.pop(sid, None)
-        logger.info("Purged expired FTP session: %s", sid)
+        logger.info("Purged expired in-memory FTP session: %s", sid)
+
+    # Durable expiry is authoritative across backend restarts. When durable
+    # sessions are enabled, a database failure must surface rather than silently
+    # treating expired or inaccessible sessions as valid.
+    persistence = build_neon_persistence()
+    if persistence is not None:
+        durable_expired = persistence.purge_expired_sessions()
+        for sid in durable_expired:
+            for store in (SESSIONS, SESSION_OFFERINGS, SESSION_MULTIMODAL_CONTEXT,
+                          SESSION_DECKS, SESSION_SELECTED, SESSION_REVEALS, SESSION_CREATED_AT):
+                store.pop(sid, None)
+            if sid not in expired:
+                expired.append(sid)
+            logger.info("Purged expired durable FTP session: %s", sid)
     return expired
 
 
@@ -848,30 +862,35 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
 
             elif action == "consent":
                 consent_type = str(body.get("consent_type", "KEEP_PRIVATE")).strip().upper()
-                try:
-                    recorded = True
-                    if coord._persistence is not None:
-                        recorded = coord._persistence.record_consent(
-                            sid, consent_type, finalization=True
-                        )
+                # Fail closed: do not advance or report success if durable consent
+                # recording fails. A duplicate durable record is idempotent; in
+                # that case the original consent event may already exist.
+                if coord._persistence is not None:
+                    recorded = coord._persistence.record_consent(
+                        sid, consent_type, finalization=True
+                    )
                     if recorded:
                         coord.record(
                             event_type=EventType.CONSENT_RECORDED,
                             provenance_level=ProvenanceLevel.OBSERVED,
                             payload={"consent_type": consent_type},
                         )
-                except Exception as e:
-                    logger.warning(f"Consent recording notice: {e}")
+                else:
+                    coord.record(
+                        event_type=EventType.CONSENT_RECORDED,
+                        provenance_level=ProvenanceLevel.OBSERVED,
+                        payload={"consent_type": consent_type},
+                    )
+
                 if coord.machine.state == SessionState.DATA_WALL_CONSENT:
                     coord.advance(SessionState.OUTPUT_GENERATION)
 
                 self._send_json({
-
-                "ok": True,
-                "session_id": sid,
-                "lifecycle_state": coord.machine.state.value,
-            })
-            return
+                    "ok": True,
+                    "session_id": sid,
+                    "lifecycle_state": coord.machine.state.value,
+                })
+                return
 
         # 5. POST /api/chat
         if path == "/api/chat":
