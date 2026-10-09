@@ -95,10 +95,19 @@ def test_approved_archive_writes_session_events_and_consent_in_one_transaction(m
         timestamp="2026-10-09T10:00:00+00:00",
     )
 
+    raw_turn = InteractionEvent(
+        session_id="session-1",
+        event_type=EventType.PARROT_TURN_GENERATED,
+        provenance_level=ProvenanceLevel.OBSERVED,
+        payload={"user_text": "private raw transcript", "reply": "parrot reply"},
+        sequence_num=2,
+        event_id="event-raw-turn",
+        timestamp="2026-10-09T09:59:00+00:00",
+    )
     adapter.persist_approved_archive(
         "session-1",
         "2026-10-09T11:00:00Z",
-        [event],
+        [raw_turn, event],
         {"reveals": {"snapshot": "shown-to-participant"}},
         consent_type="SHARE",
     )
@@ -110,6 +119,8 @@ def test_approved_archive_writes_session_events_and_consent_in_one_transaction(m
     assert "INSERT INTO ftp_sessions" in session_sql
     assert "INSERT INTO ftp_session_events" in event_sql
     assert "ON CONFLICT DO NOTHING" in event_sql
+    # The raw conversation event is not written; only the consent/provenance
+    # event is archived by this fixture.
     assert "INSERT INTO ftp_session_consents" in consent_sql
     assert session_params[0] == "session-1"
     assert event_params[0:5] == (
