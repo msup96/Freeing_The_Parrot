@@ -61,6 +61,16 @@ class TestDeterministicRealizer:
     def setup_method(self):
         LanguageRealizer.configure_adapter(None)
 
+    def test_selected_glitch_line_is_preserved_alongside_conversation(self):
+        with patch("interface_server.apply_behaviour", return_value="BANANA PROTOCOL // CONTEXT DISAGREEMENT."):
+            text = LanguageRealizer.realize(
+                _request(behaviour="banana", behaviour_family="banana", conversation_move="reflect"),
+                session=_session(),
+                roast="",
+                analysis=_NAV,
+            )
+        assert "BANANA PROTOCOL" in text
+
     def test_returns_non_empty_text(self):
         text = LanguageRealizer.realize(
             _request(),
