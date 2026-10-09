@@ -183,9 +183,7 @@ class LanguageRealizer:
             "absurd", "memory_loss", "system_glitch", "banana",
             "binary", "sarcasm", "judgment", "stupidity", "irrelevant", "roast",
         }:
-            return f"{natural}
-
-{rendered}".strip() if rendered else natural
+            return f"{natural}\n\n{rendered}".strip() if rendered else natural
         return natural
 
 
