@@ -3,6 +3,7 @@ name: Neon persistence safety tests
 on:
   push:
     branches:
+      - FTP_2.0
       - test_neon
   pull_request:
     branches:
