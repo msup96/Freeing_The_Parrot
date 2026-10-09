@@ -83,6 +83,11 @@ class EventStore:
             self._events.append(stamped)
             return stamped
 
+    def set_on_append(self, callback: Callable[[InteractionEvent], None] | None) -> None:
+        """Enable or disable durable writes without changing in-memory history."""
+        with self._lock:
+            self._on_append = callback
+
     def hydrate(self, events: list[InteractionEvent]) -> None:
         """Load an ordered persisted history without invoking write callbacks."""
         with self._lock:
