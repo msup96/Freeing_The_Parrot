@@ -187,3 +187,36 @@ def test_append_event_never_persists_raw_parrot_turns(monkeypatch):
     adapter.append_event(raw_turn)
 
     assert connection.statements == []
+
+
+def test_hydrated_event_store_continues_after_highest_archived_sequence():
+    store = EventStore("session-1")
+    store.hydrate([
+        InteractionEvent(
+            session_id="session-1",
+            event_type=EventType.SESSION_STARTED,
+            provenance_level=ProvenanceLevel.OBSERVED,
+            payload={"stage": "start"},
+            sequence_num=2,
+            event_id="event-2",
+            timestamp="2026-10-09T09:00:00+00:00",
+        ),
+        InteractionEvent(
+            session_id="session-1",
+            event_type=EventType.CONSENT_RECORDED,
+            provenance_level=ProvenanceLevel.OBSERVED,
+            payload={"consent_type": "SHARE"},
+            sequence_num=7,
+            event_id="event-7",
+            timestamp="2026-10-09T09:01:00+00:00",
+        ),
+    ])
+
+    appended = store.append(InteractionEvent(
+        session_id="session-1",
+        event_type=EventType.SESSION_LOCKED,
+        provenance_level=ProvenanceLevel.OBSERVED,
+        payload={"stage": "locked"},
+    ))
+
+    assert appended.sequence_num == 8
