@@ -147,6 +147,21 @@ class NeonSessionPersistence:
             )
 
     def append_event(self, event: InteractionEvent) -> None:
+        """Persist only approved provenance events, never raw dialogue/input."""
+        archive_event_types = {
+            EventType.SESSION_STARTED,
+            EventType.SESSION_STATE_CHANGED,
+            EventType.SESSION_LOCKED,
+            EventType.TELEMETRY_RECORDED,
+            EventType.NAVARASA_CLASSIFIED,
+            EventType.CARDS_GENERATED,
+            EventType.CARD_RESONANCE_MARKED,
+            EventType.PROFILE_REVEAL_VIEWED,
+            EventType.CONSENT_RECORDED,
+            EventType.RECEIPT_PRINTED,
+        }
+        if event.event_type not in archive_event_types:
+            return
         with psycopg.connect(self._database_url) as connection:
             connection.execute(
                 """
