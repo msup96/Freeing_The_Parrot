@@ -90,7 +90,24 @@ class NeonSessionPersistence:
                     json.dumps(artifact_columns["state"]),
                 ),
             )
+            # Archive only the provenance needed to interpret the Data Showdown.
+            # Raw turn transcripts, original multimodal inputs, and OCR/ASR payloads
+            # are deliberately excluded from the durable event archive.
+            archive_event_types = {
+                EventType.SESSION_STARTED,
+                EventType.SESSION_STATE_CHANGED,
+                EventType.SESSION_LOCKED,
+                EventType.TELEMETRY_RECORDED,
+                EventType.NAVARASA_CLASSIFIED,
+                EventType.CARDS_GENERATED,
+                EventType.CARD_RESONANCE_MARKED,
+                EventType.PROFILE_REVEAL_VIEWED,
+                EventType.CONSENT_RECORDED,
+                EventType.RECEIPT_PRINTED,
+            }
             for event in events:
+                if event.event_type not in archive_event_types:
+                    continue
                 connection.execute(
                     """
                     INSERT INTO ftp_session_events
