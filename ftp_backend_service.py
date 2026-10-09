@@ -866,7 +866,15 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json({"error": "Unsupported consent choice"}, 400)
                     return
 
-                persistence = build_neon_persistence()
+                if coord._persistence is not None:
+                    persistence = coord._persistence
+                else:
+                    try:
+                        persistence = build_neon_persistence()
+                    except RuntimeError:
+                        # A fresh memory-only session can still be kept private
+                        # even if optional durable storage is misconfigured.
+                        persistence = None
                 if consent_type == "SHARE" and persistence is None:
                     self._send_json({
                         "error": "Memory Chest storage is not configured; no data was archived.",
