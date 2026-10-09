@@ -66,14 +66,27 @@ class TestRelationshipContract:
         _decide(c, 2, "Why did you say that? What makes you think that about me?", 2)
         assert c.director_state.trust_score > before > base
 
-    def test_risk_is_impossible_before_trust_threshold(self):
+    def test_first_three_turns_preserve_apparent_understanding(self):
         c = _live()
-        c.director_state.trust_score = 0.50
-        for seed in range(100):
+        c.director_state.trust_score = 0.10
+        for turn in range(1, 4):
             instruction = _decide(
-                c, 8, "I am continuing this conversation and trying to make sense of it.", seed
+                c, turn, "I am continuing this conversation and trying to make sense of it.", turn
             )
-            assert instruction["selection_mode"] != "relationship_risk"
+            assert instruction["selection_mode"] == "trust_building"
+            assert instruction["behaviour"] == "understanding"
+
+    def test_glitches_can_surface_after_trust_window_even_if_score_stays_low(self):
+        modes = []
+        for seed in range(100):
+            trial = _live()
+            trial.director_state.trust_score = 0.10
+            instruction = _decide(
+                trial, 8, "I am continuing this conversation and trying to make sense of it.", seed
+            )
+            modes.append(instruction["selection_mode"])
+        assert "relationship_risk" in modes
+        assert "understanding" in modes
 
     def test_eligible_risk_is_random_not_forced(self):
         c = _live()
