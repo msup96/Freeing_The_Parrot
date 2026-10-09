@@ -897,14 +897,6 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                             payload={"consent_type": consent_type},
                         )
                 else:
-                    # Stage the consent event in memory first so the archive
-                    # transaction includes the decision that authorized it.
-                    if not existing_consent:
-                        coord.record(
-                            event_type=EventType.CONSENT_RECORDED,
-                            provenance_level=ProvenanceLevel.OBSERVED,
-                            payload={"consent_type": consent_type},
-                        )
                     if coord._persistence is not None:
                         # Compatibility for a session hydrated from an older
                         # durable archive: record the final choice idempotently.
@@ -917,7 +909,15 @@ class FtpApiHandler(http.server.BaseHTTPRequestHandler):
                                 provenance_level=ProvenanceLevel.OBSERVED,
                                 payload={"consent_type": "SHARE"},
                             )
-                    elif persistence is not None:
+                    else:
+                        # Stage the consent event in memory first so the new
+                        # archive transaction includes the decision authorizing it.
+                        if not existing_consent:
+                            coord.record(
+                                event_type=EventType.CONSENT_RECORDED,
+                                provenance_level=ProvenanceLevel.OBSERVED,
+                                payload={"consent_type": "SHARE"},
+                            )
                         expires_at = time.strftime(
                             "%Y-%m-%dT%H:%M:%SZ",
                             time.gmtime(SESSION_CREATED_AT.get(sid, time.time()) + SESSION_TTL_SECONDS),
