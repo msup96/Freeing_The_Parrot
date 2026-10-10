@@ -1,0 +1,78 @@
+# FREEING / THE PARROT 2.0
+### An Interactive Research Exhibition
+
+**Who owns the meaning?**
+
+An immersive digital exhibition exploring machine-generated language, human interpretation, and agency in AI-driven systems.
+
+🌐 **[Explore the Presentation Website](https://ftp2-presentation-exhibition.vercel.app/)**
+
+🦜 **[Experience FTP2.0](https://freeingtheparrot2.vercel.app/)**
+
+💻 **[Explore the FTP2.0 Source Code](https://github.com/msup96/Freeing_The_Parrot)**
+
+---
+
+## About the Project
+
+Freeing the Parrot 2.0 is an interactive research and art project that examines the tensions between fluent AI-generated language and the human experience of being understood.
+
+Designed as a dark, glitch-inspired digital exhibition, this website introduces the project's premise, traces its evolution, explains its participant journey, and makes its underlying architecture accessible to both technical and non-technical audiences.
+
+Rather than simply explaining the limitations of AI, the exhibition invites visitors to question how meaning is produced, perceived, and interpreted during human–AI interactions.
+
+## What You'll Discover
+
+- **The Premise** — Why fluent language does not necessarily demonstrate understanding.
+- **The Evolution** — How the original concept developed into FTP2.0.
+- **The Participant Journey** — From entering the experience to reflecting on a post-session reading.
+- **The Architecture** — An interactive exploration of the system's components, with plain-language and technical explanations.
+- **The Reading Cards** — Qualitative prompts designed for reflection, not diagnosis.
+- **Ethics & Governance** — Consent, participant agency, data boundaries, and accountability.
+- **The Bigger Question** — Who gets to define meaning in AI-driven systems?
+
+## Design & Interaction
+
+The presentation combines:
+
+- Dark editorial visuals with crimson accents
+- Glitch-inspired typography
+- A responsive, scrollable chapter structure
+- Interactive architecture explanations
+- Accessible introductions with optional technical depth
+- Direct links to the live application and source code
+
+## Tools & Infrastructure
+
+| Tool | Role |
+|---|---|
+| Kimi | Frontend development workflow |
+| GitHub Codespaces | Cloud-based backend development workflow |
+| v0 | Final build workflow |
+| GitHub | Source control and version history |
+| Vercel | Presentation deployment |
+
+## Ethical Position
+
+FTP2.0 explores how AI-generated interpretations can influence the way people understand themselves and their interactions.
+
+The project foregrounds participant agency: an interpretation should invite reflection, not claim unquestionable authority. Its design principles include meaningful consent, separation between live interaction and post-session interpretation, transparency, and scrutiny of data flows.
+
+These principles are design intentions, not a claim of independent privacy or security certification.
+
+## The Central Question
+
+> When AI systems participate in how we communicate and interpret ourselves, who gets to define the meaning?
+
+**Interpretation is not ownership.**
+
+---
+
+### Project References
+
+- **Presentation:** https://ftp2-presentation-exhibition.vercel.app/
+- **Live application:** https://freeingtheparrot2.vercel.app/
+- **Source repository:** https://github.com/msup96/Freeing_The_Parrot
+- **Locked FTP2.0 reference commit:** [`4d8ba72`](https://github.com/msup96/Freeing_The_Parrot/commit/4d8ba72ab487c3a5862e73989f8688f56135500a)
+
+*An independent presentation website. The FTP2.0 application and its locked final commit remain unchanged.*
