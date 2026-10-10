@@ -52,15 +52,17 @@ export default function App() {
     setStage(next);
   }, []);
 
-  const handleEnter = useCallback(async () => {
+  const handleEnter = useCallback(async (): Promise<boolean> => {
     setError(null);
     try {
       const started = await startSession();
       setSessionId(started.session_id);
       setSession((current: Session) => ({ ...current, sessionId: started.session_id }));
       goTo(2);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The apparatus could not start.');
+      return false;
     }
   }, [goTo]);
 
@@ -195,7 +197,7 @@ export default function App() {
           exit={{ opacity: 0, transition: { duration: stage >= 7 ? 0.12 : 0.5 } }}
           transition={{ duration: stage >= 7 ? 0.12 : 0.7 }}
         >
-          {stage === 1 && <Stage01Apparatus onEnter={() => void handleEnter()} />}
+          {stage === 1 && <Stage01Apparatus onEnter={handleEnter} />}
           {stage === 2 && <Stage02Offering onComplete={(offering) => void handleOffering(offering)} />}
           {stage === 3 && <Stage03HiddenReader offering={session.offering} onComplete={() => goTo(4)} />}
           {stage === 4 && (
