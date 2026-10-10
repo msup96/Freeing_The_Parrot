@@ -70,7 +70,7 @@ export function Apparatus({ intensity = 1, awakened = false, className = '' }: A
 }
 
 /** Stage 01 — APPARATUS. "Something is waiting for me." */
-export default function Stage01Apparatus({ onEnter }: { onEnter: () => void }) {
+export default function Stage01Apparatus({ onEnter }: { onEnter: () => Promise<boolean> }) {
   const [phase, setPhase] = useState(0); // 0 darkness, 1 silhouette, 2 emerged, 3 lens, 4 type, 5 enter
   const [pressing, setPressing] = useState(false);
 
@@ -84,8 +84,15 @@ export default function Stage01Apparatus({ onEnter }: { onEnter: () => void }) {
   const handleEnter = () => {
     if (pressing) return;
     setPressing(true);
-    // the apparatus responds before the screen changes — the lens illuminates
-    window.setTimeout(onEnter, 750);
+    // The lens responds before the screen changes. If session creation fails,
+    // release the control so a mobile participant can retry without refreshing.
+    window.setTimeout(() => {
+      void onEnter().then((started) => {
+        if (!started) setPressing(false);
+      }).catch(() => {
+        setPressing(false);
+      });
+    }, 750);
   };
 
   return (
