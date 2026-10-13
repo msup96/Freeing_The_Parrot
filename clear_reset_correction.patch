@@ -1,0 +1,36 @@
+--- a/ftp/parrot/director_state.py
++++ b/ftp/parrot/director_state.py
+@@ -45,6 +45,17 @@
+         self.chaos_count = 0
+         self.last_behaviour = None
+         self.behaviour_history.clear()
++        # Per-session temperament also returns to the neutral defaults.
++        neutral = DirectorState()
++        for name in (
++            "trust_turns",
++            "instability_base",
++            "instability_ramp",
++            "instability_cap",
++            "instability_jitter",
++            "early_slip_chance",
++        ):
++            setattr(self, name, getattr(neutral, name))
+ 
+     def parrot_session_view(
+         self,
+--- a/tests/test_parrot_variability.py
++++ b/tests/test_parrot_variability.py
+@@ -132,3 +132,13 @@
+     assert "Never reuse their wording" in captured["body"]["systemInstruction"]["parts"][0]["text"]
+     assert captured["timeout"] == 5.0
+     assert captured["body"]["generationConfig"]["temperature"] == 0.95
++
++
++def test_clear_resets_the_per_session_temperament_too():
++    state = DirectorState()
++    state.randomize_temperament(random.Random(5))
++    state.understanding_turns = 2
++
++    state.clear()
++
++    assert state == DirectorState()
