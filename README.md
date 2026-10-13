@@ -164,6 +164,8 @@ FTP2.0 is a working interactive project with a public deployment and source repo
 
 The reference commit identifies the intended final application code. The separate presentation website is independently deployed and does not form part of that application commit.
 
+## IMPORTANT: As you open the live application and click on ENTER, if you do not see anything happening, that is due to a possible python backend lag (Render is propagating it at a slower speed due to Free plan), so do a hard reset [Ctrl + Shift + R] and then click on ENTER - you should see it work! ##
+
 ---
 
 ## The question that remains
