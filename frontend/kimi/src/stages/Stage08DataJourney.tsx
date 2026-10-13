@@ -142,67 +142,6 @@ function Table({ head, body }: { head: string[]; body: React.ReactNode[][] }) {
   );
 }
 
-/** A pinned archival specimen tile on the Wall of Fame */
-function WallTile({
-  index,
-  title,
-  text,
-  archetype,
-  self = false,
-  selfImage,
-}: {
-  index: number;
-  title: string;
-  text: string;
-  archetype?: string;
-  self?: boolean;
-  selfImage?: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 18, rotate: self ? 0 : (index % 3) - 1 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={transition('ARCHIVE', self ? 0.2 : (index % 6) * 0.06)}
-      className={`relative aspect-[3/4] border ${
-        self ? 'border-gold shadow-[0_0_24px_rgba(201,162,39,0.25)]' : 'border-parchment/15'
-      } p-3 flex flex-col justify-between overflow-hidden`}
-      style={{ background: self ? '#141a13' : '#0e0e0d' }}
-    >
-      <div className="flex items-center justify-between">
-        <div className={`font-mono text-[8px] tracking-[0.25em] ${self ? 'text-gold' : 'text-parchment-faint/70'}`}>
-          № {String(index + 1).padStart(3, '0')}
-        </div>
-        {archetype && (
-          <span className="font-mono text-[7px] tracking-[0.15em] text-parchment-faint uppercase">
-            {archetype}
-          </span>
-        )}
-      </div>
-
-      {self && selfImage ? (
-        <img src={selfImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
-      ) : (
-        <div className="my-auto py-1">
-          <p className="font-mono text-[9px] tracking-wider text-gold/90 uppercase line-clamp-1 mb-1 font-semibold">
-            {title}
-          </p>
-          <p className="font-serif italic text-[10px] text-parchment-dim leading-snug line-clamp-4">
-            {text ? `“${text}”` : '— specimen —'}
-          </p>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between border-t border-parchment/10 pt-1.5">
-        <div className={`font-mono text-[8px] tracking-[0.2em] ${self ? 'text-gold' : 'text-parchment-faint/60'}`}>
-          {self ? 'YOUR TRACE' : 'CONSTRUCTED'}
-        </div>
-        <div className={`w-1.5 h-1.5 rounded-full ${self ? 'bg-gold animate-pulse' : 'bg-crimson/60'}`} />
-      </div>
-    </motion.div>
-  );
-}
-
 const PROFILE_FIELDS: Array<[string, string, string]> = [
   ['INPUT', 'input_modality', ''],
   ['TURNS', 'turn_count', ''],
@@ -235,7 +174,6 @@ export default function Stage08DataJourney({
   onConsent: (c: 'private' | 'wall') => void;
 }) {
   const [phase, setPhase] = useState(0); // 0 sections, 1 wall, 2 consent
-  const card = session.selectedCard;
   const reveal = session.reveal;
 
   useEffect(() => {
@@ -247,7 +185,6 @@ export default function Stage08DataJourney({
     };
   }, []);
 
-  const wallSpecimens = reveal?.wall_specimens ?? [];
   const sessionIdShort = session.sessionId ? session.sessionId.slice(-8) : '—';
 
   const art = obj(reveal?.analytical_artifacts);
@@ -317,9 +254,149 @@ export default function Stage08DataJourney({
           <div className="mt-3 text-[9px] text-parchment-faint/70">ONE SESSION · SERVER REVEAL DATA ONLY</div>
         </div>
 
-        <Tier number="01" title="RAW" level="WHAT WAS RECORDED" description="The material that entered this session, before analysis or interpretation.">
+        <Tier number="01" title="CONSTRUCTED" level="WHAT THE SYSTEM ASSEMBLED" description="Readings and machine artifacts constructed from the interaction, not discovered truths.">
+        {/* ——— 08 WHAT THE SYSTEM CONSTRUCTED ——— */}
+        <EvidenceRow label="(a.) WHAT THE SYSTEM CONSTRUCTED" sub="From analysis to qualitative readings.">
+          {readings === 0 ? (
+            'NO READINGS WERE SERIALIZED FOR THIS SESSION.'
+          ) : (
+            <>
+              <p className="mb-3 text-parchment">
+                THE SYSTEM DID NOT DISCOVER {readings} TRUTHS ABOUT YOU. IT CONSTRUCTED {readings} POSSIBLE READINGS FROM THE INTERACTION.
+              </p>
+              <Kv
+                rows={[
+                  ['READINGS CONSTRUCTED', String(readings)],
+                  ['EVIDENCE PASSED TO THE READER', fmt(rows(packet.evidence_items).length)],
+                  ['ELIGIBLE INFERENCES', fmt(rows(packet.eligible_inferences).length)],
+                  ['EVERY READING IS', 'INFERRED · TRACED TO AT LEAST ONE EVIDENCE ITEM AND ONE INFERENCE'],
+                ]}
+              />
+            </>
+          )}
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 09 THE 27 READINGS ——— */}
+        <EvidenceRow label={`(b.) THE ${readings || 27} READINGS`} sub="Machine provenance of each card you were shown. Territory is the card's semantic category.">
+          {readings === 0 ? (
+            NA
+          ) : (
+            <Table
+              head={['№', 'TERRITORY', 'TITLE', 'MOTIF', 'ARCHETYPE', 'EVIDENCE', 'INFERENCE', 'SELECTION']}
+              body={cardRecords.map((c) => {
+                const selectedAt = (pattern?.selected_card_ids ?? []).indexOf(c.card_id);
+                const gold = selectedAt >= 0 ? 'text-gold' : '';
+                return [
+                  <span className={gold}>{pad(c.card_index)}</span>,
+                  <span className={gold}>{fmt(c.semantic_anchor)}</span>,
+                  <span className={gold}>{c.title}</span>,
+                  fmt(c.semantic_motif),
+                  fmt(c.archetype),
+                  (c.provenance?.evidence_ids ?? []).map((id) => evidenceLabel.get(id) ?? id).join(' · ') || '—',
+                  (c.provenance?.inference_ids ?? []).map((id) => inferenceLabel.get(id) ?? id).join(' · ') || '—',
+                  <span className={gold}>{selectedAt >= 0 ? `SELECTED · ${pad(selectedAt + 1)}` : 'NOT SELECTED'}</span>,
+                ];
+              })}
+            />
+          )}
+        </EvidenceRow>
+
+        <Connector />
+
+        </Tier>
+        <Tier number="02" title="SELECTED" level="WHAT YOU CHOSE" description="Your selection and reported resonance are recorded choices, not validation or proof.">
+        {/* ——— 10 WHAT YOU CHOSE ——— */}
+        <EvidenceRow label="(a.) WHAT YOU CHOSE" sub={reveal?.what_you_chose?.disclaimer || 'Selected by you from the cards presented.'}>
+          <Kv
+            rows={[
+              ['CARDS PRESENTED', fmt(pattern?.total_cards_presented ?? (readings || null))],
+              ['CARDS SELECTED', fmt(pattern?.selected_count)],
+              ['YOUR SELECTED TERRITORIES', (pattern?.semantic_anchors ?? []).join(' · ') || NA],
+            ]}
+          />
+          {selectedRecords.length > 0 && (
+            <div className="mt-4">
+              <Table
+                head={['№', 'TERRITORY', 'TITLE']}
+                body={selectedRecords.map((c) => [pad(c.card_index), fmt(c.semantic_anchor), c.title])}
+              />
+            </div>
+          )}
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 11 YOUR SELECTION PATTERN ——— */}
+        <EvidenceRow label="(b.) YOUR SELECTION PATTERN" sub="THE MACHINE RECORDED. A selection is an observation, not proof of who you are.">
+          <Kv
+            rows={[
+              ['SELECTION COUNT', fmt(pattern?.selected_count)],
+              ['SELECTION ORDER', (pattern?.selected_card_indices ?? []).map(pad).join(' → ') || NA],
+              ['SEMANTIC TERRITORIES', (pattern?.semantic_anchors ?? []).join(' · ') || NA],
+              ['READING GROUPS', (pattern?.reading_groups ?? []).length ? (pattern?.reading_groups ?? []).join(' · ') : NA],
+              ['INSPECTION DATA', pattern?.cards_inspected === null || pattern?.cards_inspected === undefined ? 'NOT AVAILABLE IN THIS SESSION' : fmt(pattern.cards_inspected)],
+              ['RESONANCE', 'PARTICIPANT-REPORTED · VALIDATED PROVENANCE · NOT PROOF'],
+            ]}
+          />
+        </EvidenceRow>
+
+        <Connector />
+
+        {/* ——— 12 INTERACTION PROFILE ——— */}
+        <EvidenceRow label="(c.) INTERACTION PROFILE" sub="NOT A PROFILE OF YOU. A profile of this interaction.">
+          {profile ? (
+            <>
+            {reveal?.session_archetype && (
+              <div className="mb-4 border border-gold/30 p-3">
+                <div className="text-[9px] uppercase tracking-[0.18em] text-crimson/80">SESSION ARCHETYPE</div>
+                <div className="mt-1 font-serif text-lg text-gold">{reveal.session_archetype.name}</div>
+                <div className="mt-1 text-[10px] text-parchment-faint">Based on {reveal.session_archetype.basis}. This describes this interaction, not you.</div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {PROFILE_FIELDS.map(([label, key, suffix]) => {
+                const value = profile[key];
+                return (
+                  <div key={key} className="border border-parchment/10 p-2">
+                    <div className="text-[9px] uppercase tracking-[0.12em] text-crimson/80">{label}</div>
+                    <div className="mt-1 break-words text-gold">
+                      {value === null || value === undefined ? NA : `${fmt(value)}${suffix}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            </>
+          ) : (
+            NA
+          )}
+        </EvidenceRow>
+
+        <Connector />
+
+        </Tier>
+        <Tier number="03" title="CANNOT KNOW" level="EXPLICIT LIMITS" description="The boundaries of what this single interaction can support or establish.">
+        {/* ——— 13 WHAT THE SYSTEM CANNOT KNOW ——— */}
+        <EvidenceRow label="(a.) WHAT THE SYSTEM CANNOT KNOW" sub="THIS IS NOT WHO YOU ARE. THIS IS WHAT THIS INTERACTION MADE LEGIBLE.">
+          {reveal?.what_we_cannot_know && reveal.what_we_cannot_know.length > 0 ? (
+            <ul className="space-y-2 text-xs text-parchment-dim">
+              {reveal.what_we_cannot_know.map((lim: string, i: number) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-crimson">✕</span>
+                  <span>{lim}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            'THE SYSTEM DID NOT REPORT ITS LIMITS FOR THIS SESSION.'
+          )}
+        </EvidenceRow>
+        </Tier>
+        <Tier number="04" title="RAW" level="WHAT WAS RECORDED" description="The material that entered this session, before analysis or interpretation.">
         {/* ——— 01 WHAT YOU GAVE ——— */}
-        <EvidenceRow label="01 — WHAT YOU GAVE" sub="Your own input, as it entered the system.">
+        <EvidenceRow label="(a.) WHAT YOU GAVE" sub="Your own input, as it entered the system.">
           <Kv
             rows={[
               ['INPUT MODALITY', (session.offering?.channel ?? reveal?.what_you_gave_channel ?? NA).toString().toUpperCase()],
@@ -347,9 +424,9 @@ export default function Stage08DataJourney({
         <Connector />
 
         </Tier>
-        <Tier number="02" title="OBSERVED" level="WHAT WAS RECORDED" description="Turn-by-turn signals recorded from this interaction, without a claim about who you are.">
+        <Tier number="05" title="OBSERVED" level="WHAT WAS RECORDED" description="Turn-by-turn signals recorded from this interaction, without a claim about who you are.">
         {/* ——— 02 WHAT THE SYSTEM OBSERVED ——— */}
-        <EvidenceRow label="02 — WHAT THE SYSTEM OBSERVED" sub="Turn by turn. Measured from your text and timing; not interpreted.">
+        <EvidenceRow label="(a.) WHAT THE SYSTEM OBSERVED" sub="Turn by turn. Measured from your text and timing; not interpreted.">
           {lingRows.length === 0 ? (
             'NO TURNS WERE RECORDED FOR THIS SESSION.'
           ) : (
@@ -375,9 +452,9 @@ export default function Stage08DataJourney({
         <Connector />
 
         </Tier>
-        <Tier number="03" title="MEASURED" level="WHAT WAS CALCULATED" description="Numerical summaries describe this interaction; they are not a profile of you.">
+        <Tier number="06" title="MEASURED" level="WHAT WAS CALCULATED" description="Numerical summaries describe this interaction; they are not a profile of you.">
         {/* ——— 03 WHAT THE SYSTEM MEASURED ——— */}
-        <EvidenceRow label="03 — WHAT THE SYSTEM MEASURED" sub="Session-wide signals. A measurement describes the interaction, not you.">
+        <EvidenceRow label="(a.) WHAT THE SYSTEM MEASURED" sub="Session-wide signals. A measurement describes the interaction, not you.">
           <Tag>LINGUISTIC</Tag>
           <Kv
             rows={[
@@ -419,9 +496,9 @@ export default function Stage08DataJourney({
         <Connector />
 
         </Tier>
-        <Tier number="05" title="INFERRED" level="WHAT THE SYSTEM INTERPRETED" description="Bounded interpretations are interaction-scoped claims, not facts or diagnoses.">
+        <Tier number="07" title="INFERRED" level="WHAT THE SYSTEM INTERPRETED" description="Bounded interpretations are interaction-scoped claims, not facts or diagnoses.">
         {/* ——— 04 NAVARASA TRAJECTORY ——— */}
-        <EvidenceRow label="04 — NAVARASA TRAJECTORY" sub="Detected emotional vocabulary per turn. A default label is not a detection.">
+        <EvidenceRow label="(a.) NAVARASA TRAJECTORY" sub="Detected emotional vocabulary per turn. A default label is not a detection.">
           {rows(navarasa.turn_sequence).length > 0 && (
             <Table
               head={['TURN', 'SIGNAL', 'WORDS']}
@@ -463,7 +540,7 @@ export default function Stage08DataJourney({
         <Connector />
 
         {/* ——— 05 WHAT THE SYSTEM INTERPRETED ——— */}
-        <EvidenceRow label="05 — WHAT THE SYSTEM INTERPRETED" sub="Labels produced by rules applied to the measurements above. Interaction-scoped.">
+        <EvidenceRow label="(b.) WHAT THE SYSTEM INTERPRETED" sub="Labels produced by rules applied to the measurements above. Interaction-scoped.">
           {interpreted.length === 0
             ? 'NOTHING WAS INTERPRETED. THE EVIDENCE DID NOT SUPPORT IT.'
             : interpreted.map((s) => (
@@ -483,9 +560,9 @@ export default function Stage08DataJourney({
         <Connector />
 
         </Tier>
-        <Tier number="04" title="EVIDENCE" level="WHAT SUPPORTS A CLAIM" description="Observed records that the system used as support, with their event references and limitations.">
+        <Tier number="08" title="EVIDENCE" level="WHAT SUPPORTS A CLAIM" description="Observed records that the system used as support, with their event references and limitations.">
         {/* ——— 06 EVIDENCE ——— */}
-        <EvidenceRow label="06 — EVIDENCE" sub="OBSERVATION → EVIDENCE → INFERENCE. This is how the machine got there.">
+        <EvidenceRow label="(a.) EVIDENCE" sub="OBSERVATION → EVIDENCE → INFERENCE. This is how the machine got there.">
           {signals.length === 0
             ? 'NO EVIDENCE RECORDS WERE RETURNED FOR THIS SESSION.'
             : signals.map((s) => (
@@ -507,7 +584,7 @@ export default function Stage08DataJourney({
         <Connector />
 
         {/* ——— 07 INFERENCE ——— */}
-        <EvidenceRow label="07 — INFERENCE" sub="Bounded claims. Support is within this interaction, not the probability that a claim is true of you.">
+        <EvidenceRow label="(b.) INFERENCE" sub="Bounded claims. Support is within this interaction, not the probability that a claim is true of you.">
           {inferences.length === 0
             ? 'NO INFERENCE RECORDS WERE RETURNED FOR THIS SESSION.'
             : inferences.map((r) => (
@@ -530,182 +607,9 @@ export default function Stage08DataJourney({
         <Connector />
 
         </Tier>
-        <Tier number="06" title="CONSTRUCTED" level="WHAT THE SYSTEM ASSEMBLED" description="Readings and machine artifacts constructed from the interaction, not discovered truths.">
-        {/* ——— 08 WHAT THE SYSTEM CONSTRUCTED ——— */}
-        <EvidenceRow label="08 — WHAT THE SYSTEM CONSTRUCTED" sub="From analysis to qualitative readings.">
-          {readings === 0 ? (
-            'NO READINGS WERE SERIALIZED FOR THIS SESSION.'
-          ) : (
-            <>
-              <p className="mb-3 text-parchment">
-                THE SYSTEM DID NOT DISCOVER {readings} TRUTHS ABOUT YOU. IT CONSTRUCTED {readings} POSSIBLE READINGS FROM THE INTERACTION.
-              </p>
-              <Kv
-                rows={[
-                  ['READINGS CONSTRUCTED', String(readings)],
-                  ['EVIDENCE PASSED TO THE READER', fmt(rows(packet.evidence_items).length)],
-                  ['ELIGIBLE INFERENCES', fmt(rows(packet.eligible_inferences).length)],
-                  ['EVERY READING IS', 'INFERRED · TRACED TO AT LEAST ONE EVIDENCE ITEM AND ONE INFERENCE'],
-                ]}
-              />
-            </>
-          )}
-        </EvidenceRow>
-
-        <Connector />
-
-        {/* ——— 09 THE 27 READINGS ——— */}
-        <EvidenceRow label={`09 — THE ${readings || 27} READINGS`} sub="Machine provenance of each card you were shown. Territory is the card's semantic category.">
-          {readings === 0 ? (
-            NA
-          ) : (
-            <Table
-              head={['№', 'TERRITORY', 'TITLE', 'MOTIF', 'ARCHETYPE', 'EVIDENCE', 'INFERENCE', 'SELECTION']}
-              body={cardRecords.map((c) => {
-                const selectedAt = (pattern?.selected_card_ids ?? []).indexOf(c.card_id);
-                const gold = selectedAt >= 0 ? 'text-gold' : '';
-                return [
-                  <span className={gold}>{pad(c.card_index)}</span>,
-                  <span className={gold}>{fmt(c.semantic_anchor)}</span>,
-                  <span className={gold}>{c.title}</span>,
-                  fmt(c.semantic_motif),
-                  fmt(c.archetype),
-                  (c.provenance?.evidence_ids ?? []).map((id) => evidenceLabel.get(id) ?? id).join(' · ') || '—',
-                  (c.provenance?.inference_ids ?? []).map((id) => inferenceLabel.get(id) ?? id).join(' · ') || '—',
-                  <span className={gold}>{selectedAt >= 0 ? `SELECTED · ${pad(selectedAt + 1)}` : 'NOT SELECTED'}</span>,
-                ];
-              })}
-            />
-          )}
-        </EvidenceRow>
-
-        <Connector />
-
-        </Tier>
-        <Tier number="07" title="SELECTED" level="WHAT YOU CHOSE" description="Your selection and reported resonance are recorded choices, not validation or proof.">
-        {/* ——— 10 WHAT YOU CHOSE ——— */}
-        <EvidenceRow label="10 — WHAT YOU CHOSE" sub={reveal?.what_you_chose?.disclaimer || 'Selected by you from the cards presented.'}>
-          <Kv
-            rows={[
-              ['CARDS PRESENTED', fmt(pattern?.total_cards_presented ?? (readings || null))],
-              ['CARDS SELECTED', fmt(pattern?.selected_count)],
-              ['YOUR SELECTED TERRITORIES', (pattern?.semantic_anchors ?? []).join(' · ') || NA],
-            ]}
-          />
-          {selectedRecords.length > 0 && (
-            <div className="mt-4">
-              <Table
-                head={['№', 'TERRITORY', 'TITLE']}
-                body={selectedRecords.map((c) => [pad(c.card_index), fmt(c.semantic_anchor), c.title])}
-              />
-            </div>
-          )}
-        </EvidenceRow>
-
-        <Connector />
-
-        {/* ——— 11 YOUR SELECTION PATTERN ——— */}
-        <EvidenceRow label="11 — YOUR SELECTION PATTERN" sub="THE MACHINE RECORDED. A selection is an observation, not proof of who you are.">
-          <Kv
-            rows={[
-              ['SELECTION COUNT', fmt(pattern?.selected_count)],
-              ['SELECTION ORDER', (pattern?.selected_card_indices ?? []).map(pad).join(' → ') || NA],
-              ['SEMANTIC TERRITORIES', (pattern?.semantic_anchors ?? []).join(' · ') || NA],
-              ['READING GROUPS', (pattern?.reading_groups ?? []).length ? (pattern?.reading_groups ?? []).join(' · ') : NA],
-              ['INSPECTION DATA', pattern?.cards_inspected === null || pattern?.cards_inspected === undefined ? 'NOT AVAILABLE IN THIS SESSION' : fmt(pattern.cards_inspected)],
-              ['RESONANCE', 'PARTICIPANT-REPORTED · VALIDATED PROVENANCE · NOT PROOF'],
-            ]}
-          />
-        </EvidenceRow>
-
-        <Connector />
-
-        {/* ——— 12 INTERACTION PROFILE ——— */}
-        <EvidenceRow label="12 — INTERACTION PROFILE" sub="NOT A PROFILE OF YOU. A profile of this interaction.">
-          {profile ? (
-            <>
-            {reveal?.session_archetype && (
-              <div className="mb-4 border border-gold/30 p-3">
-                <div className="text-[9px] uppercase tracking-[0.18em] text-crimson/80">SESSION ARCHETYPE</div>
-                <div className="mt-1 font-serif text-lg text-gold">{reveal.session_archetype.name}</div>
-                <div className="mt-1 text-[10px] text-parchment-faint">Based on {reveal.session_archetype.basis}. This describes this interaction, not you.</div>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {PROFILE_FIELDS.map(([label, key, suffix]) => {
-                const value = profile[key];
-                return (
-                  <div key={key} className="border border-parchment/10 p-2">
-                    <div className="text-[9px] uppercase tracking-[0.12em] text-crimson/80">{label}</div>
-                    <div className="mt-1 break-words text-gold">
-                      {value === null || value === undefined ? NA : `${fmt(value)}${suffix}`}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            </>
-          ) : (
-            NA
-          )}
-        </EvidenceRow>
-
-        <Connector />
-
-        </Tier>
-        <Tier number="08" title="CANNOT KNOW" level="EXPLICIT LIMITS" description="The boundaries of what this single interaction can support or establish.">
-        {/* ——— 13 WHAT THE SYSTEM CANNOT KNOW ——— */}
-        <EvidenceRow label="13 — WHAT THE SYSTEM CANNOT KNOW" sub="THIS IS NOT WHO YOU ARE. THIS IS WHAT THIS INTERACTION MADE LEGIBLE.">
-          {reveal?.what_we_cannot_know && reveal.what_we_cannot_know.length > 0 ? (
-            <ul className="space-y-2 text-xs text-parchment-dim">
-              {reveal.what_we_cannot_know.map((lim: string, i: number) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-crimson">✕</span>
-                  <span>{lim}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            'THE SYSTEM DID NOT REPORT ITS LIMITS FOR THIS SESSION.'
-          )}
-        </EvidenceRow>
-        </Tier>
       </div>
 
-      {/* ——— Wall of Fame ——— */}
-      <AnimatePresence>
-        {phase >= 1 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={transition('REVEAL')}
-            className="max-w-4xl mx-auto mt-20 md:mt-28"
-          >
-            <div className="font-mono text-[10px] tracking-[0.45em] text-crimson mb-2 uppercase">THE MEMORY CHEST</div>
-            <p className="font-mono text-[11px] text-parchment-faint tracking-[0.15em] mb-8">
-              Session materials available for consent. No cross-session specimens are loaded here.
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {wallSpecimens.slice(0, 11).map((s: { title: string; qualitative_reading: string; archetype?: string }, i: number) => (
-                <WallTile key={i} index={i} title={s.title} text={s.qualitative_reading} archetype={s.archetype} />
-              ))}
-
-              {/* The participant's material, waiting for a decision */}
-              <WallTile
-                index={26}
-                title={card?.title || 'Your Selected Reading'}
-                text={card?.statement || session.offering?.text || 'Your trace in this session'}
-                archetype={card?.archetype || 'Participant'}
-                self
-                selfImage={session.offering?.imageDataUrl}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ——— 14 CONSENT / PURGE ——— */}
+      {/* ——— CONSENT / PURGE ——— */}
       <AnimatePresence>
         {phase >= 2 && (
           <motion.div
