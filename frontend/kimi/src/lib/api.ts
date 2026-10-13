@@ -14,6 +14,20 @@ function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
+const DIRECT_API_FALLBACK = 'https://ftp2-backend.onrender.com';
+
+async function fetchApi(url: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(url, init);
+  if (response.status !== 404) return response;
+
+  // Recover if the Vercel same-origin API rewrite is missing or stale.
+  const parsed = url.startsWith('http') ? new URL(url) : null;
+  const path = parsed ? `${parsed.pathname}${parsed.search}` : url;
+  if (!path.startsWith('/api/')) return response;
+  const fallback = await fetch(`${DIRECT_API_FALLBACK}${path}`, init);
+  return fallback.status === 404 ? response : fallback;
+}
+
 async function readJson(response: Response): Promise<Json> {
   const data = (await response.json().catch(() => ({}))) as Json;
   if (!response.ok) {
@@ -24,12 +38,12 @@ async function readJson(response: Response): Promise<Json> {
 }
 
 export async function startSession(): Promise<{ session_id: string }> {
-  const data = await readJson(await fetch(apiUrl('/api/session/start'), { method: 'POST' }));
+  const data = await readJson(await fetchApi(apiUrl('/api/session/start'), { method: 'POST' }));
   return { session_id: String(data.session_id) };
 }
 
 export async function submitInitialText(sessionId: string, text: string): Promise<{ analysis_ready: boolean }> {
-  const data = await readJson(await fetch(apiUrl('/api/input/text'), {
+  const data = await readJson(await fetchApi(apiUrl('/api/input/text'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, text }),
@@ -47,7 +61,7 @@ export async function submitInitialMedia(
   // The authoritative backend accepts a normalized JSON ingest contract. The
   // raw media bytes are intentionally not sent to the analytical pipeline;
   // modality and filename are recorded as the participant's input event.
-  const data = await readJson(await fetch(apiUrl('/api/input/ingest'), {
+  const data = await readJson(await fetchApi(apiUrl('/api/input/ingest'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -65,7 +79,7 @@ export async function submitInitialMedia(
 }
 
 export async function completeInput(sessionId: string): Promise<void> {
-  await readJson(await fetch(apiUrl('/api/session-lifecycle'), {
+  await readJson(await fetchApi(apiUrl('/api/session-lifecycle'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, action: 'input_complete' }),
@@ -80,7 +94,7 @@ export async function sendChat(sessionId: string, message: string): Promise<{
   glitch_type?: string | null;
   glitch_severity?: string;
 }> {
-  const data = await readJson(await fetch(apiUrl('/api/chat'), {
+  const data = await readJson(await fetchApi(apiUrl('/api/chat'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, message }),
@@ -106,7 +120,7 @@ export async function endConversation(sessionId: string): Promise<{
     qualitative_reading: string;
   }>;
 }> {
-  const data = await readJson(await fetch(apiUrl('/api/end-conversation'), {
+  const data = await readJson(await fetchApi(apiUrl('/api/end-conversation'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId }),
@@ -140,7 +154,7 @@ export async function advanceLifecycle(
   action: string,
   extra: Record<string, unknown> = {},
 ): Promise<void> {
-  await readJson(await fetch(apiUrl('/api/session-lifecycle'), {
+  await readJson(await fetchApi(apiUrl('/api/session-lifecycle'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, action, ...extra }),
@@ -148,7 +162,7 @@ export async function advanceLifecycle(
 }
 
 export async function getSessionReveal(sessionId: string): Promise<SessionReveal> {
-  const data = await readJson(await fetch(apiUrl(`/api/session-reveal?session_id=${encodeURIComponent(sessionId)}`)));
+  const data = await readJson(await fetchApi(apiUrl(`/api/session-reveal?session_id=${encodeURIComponent(sessionId)}`)));
   if (data.ok === false || !data.reveal) {
     throw new Error(typeof data.error === 'string' ? data.error : 'Reveal retrieval failed.');
   }
@@ -156,7 +170,7 @@ export async function getSessionReveal(sessionId: string): Promise<SessionReveal
 }
 
 export async function generateOutput(sessionId: string): Promise<{ success: boolean; text: string }> {
-  const data = await readJson(await fetch(apiUrl('/api/session-output'), {
+  const data = await readJson(await fetchApi(apiUrl('/api/session-output'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId }),
@@ -171,7 +185,7 @@ export async function generateOutput(sessionId: string): Promise<{ success: bool
 }
 
 export async function resetSession(sessionId: string, consentType: string): Promise<void> {
-  await readJson(await fetch(apiUrl('/api/session-output-reset'), {
+  await readJson(await fetchApi(apiUrl('/api/session-output-reset'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, consent_type: consentType }),
